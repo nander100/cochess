@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.main import create_app
+from tests.auth_helpers import BASE_URL, log_in
 
 
 @pytest.fixture
@@ -21,7 +22,14 @@ def app(settings: Settings) -> FastAPI:
 
 @pytest.fixture
 def client(app: FastAPI) -> TestClient:
-    return TestClient(app)
+    """Logged in as "Owner" (Elo 1350, rapid). Most tests act as one player."""
+    return log_in(app, "Owner")
+
+
+@pytest.fixture
+def anon_client(app: FastAPI) -> TestClient:
+    """No session cookie."""
+    return TestClient(app, base_url=BASE_URL)
 
 
 @pytest.fixture

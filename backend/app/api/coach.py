@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.analysis.engine import EngineResult, EngineResultError
 from app.api import sse
 from app.api.deps import get_app_settings, get_session
+from app.api.scoping import OwnedGame
 from app.coach.chat import (
     ChatLimitError,
     ChatOutcome,
@@ -29,7 +30,6 @@ from app.coach.service import SynopsisResult, generate_synopsis
 from app.config import Settings
 from app.db.chat import count_player_messages
 from app.db.engine_results import load_summary
-from app.db.models import Game
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/games", tags=["coach"])
@@ -62,8 +62,9 @@ class EngineResultSubmission(BaseModel):
 
 @router.post("/{game_id}/synopsis")
 def synopsis(
-    game_id: str, request: Request, session: SessionDep, settings: SettingsDep, client: ClientDep
+    game: OwnedGame, request: Request, session: SessionDep, settings: SettingsDep, client: ClientDep
 ) -> StreamingResponse:
+    game_id = game.id
     _require_summary(session, game_id)
     work = generate_synopsis(client, settings, _sessions(request), game_id)
     return _stream(work, _synopsis_events, settings, game_id)
@@ -71,13 +72,14 @@ def synopsis(
 
 @router.post("/{game_id}/chat")
 def chat(
-    game_id: str,
+    game: OwnedGame,
     body: ChatRequest,
     request: Request,
     session: SessionDep,
     settings: SettingsDep,
     client: ClientDep,
 ) -> StreamingResponse:
+    game_id = game.id
     _require_summary(session, game_id)
     message = body.message.strip()
     limits = settings.coach
@@ -99,13 +101,14 @@ def chat(
 
 @router.post("/{game_id}/chat/engine_result")
 def chat_engine_result(
-    game_id: str,
+    game: OwnedGame,
     body: EngineResultSubmission,
     request: Request,
     session: SessionDep,
     settings: SettingsDep,
     client: ClientDep,
 ) -> StreamingResponse:
+    game_id = game.id
     _require_summary(session, game_id)
     sessions = _sessions(request)
     try:
@@ -121,8 +124,6 @@ def chat_engine_result(
 
 
 def _require_summary(session: Session, game_id: str) -> None:
-    if session.get(Game, game_id) is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Game not found.")
     if load_summary(session, game_id) is None:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Finish the engine analysis first.")
 

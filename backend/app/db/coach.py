@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.coach.client import Usage
-from app.db.models import ChatMessageRow, LlmUsageRow
+from app.db.models import ChatMessageRow, Game, LlmUsageRow
 
 SYNOPSIS = "synopsis"
 
@@ -12,10 +12,13 @@ SYNOPSIS = "synopsis"
 def record_usage(
     session: Session, game_id: str | None, endpoint: str, model: str, usage: Usage
 ) -> None:
+    game = session.get(Game, game_id) if game_id is not None else None
     session.add(
         LlmUsageRow(
             game_id=game_id,
+            user_id=game.user_id if game is not None else None,
             endpoint=endpoint,
+            task=endpoint,  # v1's two endpoints are also the task names (SPEC_V2 §6.1)
             model=model,
             input_tokens=usage.input_tokens,
             output_tokens=usage.output_tokens,

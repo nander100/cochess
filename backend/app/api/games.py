@@ -1,4 +1,4 @@
-"""Game routes (SPEC §9)."""
+"""Game routes (SPEC_V2 §11). Every game belongs to the player who uploaded it."""
 
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
@@ -7,13 +7,18 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.analysis.game_info import played_at, user_result
 from app.analysis.pgn import PgnError, parse_pgn
 from app.api.deps import get_app_settings, get_session
+from app.api.profile import is_complete
 from app.api.schemas import CreateGameRequest, CreateGameResponse, PgnErrorDetail, PgnErrorResponse
+from app.auth.deps import CurrentUser
 from app.config import Settings
 from app.db.models import Game
 
 router = APIRouter(prefix="/api/games", tags=["games"])
+
+PROFILE_FIRST = "Fill in your profile (rating and time control) before analyzing a game."
 
 
 @router.post(
@@ -23,18 +28,13 @@ router = APIRouter(prefix="/api/games", tags=["games"])
 )
 def create_game(
     body: CreateGameRequest,
+    user: CurrentUser,
     session: Annotated[Session, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> CreateGameResponse:
-    cap = settings.limits.max_games_per_day
-    since = datetime.now(UTC) - timedelta(days=1)
-    recent = session.scalar(select(func.count()).where(Game.created_at >= since)) or 0
-    if recent >= cap:
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"CoChess analyzes at most {cap} new games a day while in testing. "
-            "Please try again tomorrow.",
-        )
+    if not is_complete(user) or user.elo is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=PROFILE_FIRST)
+    _check_daily_cap(session, user.id, settings)
     try:
         parsed = parse_pgn(
             body.pgn,
@@ -49,12 +49,18 @@ def create_game(
             status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail.model_dump()
         ) from error
 
+    now = datetime.now(UTC)
     game = Game(
+        user_id=user.id,
         pgn=parsed.pgn,
         user_color=body.user_color,
-        elo=body.elo,
-        playstyle=body.playstyle,
+        elo=user.elo,  # the Elo at analysis time; the profile can change later
+        playstyle=user.playstyle,
         headers=parsed.headers,
+        played_at=played_at(parsed.headers) or now,
+        user_result=user_result(parsed.headers.get("Result"), body.user_color),
+        source="single",
+        created_at=now,
     )
     session.add(game)
     session.commit()
@@ -65,3 +71,23 @@ def create_game(
         final_fen=parsed.final_fen,
         final_is_terminal=parsed.final_is_terminal,
     )
+
+
+def _check_daily_cap(session: Session, user_id: str, settings: Settings) -> None:
+    """New single-game uploads per player per rolling 24 hours (PLAN_V2 §6 Q8)."""
+    cap = settings.limits.max_games_per_day
+    since = datetime.now(UTC) - timedelta(days=1)
+    recent = (
+        session.scalar(
+            select(func.count()).where(
+                Game.user_id == user_id, Game.source == "single", Game.created_at >= since
+            )
+        )
+        or 0
+    )
+    if recent >= cap:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"CoChess analyzes at most {cap} new games a day per player while in "
+            "testing. Please try again tomorrow.",
+        )

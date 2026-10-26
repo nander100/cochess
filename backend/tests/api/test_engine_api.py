@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.db.engine_results import load_summary
-from app.db.models import EngineResultRow
+from app.db.models import EngineResultRow, Game
 from tests.engine_fakes import fake_result
 from tests.pgn_fixtures import read_pgn
 
@@ -12,7 +12,7 @@ OPERA_PLIES = 33
 
 
 def create_game(client: TestClient) -> dict[str, Any]:
-    body = {"pgn": read_pgn("opera_game.pgn"), "user_color": "white", "elo": 1350}
+    body = {"pgn": read_pgn("opera_game.pgn"), "user_color": "white"}
     response = client.post("/api/games", json=body)
     assert response.status_code == 201
     game: dict[str, Any] = response.json()
@@ -71,6 +71,24 @@ def test_scan_then_verify_round_trip(client: TestClient, db_session: Session) ->
     summary = load_summary(db_session, game["game_id"])
     assert summary is not None
     assert len(summary.move_list) == OPERA_PLIES
+
+
+def test_status_moves_through_scanned_to_analyzed_and_results_belong_to_the_player(
+    client: TestClient, db_session: Session
+) -> None:
+    game = create_game(client)
+    row = db_session.get(Game, game["game_id"])
+    assert row is not None and row.status == "uploaded"
+
+    verify_fens = post(client, game, "scan", scan_batch(game)).json()["verify_fens"]
+    db_session.refresh(row)
+    assert row.status == "scanned"
+    post(client, game, "verify", [fake_result(f, "verify", lines=4, plies=10) for f in verify_fens])
+
+    db_session.refresh(row)
+    assert row.status == "analyzed"
+    owners = {result.user_id for result in db_session.query(EngineResultRow).all()}
+    assert owners == {row.user_id} and row.user_id is not None
 
 
 def test_scan_flags_the_users_blunder(client: TestClient) -> None:

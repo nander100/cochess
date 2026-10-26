@@ -9,10 +9,10 @@ from tests.pgn_fixtures import read_pgn
 
 
 def analyzed_game(client: TestClient, pgn_name: str = "opera_game.pgn", elo: int = 1350) -> str:
-    """Create, scan and verify a game; returns its id. The summary is stored afterwards."""
-    response = client.post(
-        "/api/games", json={"pgn": read_pgn(pgn_name), "user_color": "white", "elo": elo}
-    )
+    """Create, scan and verify a game as the logged-in player, after setting their profile Elo
+    (games take it from the profile). Returns the game id; the summary is stored afterwards."""
+    assert client.patch("/api/me", json={"elo": elo}).status_code == 200
+    response = client.post("/api/games", json={"pgn": read_pgn(pgn_name), "user_color": "white"})
     assert response.status_code == 201, response.text
     game: dict[str, Any] = response.json()
     fens = [p["fen_before"] for p in game["positions"]]

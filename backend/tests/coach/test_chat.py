@@ -9,6 +9,7 @@ from app.db.chat import load_messages, tool_results
 from app.db.models import LlmUsageRow, PendingToolCallRow
 from app.main import create_app
 from tests.analysis_flow import analyzed_game
+from tests.auth_helpers import log_in
 from tests.coach.test_synopsis import sse_events
 from tests.coach_fakes import FakeCoachClient, Reply, ToolCall
 from tests.engine_fakes import fake_result
@@ -22,7 +23,7 @@ def setup(
     fake = FakeCoachClient(*replies)
     settings = Settings(_env_file=None, database_url="sqlite://", coach=coach or CoachSettings())
     app = create_app(settings, fake)
-    client = TestClient(app)
+    client = log_in(app, "Owner")
     return client, fake, app, analyzed_game(client)
 
 

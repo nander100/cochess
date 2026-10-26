@@ -98,8 +98,8 @@ class Limits(BaseModel):
 
     max_pgn_chars: int = 100_000
     max_plies: int = 600
-    # New games per rolling 24 hours, for the whole server: v1 testers share one access code
-    # (PLAN Q27).
+    # New single-game uploads per player per rolling 24 hours (PLAN_V2 §6 Q8). Onboarding games
+    # don't count.
     max_games_per_day: int = 10
     max_playstyle_chars: int = 500
 
@@ -118,7 +118,6 @@ class AuthSettings(BaseModel):
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", extra="ignore")
 
-    access_code: str = ""
     anthropic_api_key: str = ""
     # Cost review (option B): Sonnet at low effort writes the synopsis, Haiku handles the chat.
     # Stronger models are a config change away (SPEC §11 v4: user-selectable coach strength).

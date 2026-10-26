@@ -8,11 +8,14 @@ from sqlalchemy.orm import Session
 
 from app.analysis.engine import EngineLine, EngineResult, Tier
 from app.analysis.summary_models import GameSummary
-from app.db.models import EngineResultRow, GameSummaryRow
+from app.db.models import EngineResultRow, Game, GameSummaryRow
 
 
 def save_results(session: Session, game_id: str, results: Sequence[EngineResult]) -> None:
-    """Store results, replacing any earlier result for the same position and tier."""
+    """Store results, replacing any earlier result for the same position and tier. Results are
+    tagged with the game's owner: browser results are never shared across users (SPEC_V2 §4.2)."""
+    game = session.get(Game, game_id)
+    user_id = game.user_id if game is not None else None
     for tier in {result.tier for result in results}:
         fens = [result.fen for result in results if result.tier == tier]
         session.execute(
@@ -25,6 +28,7 @@ def save_results(session: Session, game_id: str, results: Sequence[EngineResult]
     session.add_all(
         EngineResultRow(
             game_id=game_id,
+            user_id=user_id,
             ply=result.ply,
             fen=result.fen,
             tier=result.tier,

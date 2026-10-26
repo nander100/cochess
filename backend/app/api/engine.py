@@ -20,6 +20,8 @@ from app.analysis.summary import build_summary
 from app.analysis.summary_models import UserInfo
 from app.api.deps import get_app_settings, get_session
 from app.api.schemas import EngineResultsRequest, ScanResponse, VerifyResponse
+from app.api.scoping import OwnedGame
+from app.auth.deps import CurrentUser
 from app.config import EngineSettings, Settings
 from app.db.engine_results import load_results, save_results, save_summary
 from app.db.models import Game
@@ -31,25 +33,28 @@ SettingsDep = Annotated[Settings, Depends(get_app_settings)]
 
 
 @router.get("/engine-config")
-def engine_config(settings: SettingsDep) -> EngineSettings:
+def engine_config(_user: CurrentUser, settings: SettingsDep) -> EngineSettings:
     return settings.engine
 
 
 @router.post("/games/{game_id}/engine/scan")
 def submit_scan(
-    game_id: str, body: EngineResultsRequest, session: SessionDep, settings: SettingsDep
+    game: OwnedGame, body: EngineResultsRequest, session: SessionDep, settings: SettingsDep
 ) -> ScanResponse:
-    game, parsed = _load_game(session, settings, game_id)
+    parsed = _parse(game, settings)
     results = _check(body.results, "scan", settings, scan_fens(parsed))
     save_results(session, game.id, results)
+    if game.status == "uploaded":
+        game.status = "scanned"
+        session.commit()
     return ScanResponse(verify_fens=_verify_fens(parsed, game, results, settings))
 
 
 @router.post("/games/{game_id}/engine/verify")
 def submit_verify(
-    game_id: str, body: EngineResultsRequest, session: SessionDep, settings: SettingsDep
+    game: OwnedGame, body: EngineResultsRequest, session: SessionDep, settings: SettingsDep
 ) -> VerifyResponse:
-    game, parsed = _load_game(session, settings, game_id)
+    parsed = _parse(game, settings)
     scan_results = load_results(session, game.id, ["scan"])
     if not scan_results:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Submit the scan results first.")
@@ -61,18 +66,16 @@ def submit_verify(
     all_results = load_results(session, game.id, ["scan", "verify"])
     summary = build_summary(parsed, all_results, user, settings)
     save_summary(session, game.id, summary)
+    game.status = "analyzed"
+    session.commit()
     return VerifyResponse(summary_ready=True, counts=summary.counts, accuracy=summary.accuracy)
 
 
-def _load_game(session: Session, settings: Settings, game_id: str) -> tuple[Game, ParsedGame]:
-    game = session.get(Game, game_id)
-    if game is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Game not found.")
+def _parse(game: Game, settings: Settings) -> ParsedGame:
     # The stored PGN was validated on upload, so re-parsing it can't fail.
-    parsed = parse_pgn(
+    return parse_pgn(
         game.pgn, max_chars=settings.limits.max_pgn_chars, max_plies=settings.limits.max_plies
     )
-    return game, parsed
 
 
 def _check(

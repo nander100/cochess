@@ -13,6 +13,7 @@ from app.config import Settings
 from app.db.models import ChatMessageRow, LlmUsageRow
 from app.main import create_app
 from tests.analysis_flow import analyzed_game
+from tests.auth_helpers import log_in
 from tests.coach_fakes import FakeCoachClient
 
 VALID = "### Overall\nA classic: 13. Rxd7 Rxd7 and 17. Rd8# finished it."
@@ -22,7 +23,7 @@ INVALID = "### Overall\nYou could have played 9. Ka8 or Qh5 instead."
 def make(*replies: str | Exception) -> tuple[TestClient, FakeCoachClient, FastAPI]:
     coach = FakeCoachClient(*replies)
     app = create_app(Settings(_env_file=None, database_url="sqlite://"), coach_client=coach)
-    return TestClient(app), coach, app
+    return log_in(app, "Owner"), coach, app
 
 
 def sse_events(body: str) -> list[tuple[str, dict[str, Any]]]:
