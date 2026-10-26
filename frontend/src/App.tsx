@@ -6,12 +6,15 @@ import {
   runAnalysis,
   statusLabel,
 } from './analysis/pipeline'
+import { type ChatDeps, askCoach } from './analysis/chat'
 import { createApiClient } from './api/client'
 import type { CreateGameRequest, EngineConfig } from './api/types'
+import { ChatPanel } from './components/ChatPanel'
 import { EngineStats } from './components/EngineStats'
 import { GameInput } from './components/GameInput'
 import { ProgressBar } from './components/ProgressBar'
 import { Synopsis, type SynopsisState } from './components/Synopsis'
+import { analyzeAll } from './engine/runner'
 import { type EngineHandle, StockfishEngine } from './engine/StockfishEngine'
 
 type View =
@@ -55,6 +58,18 @@ export default function App({ deps }: AppProps) {
       if (run.outcome.summary_ready) void coach(run.game.game_id)
     } catch (error) {
       setView({ kind: 'error', message: errorText(error) })
+    }
+  }
+
+  /** Chat deep-dives run on the same in-browser engine, with the deep tier's settings. */
+  function chatDeps(run: AnalysisRun): ChatDeps {
+    return {
+      api: pipeline.api,
+      async analyzeDeep(positions) {
+        const engine = await pipeline.getEngine(run.config)
+        const items = positions.map((p) => ({ fen: p.fen, ply: null }))
+        return analyzeAll(engine, items, 'deep', run.config.deep)
+      },
     }
   }
 
@@ -104,7 +119,17 @@ export default function App({ deps }: AppProps) {
         <section className="result" aria-label="Analysis">
           <p>Analysis complete.</p>
           <ResultHeadline run={view.run} />
-          {synopsis && <Synopsis state={synopsis} />}
+          <div className="coach-columns">
+            {synopsis && <Synopsis state={synopsis} />}
+            {synopsis && synopsis.status !== 'writing' && (
+              <ChatPanel
+                key={view.run.game.game_id}
+                ask={(message, onProgress) =>
+                  askCoach(chatDeps(view.run), view.run.game.game_id, message, onProgress)
+                }
+              />
+            )}
+          </div>
           <EngineStats run={view.run} />
         </section>
       )}

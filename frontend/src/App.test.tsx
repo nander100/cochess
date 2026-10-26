@@ -104,3 +104,33 @@ test('no synopsis is requested before the summary is ready', async () => {
   await screen.findByText('Analysis complete.')
   expect(deps.api.streamSynopsis).not.toHaveBeenCalled()
 })
+
+test('after the synopsis, a what-if question runs the deep tier on the engine', async () => {
+  const deps = fakeDeps({
+    submitVerify: vi.fn(async () => ({
+      summary_ready: true,
+      counts: { inaccuracies: 0, mistakes: 0, blunders: 0, missed_mates: 0 },
+      accuracy: { user: 90, opponent: 80 },
+    })),
+    sendChat: vi.fn(async (_g: string, _m: string, emit: (event: CoachEvent) => void) => {
+      emit({ type: 'engine_request', request_id: 'r1', positions: [{ fen: 'fen-1 b', label: 'position' }] })
+    }),
+    submitEngineResult: vi.fn(async (_g: string, _r: string, _res: unknown, emit: (event: CoachEvent) => void) => {
+      emit({ type: 'text', text: 'The engine likes your idea.' })
+      emit({ type: 'done', invalid_moves_removed: [] })
+    }),
+  })
+  render(<App deps={deps} />)
+  submitGame()
+  await screen.findByRole('heading', { name: 'Overall' })
+
+  fireEvent.change(screen.getByLabelText('Your question'), { target: { value: 'What if e5?' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+  expect(await screen.findByText('The engine likes your idea.')).toBeInTheDocument()
+  expect(deps.engine.analyze).toHaveBeenLastCalledWith(
+    { fen: 'fen-1 b', ply: null },
+    'deep',
+    expect.objectContaining({ multipv: 4 }),
+  )
+})

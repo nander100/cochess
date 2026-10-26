@@ -5,6 +5,13 @@ export type CoachEvent =
   | { type: 'text'; text: string }
   | { type: 'done'; invalid_moves_removed: string[] }
   | { type: 'error'; message: string }
+  | { type: 'engine_request'; request_id: string; positions: EnginePositionRequest[] }
+
+/** A position the coach wants the deep-dive engine tier to analyze (SPEC §8.3). */
+export interface EnginePositionRequest {
+  fen: string
+  label: 'position' | 'after_candidate'
+}
 
 /** Read an SSE response body, calling `onEvent` for each recognized event, until it ends. */
 export async function readCoachEvents(
@@ -60,7 +67,18 @@ function toCoachEvent(name: string, payload: unknown): CoachEvent | null {
         : []
       return { type: 'done', invalid_moves_removed: removed }
     }
+    case 'engine_request': {
+      const positions = Array.isArray(record.positions) ? record.positions.filter(isPosition) : []
+      if (typeof record.request_id !== 'string' || positions.length === 0) return null
+      return { type: 'engine_request', request_id: record.request_id, positions }
+    }
     default:
       return null
   }
+}
+
+function isPosition(value: unknown): value is EnginePositionRequest {
+  if (typeof value !== 'object' || value === null) return false
+  const { fen, label } = value as Record<string, unknown>
+  return typeof fen === 'string' && (label === 'position' || label === 'after_candidate')
 }

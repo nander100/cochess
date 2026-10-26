@@ -26,6 +26,14 @@ export interface ApiClient {
   submitVerify(gameId: string, results: EngineResult[]): Promise<VerifyResponse>
   /** Resolves when the stream ends; coach failures arrive as an `error` event. */
   streamSynopsis(gameId: string, onEvent: (event: CoachEvent) => void): Promise<void>
+  sendChat(gameId: string, message: string, onEvent: (event: CoachEvent) => void): Promise<void>
+  /** Answer a coach `engine_request` with deep-dive results; the answer streams back. */
+  submitEngineResult(
+    gameId: string,
+    requestId: string,
+    results: EngineResult[],
+    onEvent: (event: CoachEvent) => void,
+  ): Promise<void>
 }
 
 export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)): ApiClient {
@@ -52,6 +60,18 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
     return (await response.json()) as T
   }
 
+  async function stream(
+    path: string,
+    body: unknown,
+    onEvent: (event: CoachEvent) => void,
+  ): Promise<void> {
+    const init: RequestInit = { method: 'POST' }
+    if (body !== null) init.body = JSON.stringify(body)
+    const response = await send(path, init)
+    if (!response.body) throw new ApiError(response.status, 'The coach sent an empty response.')
+    await readCoachEvents(response.body, onEvent)
+  }
+
   const post = <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'POST', body: JSON.stringify(body) })
 
@@ -60,11 +80,11 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
     engineConfig: () => request('/api/engine-config'),
     submitScan: (gameId, results) => post(`/api/games/${gameId}/engine/scan`, { results }),
     submitVerify: (gameId, results) => post(`/api/games/${gameId}/engine/verify`, { results }),
-    async streamSynopsis(gameId, onEvent) {
-      const response = await send(`/api/games/${gameId}/synopsis`, { method: 'POST' })
-      if (!response.body) throw new ApiError(response.status, 'The coach sent an empty response.')
-      await readCoachEvents(response.body, onEvent)
-    },
+    streamSynopsis: (gameId, onEvent) => stream(`/api/games/${gameId}/synopsis`, null, onEvent),
+    sendChat: (gameId, message, onEvent) =>
+      stream(`/api/games/${gameId}/chat`, { message }, onEvent),
+    submitEngineResult: (gameId, requestId, results, onEvent) =>
+      stream(`/api/games/${gameId}/chat/engine_result`, { request_id: requestId, results }, onEvent),
   }
 }
 

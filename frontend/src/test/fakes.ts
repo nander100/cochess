@@ -55,6 +55,11 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
       onEvent({ type: 'text', text: SYNOPSIS_TEXT })
       onEvent({ type: 'done', invalid_moves_removed: [] })
     }),
+    sendChat: vi.fn(async (_gameId: string, _message: string, onEvent: (e: CoachEvent) => void) => {
+      onEvent({ type: 'text', text: 'Good question.' })
+      onEvent({ type: 'done', invalid_moves_removed: [] })
+    }),
+    submitEngineResult: vi.fn(async () => {}),
     ...overrides,
   }
 }
