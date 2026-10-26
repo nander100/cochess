@@ -1,0 +1,13 @@
+[Event "Casual rapid game"]
+[Site "?"]
+[Date "2026.01.01"]
+[Round "-"]
+[White "Player A"]
+[Black "Player B"]
+[Result "0-1"]
+[TimeControl "600+5"]
+
+1. e4 {[%clk 0:10:00]} e5 {[%clk 0:10:00]} 2. Nf3 $1 {[%clk 0:09:58]} Nc6 { Book move [%clk 0:09:57] }
+(2... d6 3. d4 exd4) 3. Bc4 {[%clk 0:09:50]} Nd4 $6 {[%clk 0:09:40]} 4. Nxe5 $2 {[%clk 0:09:30]}
+Qg5 {[%clk 0:09:20]} 5. Nxf7 {[%clk 0:09:00]} Qxg2 {[%clk 0:09:10]} 6. Rf1 {[%clk 0:08:50]}
+Qxe4+ {[%clk 0:09:05]} 7. Be2 {[%clk 0:08:40]} Nf3# {[%clk 0:09:00]} 0-1

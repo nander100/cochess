@@ -60,7 +60,7 @@ Stockfish build: `stockfish-19-lite` (multi-threaded) with `stockfish-19-lite-si
 
 Backend (run from `backend/`):
 - Install: `uv sync`
-- Dev server: `uv run uvicorn app.main:app --reload`
+- Dev server: `uv run uvicorn app.main:create_app --factory --reload` (app factory: importing `app.main` has no side effects; tests build apps on in-memory SQLite via `tests/conftest.py`)
 - Tests: `uv run pytest` (includes coverage; pytest plugin autoload is disabled in `pyproject.toml` so globally installed plugins, e.g. ROS on `PYTHONPATH`, can't break the run — add new pytest plugins there with `-p`)
 - Lint/format: `uv run ruff check . && uv run ruff format .`
 - Types: `uv run mypy app` (strict)

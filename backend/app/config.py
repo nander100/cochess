@@ -38,6 +38,14 @@ class Thresholds(BaseModel):
     verify_max_plies: int = 15
 
 
+class Limits(BaseModel):
+    """Input size limits for user-submitted data."""
+
+    max_pgn_chars: int = 100_000
+    max_plies: int = 600
+    max_playstyle_chars: int = 500
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", extra="ignore")
 
@@ -49,6 +57,7 @@ class Settings(BaseSettings):
 
     engine: EngineTiers = EngineTiers()
     thresholds: Thresholds = Thresholds()
+    limits: Limits = Limits()
 
 
 @lru_cache
