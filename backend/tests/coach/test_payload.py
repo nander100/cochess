@@ -67,6 +67,8 @@ def test_system_prompt_carries_the_hard_rules() -> None:
     assert "hangingPiece" in prompt and "Lichess's puzzle trainer" in prompt
     assert "### Your turn" in prompt
     assert "at most 300 words in total" in prompt
+    assert "Do reason about the position" in prompt  # owner, M5 review
+    assert "The engine is the authority on moves and evaluations" in prompt
 
 
 def test_system_blocks_mark_only_the_last_block_for_caching() -> None:
