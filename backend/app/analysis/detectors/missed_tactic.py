@@ -45,7 +45,7 @@ def subtype(
     best = line[0]
     after = board.copy(stack=False)
     after.push(best)
-    if _back_rank(board, line, mated, user, plies):
+    if _back_rank(board, line, mated, user):
         return "back_rank"
     if _is_fork(after, best.to_square, user):
         return "fork"
@@ -66,25 +66,19 @@ def _back_rank(
     line: tuple[chess.Move, ...],
     mated: chess.Board | None,
     user: chess.Color,
-    plies: int,
 ) -> bool:
-    """Mate with the king on its back rank, or a rook/queen check along the opponent's back rank."""
+    """Mate with the king on its back rank, or a line that starts with a rook/queen check along
+    the opponent's back rank. A back-rank check later in the line is usually just the capture
+    that cashes in some other tactic (e.g. the Qxd8+ after a queen fork), so it doesn't count."""
     opponent_rank = _back_rank_of(not user)
     if mated is not None:
         king = mated.king(not user)
         return king is not None and chess.square_rank(king) == opponent_rank
-    work = board.copy(stack=False)
-    for move in line[:plies]:
-        heavy = work.piece_type_at(move.from_square) in (chess.ROOK, chess.QUEEN)
-        if (
-            work.turn == user
-            and heavy
-            and chess.square_rank(move.to_square) == opponent_rank
-            and work.gives_check(move)
-        ):
-            return True
-        work.push(move)
-    return False
+    first = line[0]
+    heavy = board.piece_type_at(first.from_square) in (chess.ROOK, chess.QUEEN)
+    return (
+        heavy and chess.square_rank(first.to_square) == opponent_rank and board.gives_check(first)
+    )
 
 
 def _is_fork(after: chess.Board, square: chess.Square, user: chess.Color) -> bool:

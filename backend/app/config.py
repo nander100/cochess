@@ -38,6 +38,9 @@ class Thresholds(BaseModel):
     inaccuracy: float = 0.10
     mistake: float = 0.20
     blunder: float = 0.30
+    # A lost forced mate only counts if the mover's win% afterwards is below this; missing a
+    # mate while still completely winning isn't a mistake worth coaching (M3 review).
+    missed_mate_max_win_pct_after: float = 90
     verify_top_swings: int = 3
     verify_max_plies: int = 15
     key_moments_max: int = 8

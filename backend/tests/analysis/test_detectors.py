@@ -3,6 +3,7 @@
 import pytest
 
 from app.analysis.detectors import (
+    allowed_tactic,
     endgame_technique,
     hung_piece,
     king_safety,
@@ -51,6 +52,55 @@ class TestHungPiece:
         ctx = move_ctx(self.AFTER_NC3_D5, "Ne4", best_after=["dxe4"], classification=None)
 
         assert hung_piece.detect(ctx) == []
+
+
+class TestAllowedTactic:
+    # Owner's game5b, 31...Kg7?? walks into 32. Qe7+, checking the king and hitting the rook.
+    BEFORE_KG7 = "3r1k2/7p/6pb/5p2/1Q1Pp1n1/1P2Pq2/P4P2/R3KR2 b - - 0 31"
+
+    def test_walking_into_a_queen_fork(self) -> None:
+        ctx = move_ctx(
+            self.BEFORE_KG7, "Kg7", best_after=["Qe7+", "Kg8", "Qxd8+", "Bf8"],
+            classification="blunder",
+        )  # fmt: skip
+
+        [fact] = allowed_tactic.detect(ctx)
+
+        assert fact.details == {
+            "subtype": "fork",
+            "reply_move": "Qe7+",
+            "line": ["Qe7+", "Kg8", "Qxd8+", "Bf8"],
+            "material_lost": 5,
+            "allows_mate": False,
+        }
+
+    def test_allowing_a_back_rank_mate(self) -> None:
+        ctx = move_ctx(
+            "r5k1/8/8/8/8/8/2P2PPP/6K1 w - - 0 1", "c3", best_after=["Ra1#"],
+            classification="blunder",
+        )  # fmt: skip
+
+        [fact] = allowed_tactic.detect(ctx)
+
+        assert (fact.details["subtype"], fact.details["allows_mate"]) == ("back_rank", True)
+
+    def test_a_hung_piece_is_left_to_the_hung_piece_detector(self) -> None:
+        after_nc3_d5 = "rnbqkbnr/ppp1pppp/8/3p4/8/2N5/PPPPPPPP/R1BQKBNR w KQkq d6 0 2"
+
+        assert allowed_tactic.detect(move_ctx(after_nc3_d5, "Ne4", best_after=["dxe4"])) == []
+
+    def test_a_quiet_reply_is_not_a_tactic(self) -> None:
+        ctx = move_ctx("6k1/8/8/8/8/8/P4PPP/6K1 w - - 0 1", "a3", best_after=["Kf7"])
+
+        assert allowed_tactic.detect(ctx) == []
+
+    def test_inaccuracies_are_below_the_threshold(self) -> None:
+        ctx = move_ctx(
+            self.BEFORE_KG7, "Kg7", best_after=["Qe7+", "Kg8", "Qxd8+", "Bf8"],
+            classification="inaccuracy",
+        )  # fmt: skip
+
+        assert allowed_tactic.detect(ctx) == []
 
 
 class TestMissedCaptureOrCheck:

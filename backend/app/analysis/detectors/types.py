@@ -21,6 +21,7 @@ ThemeName = Literal[
     "pawn_structure",
     "endgame_technique",
     "time_trouble",
+    "allowed_tactic",  # owner-approved addition (M3 review)
 ]
 # Per-move facts carry the move's classification; game-level facts are "note" or "concern".
 Severity = Literal["inaccuracy", "mistake", "blunder", "note", "concern"]

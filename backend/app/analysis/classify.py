@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from app.analysis.evals import Color, Evaluation
+from app.analysis.evals import Color, Evaluation, win_percent
 from app.config import Thresholds
 
 Classification = Literal["inaccuracy", "mistake", "blunder"]
@@ -20,9 +20,16 @@ def classify(drop: float, thresholds: Thresholds) -> Classification | None:
     return None
 
 
-def is_missed_mate(before: Evaluation, after: Evaluation, mover: Color) -> bool:
-    """The mover had a forced mate before the move and no longer has one (PLAN Q21)."""
-    return _mover_mates(before, mover) and not _mover_mates(after, mover)
+def is_missed_mate(
+    before: Evaluation, after: Evaluation, mover: Color, thresholds: Thresholds
+) -> bool:
+    """The mover had a forced mate before the move, no longer has one (PLAN Q21), and the miss
+    cost something: the mover's win% afterwards is below the configured cutoff."""
+    if not _mover_mates(before, mover) or _mover_mates(after, mover):
+        return False
+    white_pct = win_percent(after)
+    mover_pct = white_pct if mover == "white" else 100 - white_pct
+    return mover_pct < thresholds.missed_mate_max_win_pct_after
 
 
 def _mover_mates(evaluation: Evaluation, mover: Color) -> bool:

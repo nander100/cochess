@@ -43,7 +43,7 @@ def build_game_context(
                 board_before=before,
                 board_after=after,
                 classification=classify(drop, settings.thresholds),
-                missed_mate=is_missed_mate(eval_before, eval_after, mover),
+                missed_mate=is_missed_mate(eval_before, eval_after, mover, settings.thresholds),
                 drop=drop,
                 eval_before=eval_before,
                 eval_after=eval_after,

@@ -1,8 +1,9 @@
-"""Theme detectors (SPEC §6.4). Each is a pure function: (context) -> list[ThemeFact]."""
+"""Theme detectors (SPEC §6.4, plus allowed_tactic). Each is pure: (context) -> list[ThemeFact]."""
 
 from collections.abc import Callable
 
 from app.analysis.detectors import (
+    allowed_tactic,
     endgame_technique,
     hung_piece,
     king_safety,
@@ -16,6 +17,7 @@ from app.analysis.detectors.types import GameContext, MoveContext, ThemeFact
 
 PER_MOVE: tuple[Callable[[MoveContext], list[ThemeFact]], ...] = (
     hung_piece.detect,
+    allowed_tactic.detect,
     missed_capture_or_check.detect,
     missed_tactic.detect,
     king_safety.detect,
