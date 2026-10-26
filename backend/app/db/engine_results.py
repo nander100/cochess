@@ -1,4 +1,4 @@
-"""Persistence for engine results."""
+"""Persistence for engine results and game summaries."""
 
 from collections.abc import Collection, Sequence
 from typing import cast
@@ -7,7 +7,8 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.analysis.engine import EngineLine, EngineResult, Tier
-from app.db.models import EngineResultRow
+from app.analysis.summary_models import GameSummary
+from app.db.models import EngineResultRow, GameSummaryRow
 
 
 def save_results(session: Session, game_id: str, results: Sequence[EngineResult]) -> None:
@@ -53,3 +54,13 @@ def load_results(session: Session, game_id: str, tiers: Collection[Tier]) -> lis
         )
         for row in rows
     ]
+
+
+def save_summary(session: Session, game_id: str, summary: GameSummary) -> None:
+    session.merge(GameSummaryRow(game_id=game_id, summary=summary.model_dump(mode="json")))
+    session.commit()
+
+
+def load_summary(session: Session, game_id: str) -> GameSummary | None:
+    row = session.get(GameSummaryRow, game_id)
+    return None if row is None else GameSummary.model_validate(row.summary)

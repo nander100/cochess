@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.analysis.engine import EngineResult
 from app.analysis.pgn import PgnErrorCode, Position
+from app.analysis.summary_models import Accuracy, Counts
 
 # Input rules from SPEC §3 (user flow), not tunable thresholds.
 MIN_ELO = 100
@@ -52,18 +53,6 @@ class EngineResultsRequest(BaseModel):
 
 class ScanResponse(BaseModel):
     verify_fens: list[str]
-
-
-class Counts(BaseModel):
-    inaccuracies: int
-    mistakes: int
-    blunders: int
-    missed_mates: int
-
-
-class Accuracy(BaseModel):
-    user: float
-    opponent: float
 
 
 class VerifyResponse(BaseModel):

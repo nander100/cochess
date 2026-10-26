@@ -3,6 +3,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.db.engine_results import load_summary
 from app.db.models import EngineResultRow
 from tests.engine_fakes import fake_result
 from tests.pgn_fixtures import read_pgn
@@ -61,9 +62,15 @@ def test_scan_then_verify_round_trip(client: TestClient, db_session: Session) ->
     verify = post(client, game, "verify", verify_batch)
 
     assert verify.status_code == 200
-    assert verify.json() == {"summary_ready": False, "counts": None, "accuracy": None}
+    data = verify.json()
+    assert data["summary_ready"] is True
+    assert data["counts"] == {"inaccuracies": 0, "mistakes": 0, "blunders": 0, "missed_mates": 0}
+    assert set(data["accuracy"]) == {"user", "opponent"}
     tiers = [row.tier for row in db_session.query(EngineResultRow).all()]
     assert (tiers.count("scan"), tiers.count("verify")) == (OPERA_PLIES, 4)
+    summary = load_summary(db_session, game["game_id"])
+    assert summary is not None
+    assert len(summary.move_list) == OPERA_PLIES
 
 
 def test_scan_flags_the_users_blunder(client: TestClient) -> None:

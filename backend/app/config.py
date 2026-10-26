@@ -40,6 +40,28 @@ class Thresholds(BaseModel):
     blunder: float = 0.30
     verify_top_swings: int = 3
     verify_max_plies: int = 15
+    key_moments_max: int = 8
+    key_moment_swings: int = 3
+
+
+class DetectorSettings(BaseModel):
+    """Game phase (SPEC §6.2) and theme-detector thresholds (SPEC §6.4)."""
+
+    opening_max_ply: int = 20
+    endgame_max_non_pawn_material: int = 26
+    min_material_gain: int = 2  # "wins material >= 2" (points: N=B=3, R=5, Q=9)
+    hung_piece_plies: int = 3
+    tactic_plies: int = 5
+    king_check_plies: int = 3
+    development_move: int = 10
+    min_undeveloped_minors: int = 2
+    castle_by_move: int = 12
+    opening_wc_loss_for_concern: float = 0.15
+    threw_win_from_pct: float = 70
+    threw_win_to_pct: float = 55
+    passive_king_center_distance: int = 3
+    low_clock_fraction: float = 0.10
+    low_clock_default_s: float = 30
 
 
 class Limits(BaseModel):
@@ -61,6 +83,7 @@ class Settings(BaseSettings):
 
     engine: EngineSettings = EngineSettings()
     thresholds: Thresholds = Thresholds()
+    detectors: DetectorSettings = DetectorSettings()
     limits: Limits = Limits()
 
 

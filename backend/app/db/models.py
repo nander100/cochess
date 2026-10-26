@@ -47,3 +47,13 @@ class EngineResultRow(Base):
     time_ms: Mapped[int] = mapped_column(Integer)
     lines: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class GameSummaryRow(Base):
+    """The SPEC §6.5 game summary, rebuilt whenever verify results arrive."""
+
+    __tablename__ = "game_summaries"
+
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), primary_key=True)
+    summary: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

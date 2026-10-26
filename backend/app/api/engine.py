@@ -16,10 +16,12 @@ from app.analysis.engine import (
 from app.analysis.evals import Color
 from app.analysis.pgn import ParsedGame, parse_pgn
 from app.analysis.selection import scan_fens, select_verify_plies, verify_fens
+from app.analysis.summary import build_summary
+from app.analysis.summary_models import UserInfo
 from app.api.deps import get_app_settings, get_session
 from app.api.schemas import EngineResultsRequest, ScanResponse, VerifyResponse
 from app.config import EngineSettings, Settings
-from app.db.engine_results import load_results, save_results
+from app.db.engine_results import load_results, save_results, save_summary
 from app.db.models import Game
 
 router = APIRouter(prefix="/api", tags=["engine"])
@@ -54,8 +56,12 @@ def submit_verify(
     expected = _verify_fens(parsed, game, scan_results, settings)
     results = _check(body.results, "verify", settings, expected)
     save_results(session, game.id, results)
-    # Classification and the game summary arrive in M3.
-    return VerifyResponse(summary_ready=False, counts=None, accuracy=None)
+
+    user = UserInfo(color=cast(Color, game.user_color), elo=game.elo, playstyle=game.playstyle)
+    all_results = load_results(session, game.id, ["scan", "verify"])
+    summary = build_summary(parsed, all_results, user, settings)
+    save_summary(session, game.id, summary)
+    return VerifyResponse(summary_ready=True, counts=summary.counts, accuracy=summary.accuracy)
 
 
 def _load_game(session: Session, settings: Settings, game_id: str) -> tuple[Game, ParsedGame]:

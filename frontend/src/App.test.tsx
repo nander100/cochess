@@ -25,6 +25,24 @@ test('runs the analysis and shows engine details when done', async () => {
   expect(screen.getAllByRole('row')).toHaveLength(1 + 4 + 2) // header + scan + verify
 })
 
+test('shows accuracy and error counts from the game summary', async () => {
+  const deps = fakeDeps({
+    submitVerify: vi.fn(async () => ({
+      summary_ready: true,
+      counts: { inaccuracies: 1, mistakes: 2, blunders: 0, missed_mates: 0 },
+      accuracy: { user: 72, opponent: 53.3 },
+    })),
+  })
+  render(<App deps={deps} />)
+
+  submitGame()
+
+  const headline = await screen.findByText(/Your accuracy/)
+  expect(headline).toHaveTextContent(
+    'Your accuracy: 72% (opponent 53.3%) · 1 inaccuracy, 2 mistakes, 0 blunders',
+  )
+})
+
 test('shows the server error when the PGN is rejected', async () => {
   const deps = fakeDeps({
     createGame: vi.fn(async () => {

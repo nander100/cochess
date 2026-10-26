@@ -77,10 +77,25 @@ export default function App({ deps }: AppProps) {
       {view.kind === 'done' && (
         <section className="result" aria-label="Analysis">
           <p>Analysis complete.</p>
+          <ResultHeadline run={view.run} />
           <EngineStats run={view.run} />
         </section>
       )}
     </main>
+  )
+}
+
+/** Accuracy and error counts from the backend's game summary (the coach's synopsis is M4). */
+function ResultHeadline({ run }: { run: AnalysisRun }) {
+  const { accuracy, counts } = run.outcome
+  if (!accuracy || !counts) return null
+  const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+  return (
+    <p className="headline">
+      Your accuracy: <strong>{accuracy.user ?? '—'}%</strong> (opponent{' '}
+      {accuracy.opponent ?? '—'}%) · {count(counts.inaccuracies, 'inaccuracy', 'inaccuracies')},{' '}
+      {count(counts.mistakes, 'mistake', 'mistakes')}, {count(counts.blunders, 'blunder', 'blunders')}
+    </p>
   )
 }
 

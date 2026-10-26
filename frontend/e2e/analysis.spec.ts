@@ -9,6 +9,12 @@ const PGN = readFileSync(
 )
 const COLOR = GAME_FILE.replace(/\.\w+$/, '').endsWith('b') ? 'Black' : 'White'
 const EVIDENCE = new URL('../test-results/m2-engine-evidence.json', import.meta.url)
+// The exact results the browser posted, saved as a backend fixture so summaries can be built
+// from real engine output without re-running Stockfish (backend/tests/fixtures/engine/).
+const ENGINE_FIXTURE = new URL(
+  `../../backend/tests/fixtures/engine/${GAME_FILE.replace(/\.\w+$/, '')}.json`,
+  import.meta.url,
+)
 
 // Tier minimums from backend config: a search must reach the min depth unless it hit the cap.
 const TIERS = {
@@ -20,6 +26,12 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
   const engineLog: string[] = []
   page.on('console', (message) => {
     if (message.text().startsWith('CoChess engine:')) engineLog.push(message.text())
+  })
+
+  const posted: Record<'scan' | 'verify', unknown[]> = { scan: [], verify: [] }
+  page.on('request', (request) => {
+    const tier = request.url().match(/\/engine\/(scan|verify)$/)?.[1] as 'scan' | 'verify' | undefined
+    if (tier && request.method() === 'POST') posted[tier] = request.postDataJSON().results
   })
 
   await page.goto('/')
@@ -45,6 +57,9 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
   mkdirSync(new URL('.', EVIDENCE), { recursive: true })
   const evidence = { game: GAME_FILE, color: COLOR, wall_ms: wallMs, summary, engine_log: engineLog, rows }
   writeFileSync(EVIDENCE, JSON.stringify(evidence, null, 2))
+  mkdirSync(new URL('.', ENGINE_FIXTURE), { recursive: true })
+  const fixture = { game: GAME_FILE, user_color: COLOR.toLowerCase(), ...posted }
+  writeFileSync(ENGINE_FIXTURE, `${JSON.stringify(fixture, null, 1)}\n`)
 
   expect(engineLog.join()).toContain('CoChess engine: stockfish-19-lite,') // multi-threaded build
   expect(rows.some((row) => row.tier === 'verify')).toBe(true)

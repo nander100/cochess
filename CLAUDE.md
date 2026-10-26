@@ -65,6 +65,7 @@ Backend (run from `backend/`):
 - Lint/format: `uv run ruff check . && uv run ruff format .`
 - Types: `uv run mypy app` (strict)
 - Config: copy `.env.example` to `.env`. Nested settings use `__`, e.g. `THRESHOLDS__BLUNDER=0.35`.
+- Game summary for an owner game: `uv run python -m scripts.print_summary game1w [--elo 1400] [--compact]` (built from `tests/fixtures/engine/<game>.json`, the real engine results captured by the frontend E2E)
 
 Frontend (run from `frontend/`):
 - Install: `npm install` (its `postinstall` copies the Stockfish lite builds into `public/engine/`, which is gitignored)
@@ -73,7 +74,7 @@ Frontend (run from `frontend/`):
 - Lint: `npm run lint` (oxlint, warnings fail)
 - Types: `npm run typecheck`
 - Build: `npm run build`
-- E2E: `npm run e2e` (Playwright on the system Google Chrome via `channel: 'chrome'`, no browser download; starts its own backend on :8001 with in-memory SQLite and Vite on :5174; analyzes a real owner game with Stockfish and writes depth/time evidence to `test-results/m2-engine-evidence.json`. Pick the game with `E2E_GAME=game3w.txt`. Takes 40–90 s.)
+- E2E: `npm run e2e` (Playwright on the system Google Chrome via `channel: 'chrome'`, no browser download; starts its own backend on :8001 with in-memory SQLite and Vite on :5174; analyzes a real owner game with Stockfish and writes depth/time evidence to `test-results/m2-engine-evidence.json`. It also overwrites `backend/tests/fixtures/engine/<game>.json` with that run's engine results; engine output varies run to run, so restore the committed fixture unless you mean to re-capture. Pick the game with `E2E_GAME=game3w.txt`. Takes 40–90 s.)
 
 Everything: `docker compose up --build` → http://localhost:8080 (nginx serves the frontend with COOP/COEP and proxies `/api` to the backend; SQLite lives in the `cochess-data` volume). Needs `backend/.env`.
 
