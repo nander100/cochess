@@ -1,0 +1,21 @@
+[Event "Live Chess"]
+[Site "Chess.com"]
+[Date "2026.10.21"]
+[Round "?"]
+[White "samk930"]
+[Black "nander100"]
+[Result "1-0"]
+[TimeControl "600"]
+[WhiteElo "945"]
+[BlackElo "942"]
+[Termination "samk930 won by checkmate"]
+[ECO "B13"]
+[EndTime "0:52:54 GMT+0000"]
+[Link "https://www.chess.com/game/live/185668037356?username=nander100"]
+
+1. e4 c6 2. d4 d5 3. exd5 cxd5 4. Nc3 Bf5 5. Bb5+ Nc6 6. Qf3 e6 7. Bf4 Bxc2 8.
+Kd2 Bf5 9. Nh3 Bb4 10. a3 Bxc3+ 11. Kxc3 Qa5+ 12. b4 Qxb5 13. Rad1 Nf6 14. Rhe1
+Qc4+ 15. Kb2 Nxd4 16. Qc3 Qxc3+ 17. Kxc3 Ne4+ 18. Kxd4 Nxf2 19. Nxf2 O-O 20. g4
+Bg6 21. h4 h6 22. h5 Bh7 23. g5 Rac8 24. Rc1 b5 25. gxh6 gxh6 26. Bxh6 Rfd8 27.
+Rg1+ Kh8 28. Bg7+ Kg8 29. Bf6+ Kf8 30. Bxd8 Rxd8 31. Ng4 Ke7 32. Ne5 Kd6 33.
+Nxf7+ Kd7 34. Rg7 e5+ 35. Nxe5+ Kd6 36. Rxh7 Rg8 37. Rc6# 1-0

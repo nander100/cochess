@@ -4,7 +4,7 @@ import chess
 import pytest
 
 from app.analysis.pgn import ParsedGame, PgnError, PgnErrorCode, parse_pgn
-from tests.pgn_fixtures import USER_FIXTURES, read_pgn
+from tests.pgn_fixtures import OWNER_USERNAME, USER_FIXTURES, owner_color, read_pgn
 
 STANDARD_FEN_HEADER = f'[SetUp "1"]\n[FEN "{chess.STARTING_FEN}"]\n\n'
 ANNOTATED_MAINLINE = [
@@ -196,7 +196,10 @@ class TestRejections:
 
 
 @pytest.mark.parametrize("path", USER_FIXTURES, ids=lambda p: p.name)
-def test_owner_games_parse(path: Path) -> None:
+def test_owner_games_parse_with_the_labelled_color(path: Path) -> None:
     parsed = parse(path.read_text())
 
     assert parsed.positions
+    # The color in the file name must match the side the owner's account played.
+    color_header = "White" if owner_color(path) == "white" else "Black"
+    assert parsed.headers[color_header] == OWNER_USERNAME

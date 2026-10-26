@@ -1,0 +1,27 @@
+[Event "Live Chess"]
+[Site "Chess.com"]
+[Date "2026.10.25"]
+[Round "?"]
+[White "nander100"]
+[Black "Rajsrai1973"]
+[Result "0-1"]
+[TimeControl "600"]
+[WhiteElo "949"]
+[BlackElo "942"]
+[Termination "Rajsrai1973 won by checkmate"]
+[ECO "D00"]
+[EndTime "8:10:31 GMT+0000"]
+[Link "https://www.chess.com/game/live/185907873924?username=nander100"]
+
+1. d4 d5 2. Bf4 e6 3. e3 Nf6 4. Nf3 Nc6 5. c3 Bd7 6. Nbd2 Be7 7. Bd3 Nh5 8. Bg3
+Nxg3 9. hxg3 Bf6 10. Qc2 h6 11. O-O-O Qe7 12. e4 dxe4 13. Bxe4 O-O-O 14. Rh2 Kb8
+15. Rdh1 e5 16. dxe5 Nxe5 17. Nxe5 Bxe5 18. Nf3 Bf6 19. Qb3 c6 20. Nh4 Be6 21.
+c4 Qc5 22. Qc2 Qxc4 23. Qxc4 Bxc4 24. Nf3 Bxa2 25. Kc2 Be6 26. Nd2 Rd7 27. Ra1
+Rhd8 28. Nf3 Bd5 29. Bxd5 Rxd5 30. Rhh1 Rc5+ 31. Kb3 Rb5+ 32. Kc4 Bxb2 33. Rab1
+Bf6 34. Rhd1 Rbd5 35. Rxd5 Rxd5 36. Re1 Rd7 37. Re8+ Kc7 38. Ne5 Bxe5 39. Rxe5
+f6 40. Re4 a6 41. Kb4 Kb6 42. f4 c5+ 43. Kc4 Kc6 44. Re6+ Rd6 45. Rxd6+ Kxd6 46.
+g4 b6 47. g3 a5 48. Kb5 Kc7 49. f5 Kb7 50. Ka4 Kc6 51. Kb3 Kb5 52. Kc3 a4 53.
+Kb2 Kb4 54. Ka2 c4 55. g5 fxg5 56. Kb2 Kc5 57. Ka3 b5 58. Kb2 Kd4 59. f6 gxf6
+60. g4 Kd3 61. Ka3 Kc3 62. Ka2 Kb4 63. Kb2 c3+ 64. Kc2 Kc4 65. Kb1 b4 66. Kc2
+b3+ 67. Kb1 a3 68. Ka1 b2+ 69. Kb1 Kb4 70. Kc2 a2 71. Kd1 a1=Q+ 72. Kc2 b1=Q#
+0-1

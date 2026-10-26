@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 import chess
@@ -7,7 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.db.models import Game
-from tests.pgn_fixtures import read_pgn
+from tests.pgn_fixtures import USER_FIXTURES, owner_color, read_pgn
 
 
 def game_body(**overrides: Any) -> dict[str, Any]:
@@ -106,3 +107,12 @@ def test_missing_required_fields_are_rejected(client: TestClient) -> None:
     response = client.post("/api/games", json={"pgn": "1. e4 *"})
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize("path", USER_FIXTURES, ids=lambda p: p.name)
+def test_owner_games_are_accepted(client: TestClient, path: Path) -> None:
+    body = game_body(pgn=path.read_text(), user_color=owner_color(path), playstyle=None)
+
+    response = client.post("/api/games", json=body)
+
+    assert response.status_code == 201, response.json()
