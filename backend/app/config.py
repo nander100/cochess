@@ -76,7 +76,7 @@ class CoachSettings(BaseModel):
     toward max_tokens, so these leave room for it."""
 
     synopsis_max_tokens: int = 8000
-    synopsis_effort: Effort = "medium"
+    synopsis_effort: Effort = "low"
     # The prompt asks for <= 300 words; past this ceiling the backend logs a warning.
     synopsis_max_words: int = 350
     # What the coach sees of each key moment's engine lines. The full lines stay in the stored
@@ -109,8 +109,10 @@ class Settings(BaseSettings):
 
     access_code: str = ""
     anthropic_api_key: str = ""
-    coach_model_synopsis: str = "claude-opus-5-5"
-    coach_model_chat: str = "claude-sonnet-5-5"
+    # Cost review (option B): Sonnet at low effort writes the synopsis, Haiku handles the chat.
+    # Stronger models are a config change away (SPEC §11 v4: user-selectable coach strength).
+    coach_model_synopsis: str = "claude-sonnet-5-5"
+    coach_model_chat: str = "claude-haiku-5-5"
     database_url: str = "sqlite:///./cochess.db"
 
     engine: EngineSettings = EngineSettings()

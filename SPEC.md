@@ -418,6 +418,8 @@ Stop for owner review at every ✅ checkpoint (see CLAUDE.md).
 - Stripe subscriptions (e.g. $10/month including a monthly API credit allowance) and one-time credit top-ups.
 - Credit metering from `llm_usage` (token counts × current model pricing), usage tracker in the UI, block or warn at zero.
 - Cost controls: prompt caching, model routing, compact payloads.
+- **Credit budget (owner decision, post-v1 cost review):** a $10/month subscription includes at most **$3/month of API usage** per user. At the v1 defaults (Sonnet 5.5 low-effort synopsis, Haiku 5.5 chat, ~$0.02 per game with a few questions) that is roughly 150 analyzed games a month.
+- **User-selectable coach strength:** users can raise the coach to a stronger model and effort (e.g. Opus synopsis, Sonnet chat, ~$0.08 per game) for more in-depth analysis. The UI must say that it uses their allotted credits faster (roughly 4× at those settings, about 35–40 games a month on the $3 allowance). Model and effort are already per-call settings in `CoachSettings`, so this means making them per-user instead of per-server.
 - Deployment on AWS (App Runner or ECS, RDS Postgres, Secrets Manager), monitoring, backups, rate limiting.
 - Terms of service, privacy policy, account deletion.
 - Later: Chessly-style opening courses and drills.

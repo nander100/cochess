@@ -48,8 +48,8 @@ class TestService:
 
         assert (result.text, result.invalid_moves_removed) == (VALID, [])
         [request] = coach.requests
-        assert request.model == "claude-opus-5-5"
-        assert (request.max_tokens, request.effort) == (8000, "medium")
+        assert request.model == "claude-sonnet-5-5"
+        assert (request.max_tokens, request.effort) == (8000, "low")
         assert request.system[-1]["cache_control"] == {"type": "ephemeral"}
         assert str(request.messages[0]["content"]).startswith("Here is the engine")
         with app.state.session_factory() as session:

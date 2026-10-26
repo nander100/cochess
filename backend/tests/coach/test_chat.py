@@ -68,7 +68,7 @@ class TestPlainQuestions:
         assert events[0][0] == "status"
         assert text_of(events) == "Your 13. Rxd7 was the key sacrifice."
         [request] = fake.requests
-        assert request.model == "claude-sonnet-5-5"
+        assert request.model == "claude-haiku-5-5"
         assert [t["name"] for t in request.tools] == ["analyze_position"]
         assert request.tool_choice is None
         context = request.system[1]["text"]

@@ -24,10 +24,10 @@ def test_classification_thresholds_match_spec_defaults() -> None:
 
 
 def test_env_vars_override_models_and_nested_settings(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("COACH_MODEL_CHAT", "claude-haiku-5-5")
+    monkeypatch.setenv("COACH_MODEL_CHAT", "claude-sonnet-5-5")
     monkeypatch.setenv("THRESHOLDS__BLUNDER", "0.35")
 
     settings = Settings(_env_file=None)
 
-    assert settings.coach_model_chat == "claude-haiku-5-5"
+    assert settings.coach_model_chat == "claude-sonnet-5-5"
     assert settings.thresholds.blunder == 0.35
