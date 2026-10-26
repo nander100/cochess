@@ -4,6 +4,8 @@ import type {
   CreateGameResponse,
   EngineConfig,
   EngineResult,
+  Profile,
+  ProfileUpdate,
   ScanResponse,
   VerifyResponse,
 } from './types'
@@ -19,7 +21,17 @@ export class ApiError extends Error {
   }
 }
 
+/** The request needs a login: no session, or it expired (the server answered 401). */
+export function isLoggedOut(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401
+}
+
 export interface ApiClient {
+  /** Use a one-time login link's token; the server sets the session cookie. */
+  redeem(token: string): Promise<void>
+  logout(): Promise<void>
+  me(): Promise<Profile>
+  updateMe(update: ProfileUpdate): Promise<Profile>
   createGame(body: CreateGameRequest): Promise<CreateGameResponse>
   engineConfig(): Promise<EngineConfig>
   submitScan(gameId: string, results: EngineResult[]): Promise<ScanResponse>
@@ -36,22 +48,16 @@ export interface ApiClient {
   ): Promise<void>
 }
 
-export function createApiClient(
-  fetchImpl: typeof fetch = fetch.bind(globalThis),
-  getAccessCode: () => string | null = () => null,
-): ApiClient {
-  /** Fetch, turning network failures and non-2xx responses into ApiErrors. */
+export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)): ApiClient {
+  /** Fetch, turning network failures and non-2xx responses into ApiErrors. The session is an
+   * httpOnly cookie, sent by the browser on same-origin requests. */
   async function send(path: string, init?: RequestInit): Promise<Response> {
     let response: Response
     try {
-      const code = getAccessCode()
       response = await fetchImpl(path, {
         ...init,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(code ? { 'X-Access-Code': code } : {}),
-          ...init?.headers,
-        },
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', ...init?.headers },
       })
     } catch {
       throw new ApiError(0, "Couldn't reach the CoChess server. Check your connection and try again.")
@@ -84,6 +90,14 @@ export function createApiClient(
     request<T>(path, { method: 'POST', body: JSON.stringify(body) })
 
   return {
+    redeem: async (token) => {
+      await send('/api/auth/redeem', { method: 'POST', body: JSON.stringify({ token }) })
+    },
+    logout: async () => {
+      await send('/api/auth/logout', { method: 'POST' })
+    },
+    me: () => request('/api/me'),
+    updateMe: (update) => request('/api/me', { method: 'PATCH', body: JSON.stringify(update) }),
     createGame: (body) => post('/api/games', body),
     engineConfig: () => request('/api/engine-config'),
     submitScan: (gameId, results) => post(`/api/games/${gameId}/engine/scan`, { results }),

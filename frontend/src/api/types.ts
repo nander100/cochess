@@ -11,11 +11,29 @@ export interface Position {
   clock_s: number | null
 }
 
+/** Elo and playstyle come from the player's profile (SPEC_V2 §4.3). */
 export interface CreateGameRequest {
   pgn: string
   user_color: Color
-  elo: number
+}
+
+export type TimeControl = 'bullet' | 'blitz' | 'rapid' | 'classical'
+
+export interface Profile {
+  name: string
+  elo: number | null
+  time_control: TimeControl | null
   playstyle: string | null
+  /** Elo and time control are set: the player can analyze games. */
+  complete: boolean
+}
+
+/** PATCH /api/me: only the fields sent change. A blank playstyle clears it. */
+export interface ProfileUpdate {
+  name?: string
+  elo?: number
+  time_control?: TimeControl
+  playstyle?: string
 }
 
 export interface CreateGameResponse {

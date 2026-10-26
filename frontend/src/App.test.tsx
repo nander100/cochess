@@ -1,23 +1,34 @@
 import { fireEvent, render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import App from './App'
+import type { PipelineDeps } from './analysis/pipeline'
 import { ApiError } from './api/client'
 import type { CoachEvent } from './api/sse'
-import { ENGINE_CONFIG, fakeDeps } from './test/fakes'
+import { PROFILE, fakeDeps } from './test/fakes'
+
+function renderApp(deps: PipelineDeps, path = '/') {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <App deps={deps} />
+    </MemoryRouter>,
+  )
+}
 
 async function submitGame() {
-  fireEvent.change(await screen.findByLabelText(/rating/i), { target: { value: '1350' } })
-  fireEvent.change(screen.getByLabelText(/your game/i), { target: { value: '1. e4 e5 2. Nf3 *' } })
+  fireEvent.change(await screen.findByLabelText(/your game/i), {
+    target: { value: '1. e4 e5 2. Nf3 *' },
+  })
   fireEvent.click(screen.getByRole('button', { name: 'Analyze' }))
 }
 
 test('renders the app title', async () => {
-  render(<App deps={fakeDeps()} />)
+  renderApp(fakeDeps())
 
   expect(await screen.findByRole('heading', { name: 'CoChess' })).toBeInTheDocument()
 })
 
 test('runs the analysis and shows engine details when done', async () => {
-  render(<App deps={fakeDeps()} />)
+  renderApp(fakeDeps())
 
   await submitGame()
 
@@ -34,7 +45,7 @@ test('shows accuracy and error counts from the game summary', async () => {
       accuracy: { user: 72, opponent: 53.3 },
     })),
   })
-  render(<App deps={deps} />)
+  renderApp(deps)
 
   await submitGame()
 
@@ -50,7 +61,7 @@ test('shows the server error when the PGN is rejected', async () => {
       throw new ApiError(422, "Non-standard starting positions aren't supported.")
     }),
   })
-  render(<App deps={deps} />)
+  renderApp(deps)
 
   await submitGame()
 
@@ -68,7 +79,7 @@ test('the coach writes a synopsis once the summary is ready', async () => {
       accuracy: { user: 90, opponent: 80 },
     })),
   })
-  render(<App deps={deps} />)
+  renderApp(deps)
 
   await submitGame()
 
@@ -88,7 +99,7 @@ test('a coach error is shown in the synopsis panel', async () => {
       onEvent({ type: 'error', message: 'The coach is unavailable right now.' })
     }),
   })
-  render(<App deps={deps} />)
+  renderApp(deps)
 
   await submitGame()
 
@@ -97,7 +108,7 @@ test('a coach error is shown in the synopsis panel', async () => {
 
 test('no synopsis is requested before the summary is ready', async () => {
   const deps = fakeDeps()
-  render(<App deps={deps} />)
+  renderApp(deps)
 
   await submitGame()
 
@@ -120,7 +131,7 @@ test('after the synopsis, a what-if question runs the deep tier on the engine', 
       emit({ type: 'done', invalid_moves_removed: [] })
     }),
   })
-  render(<App deps={deps} />)
+  renderApp(deps)
   await submitGame()
   await screen.findByRole('heading', { name: 'Overall' })
 
@@ -133,33 +144,6 @@ test('after the synopsis, a what-if question runs the deep tier on the engine', 
     'deep',
     expect.objectContaining({ multipv: 4 }),
   )
-})
-
-const DENIED = new ApiError(401, 'Enter the access code to use CoChess.')
-
-test('a gated server shows the access gate, and the right code opens the app', async () => {
-  const engineConfig = vi.fn().mockRejectedValueOnce(DENIED).mockRejectedValueOnce(DENIED)
-    .mockResolvedValue(ENGINE_CONFIG)
-  render(<App deps={fakeDeps({ engineConfig })} />)
-
-  fireEvent.change(await screen.findByLabelText('Access code'), { target: { value: 'wrong' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
-  expect(await screen.findByRole('alert')).toHaveTextContent("That access code didn't work.")
-
-  fireEvent.change(screen.getByLabelText('Access code'), { target: { value: 'right' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
-
-  expect(await screen.findByLabelText(/rating/i)).toBeInTheDocument()
-  expect(sessionStorage.getItem('cochess-access-code')).toBe('right')
-})
-
-test('a 401 in the middle of a session returns to the gate', async () => {
-  render(<App deps={fakeDeps({ createGame: vi.fn().mockRejectedValue(DENIED) })} />)
-
-  await submitGame()
-
-  expect(await screen.findByLabelText('Access code')).toBeInTheDocument()
-  expect(screen.getByRole('alert')).toHaveTextContent('Please enter the access code again.')
 })
 
 test('a failed synopsis can be retried', async () => {
@@ -180,10 +164,72 @@ test('a failed synopsis can be retried', async () => {
       accuracy: { user: 90, opponent: 80 },
     })),
   })
-  render(<App deps={deps} />)
+  renderApp(deps)
   await submitGame()
 
   fireEvent.click(await screen.findByRole('button', { name: 'Try again' }))
 
   expect(await screen.findByText('Second time lucky.')).toBeInTheDocument()
+})
+
+const LOGGED_OUT = new ApiError(401, "You're not logged in. Ask the owner for a new login link.")
+
+test('without a session the app asks for a login link', async () => {
+  renderApp(fakeDeps({ me: vi.fn().mockRejectedValue(LOGGED_OUT) }))
+
+  expect(await screen.findByRole('alert')).toHaveTextContent("You're not logged in")
+  expect(screen.queryByLabelText(/your game/i)).not.toBeInTheDocument()
+})
+
+test('a 401 in the middle of a session shows the logged-out message', async () => {
+  renderApp(fakeDeps({ createGame: vi.fn().mockRejectedValue(LOGGED_OUT) }))
+
+  await submitGame()
+
+  expect(await screen.findByRole('alert')).toHaveTextContent("You're not logged in")
+})
+
+test('the header shows who is logged in, and logging out ends the session', async () => {
+  const deps = fakeDeps()
+  renderApp(deps)
+
+  expect(await screen.findByText('Alex')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Log out' }))
+
+  expect(await screen.findByRole('alert')).toHaveTextContent("You're not logged in")
+  expect(deps.api.logout).toHaveBeenCalled()
+})
+
+test('a login link redeems the token, then opens the app', async () => {
+  const deps = fakeDeps()
+  renderApp(deps, '/redeem#token=abc123')
+
+  expect(await screen.findByLabelText(/your game/i)).toBeInTheDocument()
+  expect(deps.api.redeem).toHaveBeenCalledTimes(1)
+  expect(deps.api.redeem).toHaveBeenCalledWith('abc123')
+})
+
+test('a used login link shows why it failed', async () => {
+  const used = new ApiError(400, 'This login link has expired or was already used.')
+  renderApp(fakeDeps({ redeem: vi.fn().mockRejectedValue(used) }), '/redeem#token=abc123')
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('expired or was already used')
+})
+
+test('a new player fills in the profile first, then can analyze', async () => {
+  const blank = { ...PROFILE, elo: null, time_control: null, complete: false }
+  const deps = fakeDeps({ me: vi.fn(async () => blank) })
+  renderApp(deps)
+
+  fireEvent.change(await screen.findByLabelText(/rating/i), { target: { value: '1450' } })
+  fireEvent.change(screen.getByLabelText(/time control/i), { target: { value: 'blitz' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save and continue' }))
+
+  expect(await screen.findByLabelText(/your game/i)).toBeInTheDocument()
+  expect(deps.api.updateMe).toHaveBeenCalledWith({
+    name: 'Alex',
+    elo: 1450,
+    time_control: 'blitz',
+    playstyle: '',
+  })
 })

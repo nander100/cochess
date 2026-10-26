@@ -106,7 +106,7 @@ Backend (run from `backend/`):
 - Types: `uv run mypy app` (strict)
 - Config: copy `.env.example` to `.env`. Nested settings use `__`, e.g. `THRESHOLDS__BLUNDER=0.35`.
 - Migrations: `uv run alembic upgrade head` / `uv run alembic revision --autogenerate -m "..."`
-- Users: `uv run python -m app.cli create-user --name "..."`, `uv run python -m app.cli invite --user "..."`
+- Users: `uv run python -m app.cli create-user --name "..."`, `uv run python -m app.cli invite --user "..."` (prints a one-time `PUBLIC_BASE_URL/redeem#token=…` link), `uv run python -m app.cli assign-games --user "..."` (gives ownerless v1 games to a player). In Docker: `docker compose exec backend uv run --no-dev python -m app.cli …`. The app also runs migrations itself at startup.
 - Real synopsis for an owner game (calls the Claude API, needs `ANTHROPIC_API_KEY` in `.env`): `uv run python -m scripts.synopsis game5b --elo 800` (`--model`, `--effort` override; prints a cost estimate)
 - Game summary for an owner game: `uv run python -m scripts.print_summary game1w [--elo 1400] [--compact]` (built from `tests/fixtures/engine/<game>.json`, real engine results captured by the frontend E2E)
 
@@ -117,7 +117,7 @@ Frontend (run from `frontend/`):
 - Lint: `npm run lint` (oxlint, warnings fail)
 - Types: `npm run typecheck`
 - Build: `npm run build`
-- End-to-end: `npm run e2e` (= `npx playwright test`; Playwright on the system Google Chrome via `channel: 'chrome'`, no browser download; starts its own backend on :8001 with in-memory SQLite and Vite on :5174. v1's E2E runs the real Stockfish on an owner game and **overwrites `backend/tests/fixtures/engine/<game>.json`** with that run's results; engine output varies run to run, so restore the committed fixture unless you mean to re-capture. `E2E_GAME=game3w.txt` picks the game. The coach (paid API) is off unless `E2E_COACH=1`; `E2E_QUESTIONS="a?|b?"` asks chat questions. `E2E_BASE_URL=http://localhost:8080` runs against a running stack. Outputs go to `test-results/`. Takes 40–90 s. v2's M7 adds engine-faked flows.)
+- End-to-end: `npm run e2e` (= `npx playwright test`; Playwright on the system Google Chrome via `channel: 'chrome'`, no browser download; starts its own backend on :8001 with in-memory SQLite and Vite on :5174. v1's E2E runs the real Stockfish on an owner game and **overwrites `backend/tests/fixtures/engine/<game>.json`** with that run's results; engine output varies run to run, so restore the committed fixture unless you mean to re-capture. `E2E_GAME=game3w.txt` picks the game. The coach (paid API) is off unless `E2E_COACH=1`; `E2E_QUESTIONS="a?|b?"` asks chat questions. The test logs in like a player: it creates one with the owner CLI against a fresh `test-results/e2e.db` (the E2E backend's database) and opens the printed link. `E2E_BASE_URL=http://localhost:8080` runs against a running stack; then pass a link from `app.cli invite` in `E2E_LOGIN_LINK`. Outputs go to `test-results/`. Takes 40–90 s. v2's M7 adds engine-faked flows.)
 
 Everything: `docker compose up --build` → http://localhost:8080 (`COCHESS_PORT` changes the host port; server deploys: `docs/DEPLOY.md`). nginx serves the frontend with COOP/COEP and proxies `/api`; SQLite lives in the `cochess-data` volume. Needs `backend/.env`.
 

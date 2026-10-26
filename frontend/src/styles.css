@@ -305,18 +305,60 @@ progress {
   white-space: nowrap;
 }
 
-.access-gate {
+.profile-form {
   display: grid;
   gap: var(--space);
-  max-width: 26rem;
+  max-width: 30rem;
   background: var(--color-surface);
   border: 1px solid var(--color-line);
   border-radius: var(--radius);
   padding: 1.5rem;
 }
 
-.access-gate p {
+.profile-form h2,
+.profile-form p {
   margin: 0;
+}
+
+.profile-form select {
+  display: block;
+  margin-top: 0.3rem;
+  font: inherit;
+  padding: 0.45rem 0.5rem;
+}
+
+nav[aria-label='Main'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 1.2rem;
+  margin-top: 0.4rem;
+}
+
+nav[aria-label='Main'] a,
+.link-button {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.signed-in {
+  color: var(--color-muted);
+}
+
+button.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+button.link-button:hover:not(:disabled) {
+  background: none;
+}
+
+.logged-out {
+  max-width: 34rem;
 }
 
 .synopsis-error {

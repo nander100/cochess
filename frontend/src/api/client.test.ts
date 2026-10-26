@@ -1,4 +1,4 @@
-import { ApiError, createApiClient } from './client'
+import { ApiError, createApiClient, isLoggedOut } from './client'
 
 function respond(status: number, body: unknown) {
   return vi.fn<typeof fetch>().mockResolvedValue(
@@ -6,7 +6,7 @@ function respond(status: number, body: unknown) {
   )
 }
 
-const request = { pgn: '1. e4 *', user_color: 'white' as const, elo: 1200, playstyle: null }
+const request = { pgn: '1. e4 *', user_color: 'white' as const }
 
 test('posts JSON and returns the parsed body', async () => {
   const fetchImpl = respond(201, { game_id: 'g1', positions: [], final_fen: 'x', final_is_terminal: false })
@@ -69,13 +69,38 @@ test('a synopsis the server refuses becomes an ApiError', async () => {
   )
 })
 
-test('sends the access code on every request when one is set', async () => {
+test('sends the session cookie with same-origin requests and no access code', async () => {
   const fetchImpl = vi.fn<typeof fetch>(async () => new Response('{"verify_fens": []}'))
 
-  await createApiClient(fetchImpl, () => 'secret').submitScan('g1', [])
-  await createApiClient(fetchImpl, () => null).submitScan('g1', [])
+  await createApiClient(fetchImpl).submitScan('g1', [])
 
-  const headers = fetchImpl.mock.calls.map(([, init]) => init?.headers as Record<string, string>)
-  expect(headers[0]['X-Access-Code']).toBe('secret')
-  expect(headers[1]).not.toHaveProperty('X-Access-Code')
+  const init = fetchImpl.mock.calls[0][1]
+  expect(init?.credentials).toBe('same-origin')
+  expect(init?.headers).not.toHaveProperty('X-Access-Code')
+})
+
+test('redeems a login token and reads and updates the profile', async () => {
+  const profile = { name: 'Alex', elo: 1400, time_control: 'rapid', playstyle: null, complete: true }
+  const fetchImpl = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    .mockImplementation(async () => new Response(JSON.stringify(profile)))
+  const api = createApiClient(fetchImpl)
+
+  await api.redeem('tok')
+  expect(await api.me()).toEqual(profile)
+  await api.updateMe({ elo: 1400 })
+
+  const calls = fetchImpl.mock.calls.map(([url, init]) => [url, init?.method, init?.body])
+  expect(calls).toEqual([
+    ['/api/auth/redeem', 'POST', '{"token":"tok"}'],
+    ['/api/me', undefined, undefined],
+    ['/api/me', 'PATCH', '{"elo":1400}'],
+  ])
+})
+
+test('a 401 means logged out; other errors do not', () => {
+  expect(isLoggedOut(new ApiError(401, 'x'))).toBe(true)
+  expect(isLoggedOut(new ApiError(404, 'x'))).toBe(false)
+  expect(isLoggedOut(new Error('x'))).toBe(false)
 })

@@ -21,11 +21,13 @@ You need Docker with Compose and an [Anthropic API key](https://platform.claude.
 
 ```bash
 cp backend/.env.example backend/.env
-# Edit backend/.env: set ACCESS_CODE to a long random string and ANTHROPIC_API_KEY to your key.
+# Edit backend/.env: set ANTHROPIC_API_KEY to your key, and PUBLIC_BASE_URL=http://localhost:8080.
 docker compose up --build
+docker compose exec backend uv run --no-dev python -m app.cli create-user --name "Alex"
+docker compose exec backend uv run --no-dev python -m app.cli invite --user Alex
 ```
 
-Open <http://localhost:8080>, enter the access code, and paste a game.
+Open the login link it prints, fill in your profile, and paste a game.
 
 To put it on a server for your testers, follow [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
@@ -35,12 +37,13 @@ Settings come from `backend/.env` (never commit it). Nested settings use `__`.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `ACCESS_CODE` | *(empty)* | Shared code testers enter once per browser session. **Empty turns the gate off**, which is only for local development; the backend logs a warning. |
+| `PUBLIC_BASE_URL` | `http://localhost:5173` | Where players open CoChess; `app.cli invite` builds login links from it. |
+| `AUTH__COOKIE_SECURE` | `true` | Session cookies only over HTTPS (browsers also accept them on `http://localhost`). |
 | `ANTHROPIC_API_KEY` | *(empty)* | Needed for the coach. Without it, analysis still works and the coach panel says it isn't set up. |
 | `COACH_MODEL_SYNOPSIS` | `claude-sonnet-5-5` | Model for the synopsis (low effort). `claude-opus-5-5` writes deeper synopses at about 2× the cost. |
 | `COACH_MODEL_CHAT` | `claude-haiku-5-5` | Model for the chat. `claude-sonnet-5-5` reasons more carefully at about 20× the cost per message. |
 | `DATABASE_URL` | `sqlite:///./cochess.db` | Docker overrides it to a file on the `cochess-data` volume. |
-| `LIMITS__MAX_GAMES_PER_DAY` | `10` | New games per rolling 24 hours, for the whole server. |
+| `LIMITS__MAX_GAMES_PER_DAY` | `10` | New games per player per rolling 24 hours. |
 | `COACH__CHAT_MAX_MESSAGES` | `30` | Questions per game. |
 | `COACH__SYNOPSIS_EFFORT`, `COACH__CHAT_EFFORT` | `low`, `medium` | Claude effort level (`low` … `max`): trades depth for speed and cost. |
 | `THRESHOLDS__INACCURACY` / `__MISTAKE` / `__BLUNDER` | `0.10` / `0.20` / `0.30` | Winning-chances drop for each label. |
@@ -86,7 +89,7 @@ npm run e2e                                         # engine only, free
 E2E_GAME=game3w.txt npm run e2e                     # another game
 E2E_COACH=1 npm run e2e                             # + a real synopsis (~$0.05)
 E2E_COACH=1 E2E_QUESTIONS="What if I had played 31...Kf7?" npm run e2e   # + chat
-E2E_BASE_URL=http://localhost:8080 E2E_ACCESS_CODE=... npm run e2e   # against docker compose
+E2E_BASE_URL=http://localhost:8080 E2E_LOGIN_LINK=<link from app.cli invite> npm run e2e   # against docker compose
 ```
 
 Evidence (depth/time per search, the synopsis, the chat transcript) is written to `frontend/test-results/`.

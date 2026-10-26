@@ -1,7 +1,7 @@
 import type { PipelineDeps } from '../analysis/pipeline'
 import type { ApiClient } from '../api/client'
 import type { CoachEvent } from '../api/sse'
-import type { CreateGameResponse, EngineConfig, EngineResult } from '../api/types'
+import type { CreateGameResponse, EngineConfig, EngineResult, Profile } from '../api/types'
 import type { EngineHandle } from '../engine/StockfishEngine'
 
 const TIER = { multipv: 1, min_time_ms: 1, min_depth: 1, hard_cap_ms: 1, max_line_plies: 1 }
@@ -11,6 +11,14 @@ export const ENGINE_CONFIG: EngineConfig = {
   scan: TIER,
   verify: { ...TIER, multipv: 4, max_line_plies: 10 },
   deep: { ...TIER, multipv: 4, max_line_plies: 10 },
+}
+
+export const PROFILE: Profile = {
+  name: 'Alex',
+  elo: 1350,
+  time_control: 'rapid',
+  playstyle: null,
+  complete: true,
 }
 
 export const SYNOPSIS_TEXT = '### Overall\nA tidy game.\n\n### Your turn\nWhat would you try on move 2?'
@@ -46,6 +54,10 @@ export function fakeEngine(): EngineHandle {
 
 export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
   return {
+    redeem: vi.fn(async () => {}),
+    logout: vi.fn(async () => {}),
+    me: vi.fn(async () => PROFILE),
+    updateMe: vi.fn(async (update) => ({ ...PROFILE, ...update, complete: true })),
     createGame: vi.fn(async () => GAME),
     engineConfig: vi.fn(async () => ENGINE_CONFIG),
     submitScan: vi.fn(async () => ({ verify_fens: ['fen-1 b', 'fen-2 w'] })),

@@ -1,6 +1,6 @@
-# Deploying CoChess v1 on one small server
+# Deploying CoChess on one small server
 
-v1 is for a handful of testers, so it runs on a single machine with Docker Compose: nginx serves the frontend and proxies the API, the FastAPI backend keeps its data in SQLite on a Docker volume, and a reverse proxy in front adds HTTPS.
+CoChess is for a handful of testers, so it runs on a single machine with Docker Compose: nginx serves the frontend and proxies the API, the FastAPI backend keeps its data in SQLite on a Docker volume, and a reverse proxy in front adds HTTPS.
 
 The chess engine runs in each user's browser, so the server does very little work. A 1 vCPU / 1–2 GB VPS is plenty.
 
@@ -21,11 +21,11 @@ cp backend/.env.example backend/.env
 Edit `backend/.env`:
 
 ```bash
-ACCESS_CODE=<a long random string; share it with your testers>
 ANTHROPIC_API_KEY=<your key>
+PUBLIC_BASE_URL=https://coach.example.com    # login links are built from it
 ```
 
-Generate a code with `openssl rand -base64 18`. **Don't leave `ACCESS_CODE` empty in production**: empty turns the gate off.
+Players log in with one-time links you create (step 5). Session cookies are `Secure`, so CoChess must be served over HTTPS (step 4).
 
 Keep the app off the public interface so only the HTTPS proxy can reach it:
 
@@ -40,6 +40,8 @@ docker compose up --build -d
 docker compose ps            # backend should become "healthy"
 curl -s http://127.0.0.1:8080/api/health    # {"ok":true}
 ```
+
+The backend brings the database schema up to date itself every time it starts (Alembic migrations).
 
 ## 4. Add HTTPS with Caddy
 
@@ -60,7 +62,16 @@ sudo systemctl reload caddy
 
 Caddy passes nginx's response headers through unchanged, including `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy`, which multi-threaded Stockfish needs. If you use a different proxy, make sure it doesn't strip them and doesn't buffer `/api/` responses.
 
-Check it: open `https://coach.example.com`, enter the access code, analyze a game, and open the "Engine details" line under the result. It should say `stockfish-19-lite` with more than one thread. If it says `stockfish-19-lite-single`, the cross-origin isolation headers aren't reaching the browser; it still works, just more slowly.
+## 5. Add players
+
+Create each player once, then send them a login link. A link works once and expires after 7 days; the login it starts lasts 30 days. If someone loses access (new browser, cleared cookies), send a new link.
+
+```bash
+docker compose exec backend uv run --no-dev python -m app.cli create-user --name "Alex"
+docker compose exec backend uv run --no-dev python -m app.cli invite --user Alex
+```
+
+Check it: open your own link, fill in the profile, analyze a game, and open the "Engine details" line under the result. It should say `stockfish-19-lite` with more than one thread. If it says `stockfish-19-lite-single`, the cross-origin isolation headers aren't reaching the browser; it still works, just more slowly.
 
 ## Day-to-day
 
@@ -71,9 +82,9 @@ git pull
 docker compose up --build -d
 ```
 
-The database lives on the `cochess-data` volume and survives rebuilds.
+The database lives on the `cochess-data` volume and survives rebuilds, and new migrations run when the backend starts. **Back up the database before updating** (below).
 
-**Change the access code**: edit `ACCESS_CODE` in `backend/.env`, then `docker compose up -d` (this recreates the backend). Testers are asked for the new code on their next request.
+**Upgrading from v1**: v1's games have no owner, so nobody sees them until you give them to a player: `create-user` for yourself, then `docker compose exec backend uv run --no-dev python -m app.cli assign-games --user Alex`. v1's `ACCESS_CODE` setting is no longer used; you can delete it from `backend/.env`.
 
 **Logs**
 
@@ -102,8 +113,8 @@ for row in db.execute('select model, count(*), sum(input_tokens), sum(output_tok
 
 Multiply by the current per-token prices for each model to get the cost.
 
-## Limits in v1
+## Limits
 
-- One shared access code; no accounts (real sign-in arrives in v4).
-- At most 10 new games a day for the whole server and 30 questions per game (see the configuration table in the README to change them).
+- Login links from the owner only; Google sign-in arrives in v4.
+- At most 10 new games a day per player and 30 questions per game (see the configuration table in the README to change them).
 - SQLite and a single backend process: fine for a few testers, not for public traffic.

@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
+import { logInWithProfile, newLoginLink } from './login.ts'
 
 // One of the owner's real games (backend/tests/fixtures/pgn/user/gameN{w|b}.txt).
 const GAME_FILE = process.env.E2E_GAME ?? 'game5b.txt'
@@ -34,17 +35,15 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
     if (tier && request.method() === 'POST') posted[tier] = request.postDataJSON().results
   })
 
+  const link = newLoginLink(`E2E ${Date.now()}`)
   await page.goto('/')
   // The Vite dev server can reload the page once while it bundles newly added dependencies.
   await page.waitForLoadState('networkidle')
   await expect(page.getByRole('heading', { name: 'CoChess' })).toBeVisible()
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(true)
-  if (process.env.E2E_ACCESS_CODE) {
-    await page.getByLabel('Access code').fill(process.env.E2E_ACCESS_CODE)
-    await page.getByRole('button', { name: 'Continue' }).click()
-  }
+  await expect(page.getByRole('alert')).toContainText("You're not logged in")
 
-  await page.getByLabel(/rating/i).fill('950')
+  await logInWithProfile(page, link, 950)
   await page.getByLabel(COLOR, { exact: true }).check()
   await page.getByLabel(/your game/i).fill(PGN)
   const started = Date.now()
