@@ -26,7 +26,12 @@ export default defineConfig({
       command: `uv run uvicorn app.main:create_app --factory --port ${BACKEND_PORT}`,
       cwd: '../backend',
       url: `http://localhost:${BACKEND_PORT}/api/health`,
-      env: env({ DATABASE_URL: 'sqlite://' }),
+      // The coach calls the paid Claude API, so it's off unless E2E_COACH=1 (an empty key
+      // overrides backend/.env and the coach endpoint answers 503).
+      env: env({
+        DATABASE_URL: 'sqlite://',
+        ...(process.env.E2E_COACH === '1' ? {} : { ANTHROPIC_API_KEY: '' }),
+      }),
       reuseExistingServer: false,
     },
     {

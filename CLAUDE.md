@@ -75,7 +75,7 @@ Frontend (run from `frontend/`):
 - Lint: `npm run lint` (oxlint, warnings fail)
 - Types: `npm run typecheck`
 - Build: `npm run build`
-- E2E: `npm run e2e` (Playwright on the system Google Chrome via `channel: 'chrome'`, no browser download; starts its own backend on :8001 with in-memory SQLite and Vite on :5174; analyzes a real owner game with Stockfish and writes depth/time evidence to `test-results/m2-engine-evidence.json`. It also overwrites `backend/tests/fixtures/engine/<game>.json` with that run's engine results; engine output varies run to run, so restore the committed fixture unless you mean to re-capture. Pick the game with `E2E_GAME=game3w.txt`. Takes 40–90 s.)
+- E2E: `npm run e2e` (Playwright on the system Google Chrome via `channel: 'chrome'`, no browser download; starts its own backend on :8001 with in-memory SQLite and Vite on :5174; analyzes a real owner game with Stockfish and writes depth/time evidence to `test-results/m2-engine-evidence.json`. It also overwrites `backend/tests/fixtures/engine/<game>.json` with that run's engine results; engine output varies run to run, so restore the committed fixture unless you mean to re-capture. Pick the game with `E2E_GAME=game3w.txt`. The coach (paid Claude API) is off unless `E2E_COACH=1`, which also waits for the synopsis and saves it to `test-results/m4-synopsis.txt`. Takes 40–90 s.)
 
 Everything: `docker compose up --build` → http://localhost:8080 (nginx serves the frontend with COOP/COEP and proxies `/api` to the backend; SQLite lives in the `cochess-data` volume). Needs `backend/.env`.
 

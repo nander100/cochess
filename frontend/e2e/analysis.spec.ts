@@ -35,6 +35,9 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
   })
 
   await page.goto('/')
+  // The Vite dev server can reload the page once while it bundles newly added dependencies.
+  await page.waitForLoadState('networkidle')
+  await expect(page.getByRole('heading', { name: 'CoChess' })).toBeVisible()
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(true)
 
   await page.getByLabel(/rating/i).fill('950')
@@ -60,6 +63,13 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
   mkdirSync(new URL('.', ENGINE_FIXTURE), { recursive: true })
   const fixture = { game: GAME_FILE, user_color: COLOR.toLowerCase(), ...posted }
   writeFileSync(ENGINE_FIXTURE, `${JSON.stringify(fixture, null, 1)}\n`)
+
+  if (process.env.E2E_COACH === '1') {
+    // Real Claude call: the synopsis arrives as validated markdown with the five sections.
+    const synopsis = page.getByRole('region', { name: "Coach's synopsis" })
+    await expect(synopsis.getByRole('heading', { name: 'Your turn' })).toBeVisible({ timeout: 180_000 })
+    writeFileSync(new URL('../test-results/m4-synopsis.txt', import.meta.url), (await synopsis.textContent()) ?? '')
+  }
 
   expect(engineLog.join()).toContain('CoChess engine: stockfish-19-lite,') // multi-threaded build
   expect(rows.some((row) => row.tier === 'verify')).toBe(true)
