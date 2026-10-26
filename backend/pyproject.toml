@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "CoChess backend: PGN analysis, detectors, and the Claude coach"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "alembic>=1.20.1",
     "anthropic>=2.3.0",
     "chess>=1.11.2",
     "fastapi>=0.162.0",
@@ -22,6 +23,10 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.ruff.lint.isort]
+# backend/alembic/ (the migrations folder) shares the package's name; it's still third-party.
+known-third-party = ["alembic"]
 
 [tool.mypy]
 python_version = "3.12"

@@ -1,10 +1,19 @@
-"""SQLAlchemy models (SPEC §9.1). Tables leave room for a nullable `user_id` column in v2."""
+"""SQLAlchemy models. Every schema change goes through an Alembic migration (backend/alembic)."""
 
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    ForeignKey,
+    Integer,
+    MetaData,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -17,7 +26,16 @@ def _utcnow() -> datetime:
 
 
 class Base(DeclarativeBase):
-    pass
+    # Named constraints, so Alembic batch migrations can drop and recreate them on SQLite.
+    metadata = MetaData(
+        naming_convention={
+            "ix": "ix_%(column_0_label)s",
+            "uq": "uq_%(table_name)s_%(column_0_N_name)s",
+            "ck": "ck_%(table_name)s_%(constraint_name)s",
+            "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+            "pk": "pk_%(table_name)s",
+        }
+    )
 
 
 class Game(Base):

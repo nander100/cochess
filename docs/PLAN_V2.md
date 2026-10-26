@@ -1,6 +1,6 @@
 # CoChess v2 — Implementation Plan (M0)
 
-Status: **draft for owner review.** Sources: `SPEC_V2.md` §1–§13, `docs/v1-as-built.md`, the code at tag `v1`. Open questions and recommended spec changes are in §6. Each item has a recommendation in **bold**, and that recommendation is the working default unless you overrule it.
+Status: **approved 2026-10-26.** The owner approved the dependencies in §6 Q1 and every recommendation in §6 as written. Q15 (deployed v1 data) wasn't answered: `assign-games` is built and tested either way. Sources: `SPEC_V2.md` §1–§13, `docs/v1-as-built.md`, the code at tag `v1`.
 
 ---
 

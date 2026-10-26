@@ -9,6 +9,9 @@ COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-dev
 
 COPY app ./app
+# The app runs these migrations itself at startup (app/db/migrate.py).
+COPY alembic.ini ./
+COPY alembic ./alembic
 
 RUN useradd --create-home cochess && mkdir -p /data && chown cochess /data
 USER cochess
