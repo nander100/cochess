@@ -25,3 +25,7 @@ dist-ssr
 
 # Stockfish builds copied from node_modules by scripts/copy-engine.mjs
 public/engine/
+
+# Playwright output
+test-results/
+playwright-report/

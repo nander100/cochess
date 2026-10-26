@@ -1,0 +1,56 @@
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { expect, test } from '@playwright/test'
+
+// One of the owner's real games (backend/tests/fixtures/pgn/user/gameN{w|b}.txt).
+const GAME_FILE = process.env.E2E_GAME ?? 'game5b.txt'
+const PGN = readFileSync(
+  new URL(`../../backend/tests/fixtures/pgn/user/${GAME_FILE}`, import.meta.url),
+  'utf8',
+)
+const COLOR = GAME_FILE.replace(/\.\w+$/, '').endsWith('b') ? 'Black' : 'White'
+const EVIDENCE = new URL('../test-results/m2-engine-evidence.json', import.meta.url)
+
+// Tier minimums from backend config: a search must reach the min depth unless it hit the cap.
+const TIERS = {
+  scan: { minDepth: 12, hardCapMs: 1000 },
+  verify: { minDepth: 18, hardCapMs: 3000 },
+}
+
+test('analyzes a real game in the browser with the multi-threaded engine', async ({ page }) => {
+  const engineLog: string[] = []
+  page.on('console', (message) => {
+    if (message.text().startsWith('CoChess engine:')) engineLog.push(message.text())
+  })
+
+  await page.goto('/')
+  expect(await page.evaluate(() => crossOriginIsolated)).toBe(true)
+
+  await page.getByLabel(/rating/i).fill('950')
+  await page.getByLabel(COLOR, { exact: true }).check()
+  await page.getByLabel(/your game/i).fill(PGN)
+  const started = Date.now()
+  await page.getByRole('button', { name: 'Analyze' }).click()
+  await expect(page.getByText('Analysis complete.')).toBeVisible({ timeout: 9 * 60_000 })
+  const wallMs = Date.now() - started
+
+  const summary = (await page.locator('.engine-stats summary').textContent()) ?? ''
+  const rows = await page.locator('[data-testid=engine-results] tbody tr').evaluateAll((trs) =>
+    trs.map((tr) => {
+      const cells = [...tr.querySelectorAll('td')].map((td) => td.textContent ?? '')
+      const [tier, position, depth, timeMs, evaluation, line] = cells
+      return { tier, position, depth: Number(depth), time_ms: Number(timeMs), eval: evaluation, line }
+    }),
+  )
+
+  mkdirSync(new URL('.', EVIDENCE), { recursive: true })
+  const evidence = { game: GAME_FILE, color: COLOR, wall_ms: wallMs, summary, engine_log: engineLog, rows }
+  writeFileSync(EVIDENCE, JSON.stringify(evidence, null, 2))
+
+  expect(engineLog.join()).toContain('CoChess engine: stockfish-19-lite,') // multi-threaded build
+  expect(rows.some((row) => row.tier === 'verify')).toBe(true)
+  for (const row of rows) {
+    const tier = TIERS[row.tier as keyof typeof TIERS]
+    const deepEnough = row.depth >= tier.minDepth || row.time_ms >= tier.hardCapMs
+    expect(deepEnough, JSON.stringify(row)).toBe(true)
+  }
+})
