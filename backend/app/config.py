@@ -77,6 +77,8 @@ class CoachSettings(BaseModel):
 
     synopsis_max_tokens: int = 8000
     synopsis_effort: Effort = "medium"
+    # The prompt asks for <= 300 words; past this ceiling the backend logs a warning.
+    synopsis_max_words: int = 350
     chat_max_tokens: int = 6000
     chat_effort: Effort = "medium"
     # While the coach is writing (responses are validated before they're sent, PLAN Q22), the

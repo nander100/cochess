@@ -101,6 +101,17 @@ class TestService:
         with app.state.session_factory() as session:
             assert session.query(ChatMessageRow).count() == 1
 
+    async def test_an_overlong_synopsis_is_logged(self, caplog: pytest.LogCaptureFixture) -> None:
+        long_text = VALID + " word" * 400
+        client, coach, app = make(long_text)
+        game_id = analyzed_game(client)
+
+        with caplog.at_level(logging.WARNING):
+            result = await synopsis_for(coach, app, game_id)
+
+        assert result.text == long_text  # kept whole: cutting would break the sections
+        assert "synopsis too long" in caplog.text
+
 
 class TestEndpoint:
     def test_streams_status_then_the_validated_text_then_done(self) -> None:

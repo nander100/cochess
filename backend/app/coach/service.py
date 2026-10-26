@@ -75,6 +75,9 @@ async def generate_synopsis(
     if invalid:
         text = strip_moves(text, invalid)
         logger.warning("coach moves removed: game=%s endpoint=synopsis moves=%s", game_id, invalid)
+    words = len(text.split())
+    if words > settings.coach.synopsis_max_words:
+        logger.warning("synopsis too long: game=%s words=%d", game_id, words)
     with sessions() as session:
         save_synopsis(session, game_id, text, invalid)
     return SynopsisResult(text=text, invalid_moves_removed=invalid)

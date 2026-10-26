@@ -66,6 +66,7 @@ def test_system_prompt_carries_the_hard_rules() -> None:
     assert "the knight on f3" in prompt  # pieces and squares in words, not notation
     assert "hangingPiece" in prompt and "Lichess's puzzle trainer" in prompt
     assert "### Your turn" in prompt
+    assert "at most 300 words in total" in prompt
 
 
 def test_system_blocks_mark_only_the_last_block_for_caching() -> None:
