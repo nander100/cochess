@@ -81,7 +81,7 @@ Changed tables. All are adds, except the one batch recreate for `engine_results`
 
 ### 2.3 Migration list
 
-`0001_v1_baseline` → `0002_users_auth` (users, invites, sessions) → `0003_user_scoping` (games, engine_results, llm_usage, chat_messages, pending_tool_calls columns) → `0004_moments_tendencies` (game_theme_facts, tendency_snapshots, moment_progress) → `0005_baseline_reports`. Each one lands with the milestone that needs it.
+`0001_v1_baseline` → `0002_users_auth` (users, invites, sessions) → `0003_user_scoping` (games, engine_results.user_id, llm_usage) → M3: `engine_results.position_key` + `chat_messages.path_uci` + `pending_tool_calls.path_uci` → M4/M5: game_theme_facts, tendency_snapshots, moment_progress → M6: baseline_reports. Each one lands with the milestone that needs it (changed at M1: the M3 columns moved out of `0003`, so nothing is added before it's used).
 
 ---
 
