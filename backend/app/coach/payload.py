@@ -34,7 +34,7 @@ class CoachPayload(BaseModel):
     task: Task
     user_prompt: str | None = None
     player: PlayerPayload
-    pgn_to_move: str
+    pgn_to_move: str | None = None  # chat turns leave it out: the game is in the cached context
     fen: str | None = None
     engine_lines: list[LineSummary] | None = None
     game_summary: GameSummary | None = None

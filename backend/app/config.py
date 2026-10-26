@@ -81,6 +81,9 @@ class CoachSettings(BaseModel):
     synopsis_max_words: int = 350
     chat_max_tokens: int = 6000
     chat_effort: Effort = "medium"
+    chat_max_messages: int = 30  # per game (PLAN Q27)
+    chat_max_message_chars: int = 2000
+    chat_max_tool_calls: int = 2  # analyze_position calls per user message (SPEC §8.3)
     # While the coach is writing (responses are validated before they're sent, PLAN Q22), the
     # SSE stream sends a keepalive comment this often so proxies don't drop the connection.
     keepalive_s: float = 10

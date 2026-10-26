@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 import anthropic
-from anthropic.types import ContentBlock, MessageParam, TextBlockParam, ToolParam
+from anthropic.types import ContentBlock, MessageParam, TextBlockParam, ToolChoiceParam, ToolParam
 
 from app.config import Effort
 
@@ -44,6 +44,7 @@ class CoachRequest:
     max_tokens: int
     effort: Effort
     tools: list[ToolParam] = field(default_factory=list)
+    tool_choice: ToolChoiceParam | None = None
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,8 @@ class AnthropicCoachClient:
 
     async def complete(self, request: CoachRequest) -> CoachReply:
         optional: dict[str, Any] = {"tools": request.tools} if request.tools else {}
+        if request.tool_choice is not None:
+            optional["tool_choice"] = request.tool_choice
         try:
             # Streaming avoids HTTP timeouts on long responses; the reply is buffered here and
             # validated before anything reaches the player (PLAN Q22).

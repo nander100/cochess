@@ -86,3 +86,18 @@ class LlmUsageRow(Base):
     cache_read_tokens: Mapped[int] = mapped_column(Integer)
     cache_write_tokens: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class PendingToolCallRow(Base):
+    """An analyze_position call waiting for the browser's deep-dive results (SPEC §8.3)."""
+
+    __tablename__ = "pending_tool_calls"
+
+    request_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), index=True)
+    tool_use: Mapped[dict[str, Any]] = mapped_column(JSON)  # {"id": ..., "input": {...}}
+    positions: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
+    # tool_result blocks for any other tool_use blocks in the same turn (answered with errors)
+    extra_results: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
+    tool_calls_used: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
