@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 from fastapi import FastAPI, Request, Response
 from sqlalchemy.orm import sessionmaker
 
+from app.api import engine as engine_routes
 from app.api import games
 from app.config import Settings, get_settings
 from app.db.models import Base
@@ -40,4 +41,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"ok": True}
 
     app.include_router(games.router)
+    app.include_router(engine_routes.router)
     return app

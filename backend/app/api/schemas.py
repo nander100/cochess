@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.analysis.engine import EngineResult
 from app.analysis.pgn import PgnErrorCode, Position
 
 # Input rules from SPEC §3 (user flow), not tunable thresholds.
@@ -43,3 +44,29 @@ class PgnErrorDetail(BaseModel):
 
 class PgnErrorResponse(BaseModel):
     detail: PgnErrorDetail
+
+
+class EngineResultsRequest(BaseModel):
+    results: list[EngineResult]
+
+
+class ScanResponse(BaseModel):
+    verify_fens: list[str]
+
+
+class Counts(BaseModel):
+    inaccuracies: int
+    mistakes: int
+    blunders: int
+    missed_mates: int
+
+
+class Accuracy(BaseModel):
+    user: float
+    opponent: float
+
+
+class VerifyResponse(BaseModel):
+    summary_ready: bool
+    counts: Counts | None
+    accuracy: Accuracy | None

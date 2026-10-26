@@ -2,8 +2,9 @@
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
-from sqlalchemy import JSON, DateTime, Integer, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -28,4 +29,21 @@ class Game(Base):
     elo: Mapped[int] = mapped_column(Integer)
     playstyle: Mapped[str | None] = mapped_column(Text)
     headers: Mapped[dict[str, str]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class EngineResultRow(Base):
+    """One engine search of one position. `lines` holds the SPEC §5.4 lines, White POV."""
+
+    __tablename__ = "engine_results"
+    __table_args__ = (UniqueConstraint("game_id", "fen", "tier"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), index=True)
+    ply: Mapped[int | None] = mapped_column(Integer)
+    fen: Mapped[str] = mapped_column(String(100))
+    tier: Mapped[str] = mapped_column(String(6))
+    depth: Mapped[int] = mapped_column(Integer)
+    time_ms: Mapped[int] = mapped_column(Integer)
+    lines: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

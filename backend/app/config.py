@@ -16,7 +16,11 @@ class EngineTier(BaseModel):
     max_line_plies: int
 
 
-class EngineTiers(BaseModel):
+class EngineSettings(BaseModel):
+    """Served to the browser by GET /api/engine-config, so the backend stays the one source."""
+
+    max_threads: int = 4  # browser uses min(hardwareConcurrency - 1, max_threads)
+    hash_mb: int = 64
     scan: EngineTier = EngineTier(
         multipv=1, min_time_ms=250, min_depth=12, hard_cap_ms=1000, max_line_plies=1
     )
@@ -55,7 +59,7 @@ class Settings(BaseSettings):
     coach_model_chat: str = "claude-sonnet-5-5"
     database_url: str = "sqlite:///./cochess.db"
 
-    engine: EngineTiers = EngineTiers()
+    engine: EngineSettings = EngineSettings()
     thresholds: Thresholds = Thresholds()
     limits: Limits = Limits()
 
