@@ -100,6 +100,12 @@ export class StockfishEngine implements EngineHandle {
 
   /** Start the right Stockfish build in a Web Worker and complete the UCI handshake. */
   static async create(config: EngineConfig): Promise<StockfishEngine> {
+    if (typeof Worker === 'undefined' || typeof WebAssembly === 'undefined') {
+      throw new Error(
+        "Your browser can't run the chess engine. Please use a recent version of Chrome, " +
+          'Firefox, Edge or Safari.',
+      )
+    }
     const build = chooseBuild(globalThis.crossOriginIsolated === true)
     const threads = threadCount(build, navigator.hardwareConcurrency || 2, config.max_threads)
     const worker = new Worker(`/engine/${build}.js`)

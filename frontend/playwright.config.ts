@@ -4,6 +4,9 @@ import { defineConfig } from '@playwright/test'
 // system Google Chrome. Ports differ from the dev defaults so a running dev setup isn't touched.
 const BACKEND_PORT = 8001
 const FRONTEND_PORT = 5174
+// E2E_BASE_URL (e.g. http://localhost:8080) runs against an already running stack, such as the
+// production `docker compose up`, instead of starting dev servers.
+const EXTERNAL_URL = process.env.E2E_BASE_URL
 
 function env(extra: Record<string, string>): Record<string, string> {
   const base = Object.entries(process.env).filter(
@@ -17,11 +20,11 @@ export default defineConfig({
   timeout: 10 * 60_000,
   reporter: [['list']],
   use: {
-    baseURL: `http://localhost:${FRONTEND_PORT}`,
+    baseURL: EXTERNAL_URL ?? `http://localhost:${FRONTEND_PORT}`,
     channel: 'chrome',
     headless: true,
   },
-  webServer: [
+  webServer: EXTERNAL_URL ? [] : [
     {
       command: `uv run uvicorn app.main:create_app --factory --port ${BACKEND_PORT}`,
       cwd: '../backend',
@@ -30,6 +33,7 @@ export default defineConfig({
       // overrides backend/.env and the coach endpoint answers 503).
       env: env({
         DATABASE_URL: 'sqlite://',
+        ACCESS_CODE: process.env.E2E_ACCESS_CODE ?? '', // gate off unless a code is given
         ...(process.env.E2E_COACH === '1' ? {} : { ANTHROPIC_API_KEY: '' }),
       }),
       reuseExistingServer: false,

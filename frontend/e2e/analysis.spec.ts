@@ -39,6 +39,10 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
   await page.waitForLoadState('networkidle')
   await expect(page.getByRole('heading', { name: 'CoChess' })).toBeVisible()
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(true)
+  if (process.env.E2E_ACCESS_CODE) {
+    await page.getByLabel('Access code').fill(process.env.E2E_ACCESS_CODE)
+    await page.getByRole('button', { name: 'Continue' }).click()
+  }
 
   await page.getByLabel(/rating/i).fill('950')
   await page.getByLabel(COLOR, { exact: true }).check()

@@ -36,14 +36,22 @@ export interface ApiClient {
   ): Promise<void>
 }
 
-export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)): ApiClient {
+export function createApiClient(
+  fetchImpl: typeof fetch = fetch.bind(globalThis),
+  getAccessCode: () => string | null = () => null,
+): ApiClient {
   /** Fetch, turning network failures and non-2xx responses into ApiErrors. */
   async function send(path: string, init?: RequestInit): Promise<Response> {
     let response: Response
     try {
+      const code = getAccessCode()
       response = await fetchImpl(path, {
         ...init,
-        headers: { 'Content-Type': 'application/json', ...init?.headers },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(code ? { 'X-Access-Code': code } : {}),
+          ...init?.headers,
+        },
       })
     } catch {
       throw new ApiError(0, "Couldn't reach the CoChess server. Check your connection and try again.")

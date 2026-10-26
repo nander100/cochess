@@ -2,24 +2,24 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import App from './App'
 import { ApiError } from './api/client'
 import type { CoachEvent } from './api/sse'
-import { fakeDeps } from './test/fakes'
+import { ENGINE_CONFIG, fakeDeps } from './test/fakes'
 
-function submitGame() {
-  fireEvent.change(screen.getByLabelText(/rating/i), { target: { value: '1350' } })
+async function submitGame() {
+  fireEvent.change(await screen.findByLabelText(/rating/i), { target: { value: '1350' } })
   fireEvent.change(screen.getByLabelText(/your game/i), { target: { value: '1. e4 e5 2. Nf3 *' } })
   fireEvent.click(screen.getByRole('button', { name: 'Analyze' }))
 }
 
-test('renders the app title', () => {
+test('renders the app title', async () => {
   render(<App deps={fakeDeps()} />)
 
-  expect(screen.getByRole('heading', { name: 'CoChess' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'CoChess' })).toBeInTheDocument()
 })
 
 test('runs the analysis and shows engine details when done', async () => {
   render(<App deps={fakeDeps()} />)
 
-  submitGame()
+  await submitGame()
 
   expect(await screen.findByText('Analysis complete.')).toBeInTheDocument()
   expect(screen.getByText(/stockfish-19-lite, 3 thread\(s\)/)).toBeInTheDocument()
@@ -36,7 +36,7 @@ test('shows accuracy and error counts from the game summary', async () => {
   })
   render(<App deps={deps} />)
 
-  submitGame()
+  await submitGame()
 
   const headline = await screen.findByText(/Your accuracy/)
   expect(headline).toHaveTextContent(
@@ -52,7 +52,7 @@ test('shows the server error when the PGN is rejected', async () => {
   })
   render(<App deps={deps} />)
 
-  submitGame()
+  await submitGame()
 
   expect(await screen.findByRole('alert')).toHaveTextContent(
     "Non-standard starting positions aren't supported.",
@@ -70,7 +70,7 @@ test('the coach writes a synopsis once the summary is ready', async () => {
   })
   render(<App deps={deps} />)
 
-  submitGame()
+  await submitGame()
 
   expect(await screen.findByRole('heading', { name: 'Overall' })).toBeInTheDocument()
   expect(screen.getByText('A tidy game.')).toBeInTheDocument()
@@ -90,7 +90,7 @@ test('a coach error is shown in the synopsis panel', async () => {
   })
   render(<App deps={deps} />)
 
-  submitGame()
+  await submitGame()
 
   expect(await screen.findByText('The coach is unavailable right now.')).toBeInTheDocument()
 })
@@ -99,7 +99,7 @@ test('no synopsis is requested before the summary is ready', async () => {
   const deps = fakeDeps()
   render(<App deps={deps} />)
 
-  submitGame()
+  await submitGame()
 
   await screen.findByText('Analysis complete.')
   expect(deps.api.streamSynopsis).not.toHaveBeenCalled()
@@ -121,7 +121,7 @@ test('after the synopsis, a what-if question runs the deep tier on the engine', 
     }),
   })
   render(<App deps={deps} />)
-  submitGame()
+  await submitGame()
   await screen.findByRole('heading', { name: 'Overall' })
 
   fireEvent.change(screen.getByLabelText('Your question'), { target: { value: 'What if e5?' } })
@@ -133,4 +133,57 @@ test('after the synopsis, a what-if question runs the deep tier on the engine', 
     'deep',
     expect.objectContaining({ multipv: 4 }),
   )
+})
+
+const DENIED = new ApiError(401, 'Enter the access code to use CoChess.')
+
+test('a gated server shows the access gate, and the right code opens the app', async () => {
+  const engineConfig = vi.fn().mockRejectedValueOnce(DENIED).mockRejectedValueOnce(DENIED)
+    .mockResolvedValue(ENGINE_CONFIG)
+  render(<App deps={fakeDeps({ engineConfig })} />)
+
+  fireEvent.change(await screen.findByLabelText('Access code'), { target: { value: 'wrong' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent("That access code didn't work.")
+
+  fireEvent.change(screen.getByLabelText('Access code'), { target: { value: 'right' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+  expect(await screen.findByLabelText(/rating/i)).toBeInTheDocument()
+  expect(sessionStorage.getItem('cochess-access-code')).toBe('right')
+})
+
+test('a 401 in the middle of a session returns to the gate', async () => {
+  render(<App deps={fakeDeps({ createGame: vi.fn().mockRejectedValue(DENIED) })} />)
+
+  await submitGame()
+
+  expect(await screen.findByLabelText('Access code')).toBeInTheDocument()
+  expect(screen.getByRole('alert')).toHaveTextContent('Please enter the access code again.')
+})
+
+test('a failed synopsis can be retried', async () => {
+  const streamSynopsis = vi
+    .fn()
+    .mockImplementationOnce(async (_g: string, emit: (event: CoachEvent) => void) => {
+      emit({ type: 'error', message: 'The coach is unavailable right now.' })
+    })
+    .mockImplementationOnce(async (_g: string, emit: (event: CoachEvent) => void) => {
+      emit({ type: 'text', text: '### Overall\nSecond time lucky.' })
+      emit({ type: 'done', invalid_moves_removed: [] })
+    })
+  const deps = fakeDeps({
+    streamSynopsis,
+    submitVerify: vi.fn(async () => ({
+      summary_ready: true,
+      counts: { inaccuracies: 0, mistakes: 0, blunders: 0, missed_mates: 0 },
+      accuracy: { user: 90, opponent: 80 },
+    })),
+  })
+  render(<App deps={deps} />)
+  await submitGame()
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Try again' }))
+
+  expect(await screen.findByText('Second time lucky.')).toBeInTheDocument()
 })

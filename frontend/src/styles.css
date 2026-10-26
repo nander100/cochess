@@ -304,3 +304,23 @@ progress {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+.access-gate {
+  display: grid;
+  gap: var(--space);
+  max-width: 26rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+.access-gate p {
+  margin: 0;
+}
+
+.synopsis-error {
+  display: grid;
+  gap: 0.6rem;
+  justify-items: start;
+}

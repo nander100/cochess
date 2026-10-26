@@ -1,8 +1,10 @@
 """Game routes (SPEC §9)."""
 
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.analysis.pgn import PgnError, parse_pgn
@@ -24,6 +26,15 @@ def create_game(
     session: Annotated[Session, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> CreateGameResponse:
+    cap = settings.limits.max_games_per_day
+    since = datetime.now(UTC) - timedelta(days=1)
+    recent = session.scalar(select(func.count()).where(Game.created_at >= since)) or 0
+    if recent >= cap:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"CoChess analyzes at most {cap} new games a day while in testing. "
+            "Please try again tomorrow.",
+        )
     try:
         parsed = parse_pgn(
             body.pgn,

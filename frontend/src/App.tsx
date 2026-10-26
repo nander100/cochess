@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   type AnalysisRun,
   type AnalysisStatus,
@@ -7,8 +7,10 @@ import {
   statusLabel,
 } from './analysis/pipeline'
 import { type ChatDeps, askCoach } from './analysis/chat'
+import { clearAccessCode, isAccessDenied, readAccessCode, saveAccessCode } from './api/access'
 import { createApiClient } from './api/client'
 import type { CreateGameRequest, EngineConfig } from './api/types'
+import { AccessGate } from './components/AccessGate'
 import { ChatPanel } from './components/ChatPanel'
 import { EngineStats } from './components/EngineStats'
 import { GameInput } from './components/GameInput'
@@ -27,7 +29,7 @@ type View =
 function defaultDeps(): PipelineDeps {
   let engine: Promise<EngineHandle> | null = null
   return {
-    api: createApiClient(),
+    api: createApiClient(undefined, readAccessCode),
     getEngine(config: EngineConfig) {
       engine ??= StockfishEngine.create(config).catch((error: unknown) => {
         engine = null // let the next attempt retry
@@ -46,6 +48,39 @@ export default function App({ deps }: AppProps) {
   const [pipeline] = useState(() => deps ?? defaultDeps())
   const [view, setView] = useState<View>({ kind: 'idle' })
   const [synopsis, setSynopsis] = useState<SynopsisState | null>(null)
+  const [access, setAccess] = useState<'checking' | 'locked' | 'open'>('checking')
+  const [accessError, setAccessError] = useState<string | null>(null)
+
+  // One cheap gated request tells us whether this browser session needs the access code.
+  useEffect(() => {
+    pipeline.api.engineConfig().then(
+      () => setAccess('open'),
+      (error: unknown) => setAccess(isAccessDenied(error) ? 'locked' : 'open'),
+    )
+  }, [pipeline])
+
+  async function unlock(code: string) {
+    saveAccessCode(code)
+    setAccess('checking')
+    setAccessError(null)
+    try {
+      await pipeline.api.engineConfig()
+      setAccess('open')
+    } catch (error) {
+      if (isAccessDenied(error)) clearAccessCode()
+      setAccess('locked')
+      setAccessError(isAccessDenied(error) ? "That access code didn't work." : errorText(error))
+    }
+  }
+
+  /** A 401 mid-session (the code was changed on the server): back to the gate. */
+  function lockIfDenied(error: unknown): boolean {
+    if (!isAccessDenied(error)) return false
+    clearAccessCode()
+    setAccess('locked')
+    setAccessError('Please enter the access code again.')
+    return true
+  }
 
   async function analyze(request: CreateGameRequest) {
     setView({ kind: 'running', status: { phase: 'starting' } })
@@ -57,7 +92,8 @@ export default function App({ deps }: AppProps) {
       setView({ kind: 'done', run })
       if (run.outcome.summary_ready) void coach(run.game.game_id)
     } catch (error) {
-      setView({ kind: 'error', message: errorText(error) })
+      if (lockIfDenied(error)) setView({ kind: 'idle' })
+      else setView({ kind: 'error', message: errorText(error) })
     }
   }
 
@@ -92,18 +128,26 @@ export default function App({ deps }: AppProps) {
         setSynopsis({ status: 'error', text, error: 'The connection to the coach was lost.' })
       }
     } catch (error) {
-      setSynopsis({ status: 'error', text, error: errorText(error) })
+      if (!lockIfDenied(error)) setSynopsis({ status: 'error', text, error: errorText(error) })
     }
+  }
+
+  if (access !== 'open') {
+    return (
+      <main>
+        <Header />
+        {access === 'locked' ? (
+          <AccessGate error={accessError} onUnlock={(code) => void unlock(code)} />
+        ) : (
+          <p className="coach-writing">Connecting…</p>
+        )}
+      </main>
+    )
   }
 
   return (
     <main>
-      <header>
-        <h1>CoChess</h1>
-        <p className="tagline">
-          Paste a game. The engine finds what happened; your coach explains it.
-        </p>
-      </header>
+      <Header />
 
       <GameInput disabled={view.kind === 'running'} onSubmit={(request) => void analyze(request)} />
 
@@ -120,7 +164,9 @@ export default function App({ deps }: AppProps) {
           <p>Analysis complete.</p>
           <ResultHeadline run={view.run} />
           <div className="coach-columns">
-            {synopsis && <Synopsis state={synopsis} />}
+            {synopsis && (
+              <Synopsis state={synopsis} onRetry={() => void coach(view.run.game.game_id)} />
+            )}
             {synopsis && synopsis.status !== 'writing' && (
               <ChatPanel
                 key={view.run.game.game_id}
@@ -134,6 +180,15 @@ export default function App({ deps }: AppProps) {
         </section>
       )}
     </main>
+  )
+}
+
+function Header() {
+  return (
+    <header>
+      <h1>CoChess</h1>
+      <p className="tagline">Paste a game. The engine finds what happened; your coach explains it.</p>
+    </header>
   )
 }
 

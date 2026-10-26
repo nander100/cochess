@@ -94,6 +94,9 @@ class Limits(BaseModel):
 
     max_pgn_chars: int = 100_000
     max_plies: int = 600
+    # New games per rolling 24 hours, for the whole server: v1 testers share one access code
+    # (PLAN Q27).
+    max_games_per_day: int = 10
     max_playstyle_chars: int = 500
 
 

@@ -1,8 +1,11 @@
 """FastAPI application factory and middleware. Run with `uvicorn app.main:create_app --factory`."""
 
+import hmac
+import logging
 from collections.abc import Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import sessionmaker
 
 from app.api import coach as coach_routes
@@ -18,6 +21,10 @@ CROSS_ORIGIN_ISOLATION_HEADERS = {
     "Cross-Origin-Opener-Policy": "same-origin",
     "Cross-Origin-Embedder-Policy": "require-corp",
 }
+ACCESS_HEADER = "X-Access-Code"
+UNGATED_PATHS = frozenset({"/api/health"})
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(
@@ -36,6 +43,22 @@ def create_app(
     if coach_client is None and settings.anthropic_api_key:
         coach_client = AnthropicCoachClient(settings.anthropic_api_key)
     app.state.coach_client = coach_client
+    if not settings.access_code:
+        logger.warning("ACCESS_CODE is not set: the access gate is off (fine for development only)")
+
+    # Middleware added later wraps earlier middleware, so the isolation headers below also apply
+    # to the gate's 401 responses.
+    @app.middleware("http")
+    async def access_gate(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        """v1's shared access code (SPEC §4.2): every API request must carry it."""
+        path = request.url.path
+        if settings.access_code and path.startswith("/api/") and path not in UNGATED_PATHS:
+            supplied = request.headers.get(ACCESS_HEADER, "")
+            if not hmac.compare_digest(supplied.encode(), settings.access_code.encode()):
+                return JSONResponse({"detail": "Enter the access code to use CoChess."}, 401)
+        return await call_next(request)
 
     @app.middleware("http")
     async def cross_origin_isolation(

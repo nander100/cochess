@@ -8,10 +8,11 @@ export interface SynopsisState {
 
 interface SynopsisProps {
   state: SynopsisState
+  onRetry?: () => void
 }
 
 /** The coach's synopsis. Markdown is rendered without raw HTML (react-markdown's default). */
-export function Synopsis({ state }: SynopsisProps) {
+export function Synopsis({ state, onRetry }: SynopsisProps) {
   return (
     <section
       className="synopsis"
@@ -30,9 +31,16 @@ export function Synopsis({ state }: SynopsisProps) {
         </div>
       )}
       {state.status === 'error' && (
-        <p className="run-error" role="alert">
-          {state.error}
-        </p>
+        <div className="synopsis-error">
+          <p className="run-error" role="alert">
+            {state.error}
+          </p>
+          {onRetry && (
+            <button type="button" onClick={onRetry}>
+              Try again
+            </button>
+          )}
+        </div>
       )}
     </section>
   )

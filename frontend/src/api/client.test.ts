@@ -68,3 +68,14 @@ test('a synopsis the server refuses becomes an ApiError', async () => {
     new ApiError(503, "The coach isn't set up on this server yet."),
   )
 })
+
+test('sends the access code on every request when one is set', async () => {
+  const fetchImpl = vi.fn<typeof fetch>(async () => new Response('{"verify_fens": []}'))
+
+  await createApiClient(fetchImpl, () => 'secret').submitScan('g1', [])
+  await createApiClient(fetchImpl, () => null).submitScan('g1', [])
+
+  const headers = fetchImpl.mock.calls.map(([, init]) => init?.headers as Record<string, string>)
+  expect(headers[0]['X-Access-Code']).toBe('secret')
+  expect(headers[1]).not.toHaveProperty('X-Access-Code')
+})

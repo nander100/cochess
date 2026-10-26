@@ -8,14 +8,22 @@ services:
       - cochess-data:/data
     expose:
       - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
 
   frontend:
     build: ./frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
-      - "8080:80"
+      # Put a TLS reverse proxy in front of this in production (see docs/DEPLOY.md).
+      - "${COCHESS_PORT:-8080}:80"
     restart: unless-stopped
 
 volumes:
