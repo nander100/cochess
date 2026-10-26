@@ -5,8 +5,10 @@ from collections.abc import Awaitable, Callable
 from fastapi import FastAPI, Request, Response
 from sqlalchemy.orm import sessionmaker
 
+from app.api import coach as coach_routes
 from app.api import engine as engine_routes
 from app.api import games
+from app.coach.client import AnthropicCoachClient, CoachClient
 from app.config import Settings, get_settings
 from app.db.models import Base
 from app.db.session import make_engine
@@ -18,7 +20,11 @@ CROSS_ORIGIN_ISOLATION_HEADERS = {
 }
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, coach_client: CoachClient | None = None
+) -> FastAPI:
+    """`coach_client` is injected by tests; otherwise it's built from ANTHROPIC_API_KEY (and is
+    None without a key, so coach endpoints answer 503 instead of failing at startup)."""
     settings = settings or get_settings()
     engine = make_engine(settings.database_url)
     # v1 has no migrations (PLAN Q12); Alembic arrives with Postgres in v2.
@@ -27,6 +33,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="CoChess")
     app.state.settings = settings
     app.state.session_factory = sessionmaker(engine, expire_on_commit=False)
+    if coach_client is None and settings.anthropic_api_key:
+        coach_client = AnthropicCoachClient(settings.anthropic_api_key)
+    app.state.coach_client = coach_client
 
     @app.middleware("http")
     async def cross_origin_isolation(
@@ -42,4 +51,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(games.router)
     app.include_router(engine_routes.router)
+    app.include_router(coach_routes.router)
     return app

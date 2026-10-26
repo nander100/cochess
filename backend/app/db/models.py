@@ -57,3 +57,32 @@ class GameSummaryRow(Base):
     game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), primary_key=True)
     summary: Mapped[dict[str, Any]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class ChatMessageRow(Base):
+    """The coach conversation for a game. `content` is JSON: the synopsis (M4), then chat turns
+    as Anthropic content blocks (M5)."""
+
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), index=True)
+    role: Mapped[str] = mapped_column(String(10))
+    content: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class LlmUsageRow(Base):
+    """One Claude API call's token usage (SPEC §7.1), for v4 credit metering."""
+
+    __tablename__ = "llm_usage"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    game_id: Mapped[str | None] = mapped_column(ForeignKey("games.id"), index=True)
+    endpoint: Mapped[str] = mapped_column(String(32))
+    model: Mapped[str] = mapped_column(String(64))
+    input_tokens: Mapped[int] = mapped_column(Integer)
+    output_tokens: Mapped[int] = mapped_column(Integer)
+    cache_read_tokens: Mapped[int] = mapped_column(Integer)
+    cache_write_tokens: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

@@ -1,6 +1,7 @@
 """Application settings. Every threshold and engine setting lives here (SPEC §5.3, §6.1)."""
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -67,6 +68,22 @@ class DetectorSettings(BaseModel):
     low_clock_default_s: float = 30
 
 
+Effort = Literal["low", "medium", "high", "xhigh", "max"]
+
+
+class CoachSettings(BaseModel):
+    """Claude call settings (SPEC §7). Thinking is always on for current models and counts
+    toward max_tokens, so these leave room for it."""
+
+    synopsis_max_tokens: int = 8000
+    synopsis_effort: Effort = "medium"
+    chat_max_tokens: int = 6000
+    chat_effort: Effort = "medium"
+    # While the coach is writing (responses are validated before they're sent, PLAN Q22), the
+    # SSE stream sends a keepalive comment this often so proxies don't drop the connection.
+    keepalive_s: float = 10
+
+
 class Limits(BaseModel):
     """Input size limits for user-submitted data."""
 
@@ -87,6 +104,7 @@ class Settings(BaseSettings):
     engine: EngineSettings = EngineSettings()
     thresholds: Thresholds = Thresholds()
     detectors: DetectorSettings = DetectorSettings()
+    coach: CoachSettings = CoachSettings()
     limits: Limits = Limits()
 
 
