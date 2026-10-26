@@ -1,0 +1,19 @@
+# Secrets and local data — never commit (CLAUDE.md "Don't")
+.env
+*.db
+*.sqlite3
+
+# Python
+.venv/
+__pycache__/
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+
+# Local Claude Code settings
+.claude/settings.local.json
