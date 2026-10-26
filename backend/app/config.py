@@ -79,6 +79,10 @@ class CoachSettings(BaseModel):
     synopsis_effort: Effort = "medium"
     # The prompt asks for <= 300 words; past this ceiling the backend logs a warning.
     synopsis_max_words: int = 350
+    # What the coach sees of each key moment's engine lines. The full lines stay in the stored
+    # summary; the coach only needs enough to explain the idea (input tokens are most of the cost).
+    coach_engine_lines: int = 2
+    coach_line_plies: int = 6
     chat_max_tokens: int = 6000
     chat_effort: Effort = "medium"
     chat_max_messages: int = 30  # per game (PLAN Q27)

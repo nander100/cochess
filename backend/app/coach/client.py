@@ -8,21 +8,24 @@ from typing import Any, Protocol
 import anthropic
 from anthropic.types import ContentBlock, MessageParam, TextBlockParam, ToolChoiceParam, ToolParam
 
+from app.coach.payload import Task
 from app.config import Effort
 
 _PROMPTS = Path(__file__).parent / "prompts"
 
 
 @cache
-def system_prompt() -> str:
-    return (_PROMPTS / "coach_system.md").read_text()
+def system_prompt(task: Task) -> str:
+    """The shared coaching rules plus only this task's instructions (fewer input tokens)."""
+    core = (_PROMPTS / "coach_system.md").read_text()
+    return f"{core}\n{(_PROMPTS / f'{task}.md').read_text()}"
 
 
-def system_blocks(*extra: str) -> list[TextBlockParam]:
-    """The system prompt, marked for prompt caching (it's identical on every call), plus any
+def system_blocks(task: Task, *extra: str) -> list[TextBlockParam]:
+    """The task's system prompt, marked for prompt caching (identical on every call), plus any
     extra blocks. The cache breakpoint goes on the last block so they're cached together."""
     blocks: list[TextBlockParam] = [
-        {"type": "text", "text": text} for text in (system_prompt(), *extra)
+        {"type": "text", "text": text} for text in (system_prompt(task), *extra)
     ]
     blocks[-1]["cache_control"] = {"type": "ephemeral"}
     return blocks

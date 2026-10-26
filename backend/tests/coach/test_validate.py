@@ -80,3 +80,9 @@ def test_strip_moves_replaces_only_the_invalid_moves() -> None:
 
     assert stripped == f"After 3. Bc4 you played 4. {REMOVED}, then 4...Nf6."
     assert find_invalid(stripped, {"Bc4", "Nf6"}) == []
+
+
+def test_annotated_moves_in_the_data_are_allowed_without_their_marks() -> None:
+    allowed = allowed_moves({"pgn_to_move": "10. d4?? Bb4+ 11. a3?! O-O? 12. Bb5"})
+
+    assert allowed == {"d4", "Bb4", "a3", "O-O", "Bb5"}

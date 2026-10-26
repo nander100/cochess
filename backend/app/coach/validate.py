@@ -31,6 +31,7 @@ _FULL_SAN = re.compile(
     r"|[a-h](?:x[a-h])?[1-8](?:=[QRBN])?)[+#]?"
 )
 _MOVE_NUMBER = re.compile(r"^\d+\.+")
+_ANNOTATION = re.compile(r"[!?]+$")  # "Bb5??" in the annotated movetext
 
 
 def _matches(text: str) -> Iterator[tuple[int, int, str]]:
@@ -58,7 +59,7 @@ def allowed_moves(data: Any, *, skip_keys: Iterable[str] = ("user_prompt",)) -> 
     def walk(value: Any) -> None:
         if isinstance(value, str):
             for word in value.split():
-                token = _MOVE_NUMBER.sub("", word)
+                token = _ANNOTATION.sub("", _MOVE_NUMBER.sub("", word))
                 if _FULL_SAN.fullmatch(token):
                     found.add(normalize(token))
         elif isinstance(value, dict):

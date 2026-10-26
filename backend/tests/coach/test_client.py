@@ -52,7 +52,7 @@ def final_message() -> Message:
 
 REQUEST = CoachRequest(
     model="claude-opus-5-5",
-    system=system_blocks(),
+    system=system_blocks("synopsis"),
     messages=[{"role": "user", "content": "payload"}],
     max_tokens=8000,
     effort="medium",

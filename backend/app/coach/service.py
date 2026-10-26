@@ -6,7 +6,6 @@ from dataclasses import dataclass, replace
 from anthropic.types import MessageParam
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.analysis.pgn import parse_pgn
 from app.coach.client import CoachClient, CoachReply, CoachRequest, system_blocks
 from app.coach.payload import SYNOPSIS_INSTRUCTION, build_synopsis_payload, render
 from app.coach.validate import allowed_moves, find_invalid, strip_moves
@@ -43,18 +42,14 @@ async def generate_synopsis(
         summary = load_summary(session, game_id)
         if game is None or summary is None:
             raise LookupError(f"game {game_id} has no summary yet")
-        pgn = game.pgn
-    parsed = parse_pgn(
-        pgn, max_chars=settings.limits.max_pgn_chars, max_plies=settings.limits.max_plies
-    )
-    payload = build_synopsis_payload(summary, parsed)
+    payload = build_synopsis_payload(summary, settings.coach)
     allowed = allowed_moves(payload.model_dump(mode="json"))
     messages: list[MessageParam] = [
         {"role": "user", "content": render(payload, SYNOPSIS_INSTRUCTION)}
     ]
     request = CoachRequest(
         model=settings.coach_model_synopsis,
-        system=system_blocks(),
+        system=system_blocks("synopsis"),
         messages=messages,
         max_tokens=settings.coach.synopsis_max_tokens,
         effort=settings.coach.synopsis_effort,

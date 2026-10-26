@@ -16,7 +16,14 @@ from app.analysis.engine import EngineResult, best_by_fen, check_batch
 from app.analysis.pgn import ParsedGame, parse_pgn
 from app.analysis.summary_models import GameSummary
 from app.coach.client import CoachClient, CoachReply, CoachRequest, system_blocks
-from app.coach.payload import CoachPayload, movetext, player_payload, render
+from app.coach.payload import (
+    COACH_EXCLUDE,
+    CoachPayload,
+    annotated_movetext,
+    coach_view,
+    player_payload,
+    render,
+)
 from app.coach.tools import (
     ANALYZE_POSITION,
     EnginePosition,
@@ -203,7 +210,7 @@ def _request(
     limit_reached = tool_calls_used >= settings.coach.chat_max_tool_calls
     return CoachRequest(
         model=settings.coach_model_chat,
-        system=system_blocks(context.context_block),
+        system=system_blocks("chat", context.context_block),
         messages=messages,
         max_tokens=settings.coach.chat_max_tokens,
         effort=settings.coach.chat_effort,
@@ -284,9 +291,10 @@ def _load_context(session: Session, settings: Settings, game_id: str) -> _Contex
     parsed = parse_pgn(
         game.pgn, max_chars=settings.limits.max_pgn_chars, max_plies=settings.limits.max_plies
     )
+    view = coach_view(summary, settings.coach)
     data = {
-        "pgn": movetext(parsed.positions),
-        "game_summary": summary.model_dump(mode="json", exclude={"eval_curve"}),
+        "pgn_to_move": annotated_movetext(summary),
+        "game_summary": view.model_dump(mode="json", exclude=COACH_EXCLUDE["game_summary"]),
     }
     synopsis = load_synopsis(session, game_id)
     block = f"{CONTEXT_INTRO}\n\n{json.dumps(data, separators=(',', ':'))}"

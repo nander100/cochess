@@ -73,7 +73,8 @@ class TestPlainQuestions:
         assert request.tool_choice is None
         context = request.system[1]["text"]
         assert context.startswith("Context for this chat")
-        assert '"move_list"' in context and "eval_curve" not in context
+        assert '"pgn_to_move":"1. e4 e5' in context
+        assert '"move_list"' not in context and "eval_curve" not in context
         assert request.system[-1]["cache_control"] == {"type": "ephemeral"}
         turn = last_user_blocks(fake, 0)[0]["text"]
         assert json.loads(turn.split("\n\n", 1)[1]) == {
