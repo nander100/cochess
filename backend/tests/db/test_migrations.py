@@ -2,10 +2,11 @@
 
 from pathlib import Path
 
+from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import Engine, text
+from sqlalchemy import Engine, inspect, text
 
 from app.db.migrate import alembic_config, upgrade
 from app.db.models import Base
@@ -54,15 +55,47 @@ def test_v1_database_is_stamped_then_upgraded_and_keeps_its_data() -> None:
         for statement in V1_SCHEMA.read_text().split(";"):
             if statement.strip():
                 connection.execute(text(statement))
+        for game_id in ("g1", "g2"):
+            connection.execute(
+                text(
+                    "INSERT INTO games (id, pgn, user_color, elo, playstyle, headers, created_at) "
+                    f"VALUES ('{game_id}', '1. e4 *', 'white', 1400, NULL, '{{}}', "
+                    "'2026-10-01 12:00:00')"
+                )
+            )
         connection.execute(
             text(
-                "INSERT INTO games (id, pgn, user_color, elo, playstyle, headers, created_at) "
-                "VALUES ('g1', '1. e4 *', 'white', 1400, NULL, '{}', '2026-10-01 12:00:00')"
+                "INSERT INTO game_summaries (game_id, summary, created_at) "
+                "VALUES ('g1', '{}', '2026-10-01 12:01:00')"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO llm_usage (game_id, endpoint, model, input_tokens, output_tokens, "
+                "cache_read_tokens, cache_write_tokens, created_at) "
+                "VALUES ('g1', 'synopsis', 'm', 1, 1, 0, 0, '2026-10-01 12:02:00')"
             )
         )
 
     upgrade(engine)
 
     assert _version(engine) == _head()
+    assert _differences(engine) == []
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT id, elo FROM games")).all() == [("g1", 1400)]
+        games = connection.execute(text("SELECT id, elo, status, user_id FROM games ORDER BY id"))
+        assert games.all() == [("g1", 1400, "analyzed", None), ("g2", 1400, "uploaded", None)]
+        assert connection.execute(text("SELECT task FROM llm_usage")).scalar() == "synopsis"
+
+
+def test_every_migration_downgrades_back_to_an_empty_database() -> None:
+    engine = make_engine("sqlite://")
+    upgrade(engine)
+    config = alembic_config()
+
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.downgrade(config, "base")
+        assert inspect(connection).get_table_names() == ["alembic_version"]
+        command.upgrade(config, "head")
+
+    assert _differences(engine) == []

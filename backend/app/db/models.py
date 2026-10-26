@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     ForeignKey,
+    Index,
     Integer,
     MetaData,
     String,
@@ -83,12 +84,21 @@ class AuthSession(Base):
 class Game(Base):
     __tablename__ = "games"
 
+    __table_args__ = (Index("ix_games_user_id_played_at", "user_id", "played_at"),)
+
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    # Null only for v1 games not yet given to a user (`cli assign-games`); those are invisible.
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
     pgn: Mapped[str] = mapped_column(Text)
     user_color: Mapped[str] = mapped_column(String(5))
-    elo: Mapped[int] = mapped_column(Integer)
+    elo: Mapped[int] = mapped_column(Integer)  # the player's Elo when the game was analyzed
     playstyle: Mapped[str | None] = mapped_column(Text)
     headers: Mapped[dict[str, str]] = mapped_column(JSON)
+    time_control_category: Mapped[str | None] = mapped_column(String(10))
+    user_result: Mapped[str | None] = mapped_column(String(4))  # win / loss / draw
+    played_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    status: Mapped[str] = mapped_column(String(10), default="uploaded", server_default="uploaded")
+    source: Mapped[str] = mapped_column(String(10), default="single", server_default="single")
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
 
 
@@ -100,6 +110,8 @@ class EngineResultRow(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), index=True)
+    # Browser results are only ever reused within the same user's data (SPEC_V2 §4.2).
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
     ply: Mapped[int | None] = mapped_column(Integer)
     fen: Mapped[str] = mapped_column(String(100))
     tier: Mapped[str] = mapped_column(String(6))
@@ -139,7 +151,10 @@ class LlmUsageRow(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     game_id: Mapped[str | None] = mapped_column(ForeignKey("games.id"), index=True)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
     endpoint: Mapped[str] = mapped_column(String(32))
+    # SPEC_V2 §6.1 task: synopsis, chat, explain, moment_intro, moment_feedback, baseline_report
+    task: Mapped[str | None] = mapped_column(String(20))
     model: Mapped[str] = mapped_column(String(64))
     input_tokens: Mapped[int] = mapped_column(Integer)
     output_tokens: Mapped[int] = mapped_column(Integer)
