@@ -69,6 +69,20 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
     const synopsis = page.getByRole('region', { name: "Coach's synopsis" })
     await expect(synopsis.getByRole('heading', { name: 'Your turn' })).toBeVisible({ timeout: 180_000 })
     writeFileSync(new URL('../test-results/m4-synopsis.txt', import.meta.url), (await synopsis.textContent()) ?? '')
+
+    // Chat questions, separated by "|", e.g. E2E_QUESTIONS="What if I had played 31...Kf7?"
+    const questions = (process.env.E2E_QUESTIONS ?? '').split('|').filter((q) => q.trim())
+    const transcript: string[] = []
+    for (const [index, question] of questions.entries()) {
+      await page.getByLabel('Your question').fill(question)
+      await page.getByRole('button', { name: 'Send' }).click()
+      const reply = page.locator('.chat-message.coach').nth(index)
+      await expect(reply).toBeVisible({ timeout: 180_000 })
+      transcript.push(`YOU: ${question}`, `COACH: ${(await reply.innerText()).replace(/^coach\s*/i, '')}`)
+    }
+    if (questions.length) {
+      writeFileSync(new URL('../test-results/m5-chat.txt', import.meta.url), transcript.join('\n\n'))
+    }
   }
 
   expect(engineLog.join()).toContain('CoChess engine: stockfish-19-lite,') // multi-threaded build
