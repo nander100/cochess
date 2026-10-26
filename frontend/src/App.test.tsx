@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import App from './App'
 import { ApiError } from './api/client'
+import type { CoachEvent } from './api/sse'
 import { fakeDeps } from './test/fakes'
 
 function submitGame() {
@@ -57,4 +58,49 @@ test('shows the server error when the PGN is rejected', async () => {
     "Non-standard starting positions aren't supported.",
   )
   expect(screen.getByRole('button', { name: 'Analyze' })).toBeEnabled()
+})
+
+test('the coach writes a synopsis once the summary is ready', async () => {
+  const deps = fakeDeps({
+    submitVerify: vi.fn(async () => ({
+      summary_ready: true,
+      counts: { inaccuracies: 0, mistakes: 0, blunders: 0, missed_mates: 0 },
+      accuracy: { user: 90, opponent: 80 },
+    })),
+  })
+  render(<App deps={deps} />)
+
+  submitGame()
+
+  expect(await screen.findByRole('heading', { name: 'Overall' })).toBeInTheDocument()
+  expect(screen.getByText('A tidy game.')).toBeInTheDocument()
+  expect(deps.api.streamSynopsis).toHaveBeenCalledWith('game-1', expect.any(Function))
+})
+
+test('a coach error is shown in the synopsis panel', async () => {
+  const deps = fakeDeps({
+    submitVerify: vi.fn(async () => ({
+      summary_ready: true,
+      counts: { inaccuracies: 0, mistakes: 0, blunders: 0, missed_mates: 0 },
+      accuracy: { user: 90, opponent: 80 },
+    })),
+    streamSynopsis: vi.fn(async (_id: string, onEvent: (event: CoachEvent) => void) => {
+      onEvent({ type: 'error', message: 'The coach is unavailable right now.' })
+    }),
+  })
+  render(<App deps={deps} />)
+
+  submitGame()
+
+  expect(await screen.findByText('The coach is unavailable right now.')).toBeInTheDocument()
+})
+
+test('no synopsis is requested before the summary is ready', async () => {
+  const deps = fakeDeps()
+  render(<App deps={deps} />)
+
+  submitGame()
+
+  await screen.findByText('Analysis complete.')
+  expect(deps.api.streamSynopsis).not.toHaveBeenCalled()
 })

@@ -11,6 +11,7 @@ import type { CreateGameRequest, EngineConfig } from './api/types'
 import { EngineStats } from './components/EngineStats'
 import { GameInput } from './components/GameInput'
 import { ProgressBar } from './components/ProgressBar'
+import { Synopsis, type SynopsisState } from './components/Synopsis'
 import { type EngineHandle, StockfishEngine } from './engine/StockfishEngine'
 
 type View =
@@ -41,17 +42,42 @@ interface AppProps {
 export default function App({ deps }: AppProps) {
   const [pipeline] = useState(() => deps ?? defaultDeps())
   const [view, setView] = useState<View>({ kind: 'idle' })
+  const [synopsis, setSynopsis] = useState<SynopsisState | null>(null)
 
   async function analyze(request: CreateGameRequest) {
     setView({ kind: 'running', status: { phase: 'starting' } })
+    setSynopsis(null)
     try {
       const run = await runAnalysis(pipeline, request, (status) =>
         setView({ kind: 'running', status }),
       )
       setView({ kind: 'done', run })
+      if (run.outcome.summary_ready) void coach(run.game.game_id)
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Something went wrong.'
-      setView({ kind: 'error', message })
+      setView({ kind: 'error', message: errorText(error) })
+    }
+  }
+
+  async function coach(gameId: string) {
+    setSynopsis({ status: 'writing', text: '', error: null })
+    let text = ''
+    let finished = false
+    try {
+      await pipeline.api.streamSynopsis(gameId, (event) => {
+        if (event.type === 'text') {
+          text += event.text
+          setSynopsis({ status: 'writing', text, error: null })
+        } else if (event.type === 'done' || event.type === 'error') {
+          finished = true
+          const error = event.type === 'error' ? event.message : null
+          setSynopsis({ status: error ? 'error' : 'done', text, error })
+        }
+      })
+      if (!finished) {
+        setSynopsis({ status: 'error', text, error: 'The connection to the coach was lost.' })
+      }
+    } catch (error) {
+      setSynopsis({ status: 'error', text, error: errorText(error) })
     }
   }
 
@@ -78,6 +104,7 @@ export default function App({ deps }: AppProps) {
         <section className="result" aria-label="Analysis">
           <p>Analysis complete.</p>
           <ResultHeadline run={view.run} />
+          {synopsis && <Synopsis state={synopsis} />}
           <EngineStats run={view.run} />
         </section>
       )}
@@ -97,6 +124,10 @@ function ResultHeadline({ run }: { run: AnalysisRun }) {
       {count(counts.mistakes, 'mistake', 'mistakes')}, {count(counts.blunders, 'blunder', 'blunders')}
     </p>
   )
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : 'Something went wrong.'
 }
 
 function progressOf(status: AnalysisStatus): { done: number; total: number } {

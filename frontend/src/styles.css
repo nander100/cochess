@@ -181,3 +181,36 @@ progress {
 .engine-stats .line {
   font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
 }
+
+.headline {
+  font-size: 1.05rem;
+}
+
+.synopsis {
+  margin-top: 1.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-left: 4px solid var(--color-accent);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+}
+
+.synopsis h2 {
+  font-family: ui-serif, Georgia, 'Times New Roman', serif;
+  font-size: 1.35rem;
+  margin: 0 0 0.5rem;
+}
+
+.synopsis-text h3 {
+  font-size: 1rem;
+  margin: 1.1rem 0 0.3rem;
+}
+
+.synopsis-text p {
+  margin: 0 0 0.6rem;
+}
+
+.coach-writing {
+  color: var(--color-muted);
+  font-style: italic;
+}

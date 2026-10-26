@@ -1,3 +1,4 @@
+import { type CoachEvent, readCoachEvents } from './sse'
 import type {
   CreateGameRequest,
   CreateGameResponse,
@@ -23,10 +24,13 @@ export interface ApiClient {
   engineConfig(): Promise<EngineConfig>
   submitScan(gameId: string, results: EngineResult[]): Promise<ScanResponse>
   submitVerify(gameId: string, results: EngineResult[]): Promise<VerifyResponse>
+  /** Resolves when the stream ends; coach failures arrive as an `error` event. */
+  streamSynopsis(gameId: string, onEvent: (event: CoachEvent) => void): Promise<void>
 }
 
 export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)): ApiClient {
-  async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  /** Fetch, turning network failures and non-2xx responses into ApiErrors. */
+  async function send(path: string, init?: RequestInit): Promise<Response> {
     let response: Response
     try {
       response = await fetchImpl(path, {
@@ -36,11 +40,16 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
     } catch {
       throw new ApiError(0, "Couldn't reach the CoChess server. Check your connection and try again.")
     }
-    const body: unknown = await response.json().catch(() => null)
     if (!response.ok) {
+      const body: unknown = await response.json().catch(() => null)
       throw new ApiError(response.status, errorMessage(body, response.status))
     }
-    return body as T
+    return response
+  }
+
+  async function request<T>(path: string, init?: RequestInit): Promise<T> {
+    const response = await send(path, init)
+    return (await response.json()) as T
   }
 
   const post = <T>(path: string, body: unknown) =>
@@ -51,6 +60,11 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
     engineConfig: () => request('/api/engine-config'),
     submitScan: (gameId, results) => post(`/api/games/${gameId}/engine/scan`, { results }),
     submitVerify: (gameId, results) => post(`/api/games/${gameId}/engine/verify`, { results }),
+    async streamSynopsis(gameId, onEvent) {
+      const response = await send(`/api/games/${gameId}/synopsis`, { method: 'POST' })
+      if (!response.body) throw new ApiError(response.status, 'The coach sent an empty response.')
+      await readCoachEvents(response.body, onEvent)
+    },
   }
 }
 

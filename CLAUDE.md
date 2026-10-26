@@ -65,6 +65,7 @@ Backend (run from `backend/`):
 - Lint/format: `uv run ruff check . && uv run ruff format .`
 - Types: `uv run mypy app` (strict)
 - Config: copy `.env.example` to `.env`. Nested settings use `__`, e.g. `THRESHOLDS__BLUNDER=0.35`.
+- Real synopsis for an owner game (calls the Claude API, needs `ANTHROPIC_API_KEY` in `.env`, ~$0.05–0.10 per run): `uv run python -m scripts.synopsis game5b --elo 800`
 - Game summary for an owner game: `uv run python -m scripts.print_summary game1w [--elo 1400] [--compact]` (built from `tests/fixtures/engine/<game>.json`, the real engine results captured by the frontend E2E)
 
 Frontend (run from `frontend/`):

@@ -44,3 +44,27 @@ test('reports an unreachable server', async () => {
 
   await expect(createApiClient(fetchImpl).engineConfig()).rejects.toThrow("Couldn't reach the CoChess server")
 })
+
+test('streams synopsis events from the SSE response', async () => {
+  const sse = 'event: status\ndata: {"message": "Coach is writing…"}\n\nevent: done\ndata: {"invalid_moves_removed": []}\n\n'
+  const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+    new Response(sse, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
+  )
+  const events: unknown[] = []
+
+  await createApiClient(fetchImpl).streamSynopsis('g1', (event) => events.push(event))
+
+  expect(fetchImpl.mock.calls[0][0]).toBe('/api/games/g1/synopsis')
+  expect(events).toEqual([
+    { type: 'status', message: 'Coach is writing…' },
+    { type: 'done', invalid_moves_removed: [] },
+  ])
+})
+
+test('a synopsis the server refuses becomes an ApiError', async () => {
+  const fetchImpl = respond(503, { detail: "The coach isn't set up on this server yet." })
+
+  await expect(createApiClient(fetchImpl).streamSynopsis('g1', () => {})).rejects.toEqual(
+    new ApiError(503, "The coach isn't set up on this server yet."),
+  )
+})

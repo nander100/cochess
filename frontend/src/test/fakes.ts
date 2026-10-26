@@ -1,5 +1,6 @@
 import type { PipelineDeps } from '../analysis/pipeline'
 import type { ApiClient } from '../api/client'
+import type { CoachEvent } from '../api/sse'
 import type { CreateGameResponse, EngineConfig, EngineResult } from '../api/types'
 import type { EngineHandle } from '../engine/StockfishEngine'
 
@@ -11,6 +12,8 @@ export const ENGINE_CONFIG: EngineConfig = {
   verify: { ...TIER, multipv: 4, max_line_plies: 10 },
   deep: { ...TIER, multipv: 4, max_line_plies: 10 },
 }
+
+export const SYNOPSIS_TEXT = '### Overall\nA tidy game.\n\n### Your turn\nWhat would you try on move 2?'
 
 export const GAME: CreateGameResponse = {
   game_id: 'game-1',
@@ -47,6 +50,11 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     engineConfig: vi.fn(async () => ENGINE_CONFIG),
     submitScan: vi.fn(async () => ({ verify_fens: ['fen-1 b', 'fen-2 w'] })),
     submitVerify: vi.fn(async () => ({ summary_ready: false, counts: null, accuracy: null })),
+    streamSynopsis: vi.fn(async (_gameId: string, onEvent: (event: CoachEvent) => void) => {
+      onEvent({ type: 'status', message: 'Coach is writing…' })
+      onEvent({ type: 'text', text: SYNOPSIS_TEXT })
+      onEvent({ type: 'done', invalid_moves_removed: [] })
+    }),
     ...overrides,
   }
 }
