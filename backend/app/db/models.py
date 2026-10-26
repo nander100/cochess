@@ -6,7 +6,6 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
-    DateTime,
     ForeignKey,
     Integer,
     MetaData,
@@ -15,6 +14,8 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from app.db.types import UtcDateTime
 
 
 def _new_id() -> str:
@@ -38,6 +39,47 @@ class Base(DeclarativeBase):
     )
 
 
+class User(Base):
+    """A player (SPEC_V2 §4.3). The profile fields stay empty until the first login."""
+
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    name: Mapped[str] = mapped_column(String(60))
+    # Lower-cased name: names are unique ignoring case, because the CLI looks users up by name.
+    name_key: Mapped[str] = mapped_column(String(60), unique=True)
+    elo: Mapped[int | None] = mapped_column(Integer)
+    time_control: Mapped[str | None] = mapped_column(String(10))
+    playstyle: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)
+
+
+class Invite(Base):
+    """A one-time login link (SPEC_V2 §4.1). Only the token's hash is stored."""
+
+    __tablename__ = "invites"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    used_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+
+
+class AuthSession(Base):
+    """A logged-in browser. Only the cookie token's hash is stored."""
+
+    __tablename__ = "sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+
+
 class Game(Base):
     __tablename__ = "games"
 
@@ -47,7 +89,7 @@ class Game(Base):
     elo: Mapped[int] = mapped_column(Integer)
     playstyle: Mapped[str | None] = mapped_column(Text)
     headers: Mapped[dict[str, str]] = mapped_column(JSON)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
 
 
 class EngineResultRow(Base):
@@ -64,7 +106,7 @@ class EngineResultRow(Base):
     depth: Mapped[int] = mapped_column(Integer)
     time_ms: Mapped[int] = mapped_column(Integer)
     lines: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
 
 
 class GameSummaryRow(Base):
@@ -74,7 +116,7 @@ class GameSummaryRow(Base):
 
     game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), primary_key=True)
     summary: Mapped[dict[str, Any]] = mapped_column(JSON)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
 
 
 class ChatMessageRow(Base):
@@ -87,7 +129,7 @@ class ChatMessageRow(Base):
     game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), index=True)
     role: Mapped[str] = mapped_column(String(10))
     content: Mapped[dict[str, Any]] = mapped_column(JSON)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
 
 
 class LlmUsageRow(Base):
@@ -103,7 +145,7 @@ class LlmUsageRow(Base):
     output_tokens: Mapped[int] = mapped_column(Integer)
     cache_read_tokens: Mapped[int] = mapped_column(Integer)
     cache_write_tokens: Mapped[int] = mapped_column(Integer)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
 
 
 class PendingToolCallRow(Base):
@@ -118,4 +160,4 @@ class PendingToolCallRow(Base):
     # tool_result blocks for any other tool_use blocks in the same turn (answered with errors)
     extra_results: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
     tool_calls_used: Mapped[int] = mapped_column(Integer)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)

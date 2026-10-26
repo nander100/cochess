@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from app.api import coach as coach_routes
 from app.api import engine as engine_routes
 from app.api import games
+from app.auth import routes as auth_routes
 from app.coach.client import AnthropicCoachClient, CoachClient
 from app.config import Settings, get_settings
 from app.db.migrate import upgrade
@@ -22,7 +23,7 @@ CROSS_ORIGIN_ISOLATION_HEADERS = {
     "Cross-Origin-Embedder-Policy": "require-corp",
 }
 ACCESS_HEADER = "X-Access-Code"
-UNGATED_PATHS = frozenset({"/api/health"})
+UNGATED_PATHS = frozenset({"/api/health", "/api/auth/redeem"})
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ def create_app(
     async def health() -> dict[str, bool]:
         return {"ok": True}
 
+    app.include_router(auth_routes.router)
     app.include_router(games.router)
     app.include_router(engine_routes.router)
     app.include_router(coach_routes.router)

@@ -104,6 +104,17 @@ class Limits(BaseModel):
     max_playstyle_chars: int = 500
 
 
+class AuthSettings(BaseModel):
+    """Invite links and login sessions (SPEC_V2 §4.1)."""
+
+    invite_ttl_days: int = 7
+    session_ttl_days: int = 30
+    cookie_name: str = "cochess_session"
+    # Browsers treat http://localhost as secure, so this can stay on in development too. Turn it
+    # off only to test over plain HTTP on another host.
+    cookie_secure: bool = True
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", extra="ignore")
 
@@ -114,7 +125,10 @@ class Settings(BaseSettings):
     coach_model_synopsis: str = "claude-sonnet-5-5"
     coach_model_chat: str = "claude-haiku-5-5"
     database_url: str = "sqlite:///./cochess.db"
+    # Where players open CoChess; invite links are built from it.
+    public_base_url: str = "http://localhost:5173"
 
+    auth: AuthSettings = AuthSettings()
     engine: EngineSettings = EngineSettings()
     thresholds: Thresholds = Thresholds()
     detectors: DetectorSettings = DetectorSettings()
