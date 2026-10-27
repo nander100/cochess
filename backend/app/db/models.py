@@ -106,7 +106,12 @@ class EngineResultRow(Base):
     """One engine search of one position. `lines` holds the SPEC §5.4 lines, White POV."""
 
     __tablename__ = "engine_results"
-    __table_args__ = (UniqueConstraint("game_id", "fen", "tier"),)
+    # Unique on the full FEN: a position can recur in a game with different move counters, and the
+    # scan stores each occurrence. Lookups by position (e.g. a variation) use `position_key`.
+    __table_args__ = (
+        UniqueConstraint("game_id", "fen", "tier"),
+        Index("ix_engine_results_game_id_position_key", "game_id", "position_key"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), index=True)
@@ -114,6 +119,8 @@ class EngineResultRow(Base):
     user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
     ply: Mapped[int | None] = mapped_column(Integer)
     fen: Mapped[str] = mapped_column(String(100))
+    # The FEN without move counters (app.analysis.paths.position_key).
+    position_key: Mapped[str] = mapped_column(String(100))
     tier: Mapped[str] = mapped_column(String(6))
     depth: Mapped[int] = mapped_column(Integer)
     time_ms: Mapped[int] = mapped_column(Integer)
@@ -141,6 +148,8 @@ class ChatMessageRow(Base):
     game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), index=True)
     role: Mapped[str] = mapped_column(String(10))
     content: Mapped[dict[str, Any]] = mapped_column(JSON)
+    # The board position the player's message was sent from (UCI moves from the start).
+    path_uci: Mapped[list[str] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
 
 
@@ -171,6 +180,8 @@ class PendingToolCallRow(Base):
     request_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
     game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), index=True)
     tool_use: Mapped[dict[str, Any]] = mapped_column(JSON)  # {"id": ..., "input": {...}}
+    # The position the message was sent from: a tool call without a ply analyzes it.
+    path_uci: Mapped[list[str] | None] = mapped_column(JSON)
     positions: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
     # tool_result blocks for any other tool_use blocks in the same turn (answered with errors)
     extra_results: Mapped[list[dict[str, Any]]] = mapped_column(JSON)

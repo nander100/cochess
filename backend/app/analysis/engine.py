@@ -1,12 +1,13 @@
 """Engine results posted by the browser (SPEC §5.4), and checks that they fit the game."""
 
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from typing import Literal, Self
 
 import chess
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.analysis.evals import Evaluation, terminal_evaluation
+from app.analysis.paths import position_key
 from app.analysis.pgn import ParsedGame
 from app.config import EngineTier
 
@@ -86,6 +87,23 @@ def check_batch(
     if missing:
         raise EngineResultError(f"Missing engine results for {len(missing)} position(s).")
     return [_check_result(result, tier=tier, tier_config=tier_config) for result in results]
+
+
+def check_for_position(
+    result: EngineResult, *, fen: str, tier_configs: Mapping[Tier, EngineTier]
+) -> EngineResult:
+    """Validate a result the browser sent for one position (chat, Explain): it must be for `fen`
+    (the position the backend replayed from the path, compared without move counters), of an
+    allowed tier, with legal lines. Returns it with lines truncated to the tier's length."""
+    if position_key(result.fen) != position_key(fen):
+        raise EngineResultError("The engine result is for a different position than the board.")
+    config = tier_configs.get(result.tier)
+    if config is None:
+        allowed = " or ".join(tier_configs)
+        raise EngineResultError(f"Expected a {allowed} result, got {result.tier}.")
+    return _check_result(
+        result.model_copy(update={"fen": fen}), tier=result.tier, tier_config=config
+    )
 
 
 def _check_result(result: EngineResult, *, tier: Tier, tier_config: EngineTier) -> EngineResult:

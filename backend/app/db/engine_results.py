@@ -6,7 +6,8 @@ from typing import cast
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.analysis.engine import EngineLine, EngineResult, Tier
+from app.analysis.engine import TIER_RANK, EngineLine, EngineResult, Tier
+from app.analysis.paths import position_key
 from app.analysis.summary_models import GameSummary
 from app.db.models import EngineResultRow, Game, GameSummaryRow
 
@@ -31,6 +32,7 @@ def save_results(session: Session, game_id: str, results: Sequence[EngineResult]
             user_id=user_id,
             ply=result.ply,
             fen=result.fen,
+            position_key=position_key(result.fen),
             tier=result.tier,
             depth=result.depth,
             time_ms=result.time_ms,
@@ -58,6 +60,45 @@ def load_results(session: Session, game_id: str, tiers: Collection[Tier]) -> lis
         )
         for row in rows
     ]
+
+
+def load_position_result(
+    session: Session, game_id: str, fen: str, tiers: Collection[Tier] = ("verify", "deep")
+) -> EngineResult | None:
+    """The best stored search of this position in this game (deep > verify; newest wins a tie),
+    matched without move counters, so a variation that transposes finds the game's result."""
+    rows = session.scalars(
+        select(EngineResultRow)
+        .where(
+            EngineResultRow.game_id == game_id,
+            EngineResultRow.position_key == position_key(fen),
+            EngineResultRow.tier.in_(tiers),
+        )
+        .order_by(EngineResultRow.id)
+    )
+    best: EngineResultRow | None = None
+    for row in rows:
+        if best is None or TIER_RANK[cast(Tier, row.tier)] >= TIER_RANK[cast(Tier, best.tier)]:
+            best = row
+    if best is None:
+        return None
+    return EngineResult(
+        ply=best.ply,
+        fen=best.fen,
+        tier=cast(Tier, best.tier),
+        depth=best.depth,
+        time_ms=best.time_ms,
+        lines=[EngineLine.model_validate(line) for line in best.lines],
+    )
+
+
+def save_position_result(session: Session, game_id: str, result: EngineResult) -> None:
+    """Store a browser result for a chat or Explain position, unless one of the same or a
+    deeper tier is already stored: the game's own analysis is never replaced."""
+    stored = load_position_result(session, game_id, result.fen, tiers=("verify", "deep"))
+    if stored is not None and TIER_RANK[stored.tier] >= TIER_RANK[result.tier]:
+        return
+    save_results(session, game_id, [result])
 
 
 def save_summary(session: Session, game_id: str, summary: GameSummary) -> None:

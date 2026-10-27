@@ -86,7 +86,13 @@ def test_assign_games_gives_v1_games_to_the_user_with_date_and_result(
                     created_at=uploaded,
                 ),
                 EngineResultRow(
-                    game_id="dated", fen="f", tier="scan", depth=1, time_ms=1, lines=[]
+                    game_id="dated",
+                    fen="f",
+                    position_key="f",
+                    tier="scan",
+                    depth=1,
+                    time_ms=1,
+                    lines=[],
                 ),
             ]
         )
