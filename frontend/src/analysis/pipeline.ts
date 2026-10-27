@@ -31,36 +31,56 @@ export interface PipelineDeps {
   now?: () => number
 }
 
-/** The v1 analysis flow (SPEC §3 steps 4–7): validate, scan, pick positions, verify. */
+/** Upload a game, then analyze it (SPEC §3 steps 4–7): validate, scan, pick positions, verify. */
 export async function runAnalysis(
   deps: PipelineDeps,
   request: CreateGameRequest,
   onStatus: (status: AnalysisStatus) => void,
 ): Promise<AnalysisRun> {
-  const now = deps.now ?? (() => performance.now())
   onStatus({ phase: 'starting' })
   const [game, config] = await Promise.all([deps.api.createGame(request), deps.api.engineConfig()])
+  return analyzeGame(deps, game, config, onStatus)
+}
+
+/**
+ * Run the engine on an uploaded game: scan every position, then verify the ones the backend picks.
+ * With `pendingVerify` (the game's scan is already stored, e.g. the tab was closed mid-analysis),
+ * only the verify step runs. Callers show the "starting" status while the engine loads.
+ */
+export async function analyzeGame(
+  deps: PipelineDeps,
+  game: CreateGameResponse,
+  config: EngineConfig,
+  onStatus: (status: AnalysisStatus) => void,
+  pendingVerify: readonly string[] | null = null,
+): Promise<AnalysisRun> {
+  const now = deps.now ?? (() => performance.now())
   const engine = await deps.getEngine(config)
   await engine.newGame()
 
-  const totalMoves = moveNumber(game.positions.length)
-  const scanStart = now()
-  const scan = await analyzeAll(engine, scanItems(game), 'scan', config.scan, (done, total, item) =>
-    onStatus({
-      phase: 'scanning',
-      done,
-      total,
-      moveNumber: Math.min(moveNumber(item?.ply ?? game.positions.length), totalMoves),
-      totalMoves,
-    }),
-  )
-  const scanMs = now() - scanStart
-  const { verify_fens } = await deps.api.submitScan(game.game_id, scan)
+  let scan: EngineResult[] = []
+  let scanMs = 0
+  let verifyFens = pendingVerify
+  if (verifyFens === null) {
+    const totalMoves = moveNumber(game.positions.length)
+    const scanStart = now()
+    scan = await analyzeAll(engine, scanItems(game), 'scan', config.scan, (done, total, item) =>
+      onStatus({
+        phase: 'scanning',
+        done,
+        total,
+        moveNumber: Math.min(moveNumber(item?.ply ?? game.positions.length), totalMoves),
+        totalMoves,
+      }),
+    )
+    scanMs = now() - scanStart
+    verifyFens = (await deps.api.submitScan(game.game_id, scan)).verify_fens
+  }
 
   const verifyStart = now()
   const verify = await analyzeAll(
     engine,
-    itemsForFens(game, verify_fens),
+    itemsForFens(game, verifyFens),
     'verify',
     config.verify,
     (done, total) => onStatus({ phase: 'verifying', done, total }),

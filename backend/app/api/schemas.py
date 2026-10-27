@@ -127,6 +127,7 @@ class MoveInfo(BaseModel):
 class StoredLine(BaseModel):
     rank: int
     eval: str
+    win_pct: float  # White's win%, 0..100
     moves_uci: list[str]
     moves_san: list[str]
 

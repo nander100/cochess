@@ -14,3 +14,17 @@ export function positionLabel(ply: number | null, totalPlies: number): string {
   const move = Math.floor((ply + 1) / 2)
   return `before ${move}${ply % 2 === 1 ? '.' : '...'}`
 }
+
+/** Lichess winning-chances multiplier and centipawn ceiling (backend/app/analysis/evals.py). */
+const WC_MULTIPLIER = -0.00368208
+const CP_CEILING = 1000
+
+/**
+ * White's win%, 0..100: the backend's formula, mirrored for live engine lines only (stored results
+ * arrive with win% computed by the backend). Mate is 100 or 0.
+ */
+export function winPercent(line: Pick<EngineLine, 'eval_cp' | 'mate'>): number {
+  if (line.mate !== null) return line.mate > 0 ? 100 : 0
+  const cp = Math.max(-CP_CEILING, Math.min(CP_CEILING, line.eval_cp ?? 0))
+  return 50 + 50 * (2 / (1 + Math.exp(WC_MULTIPLIER * cp)) - 1)
+}

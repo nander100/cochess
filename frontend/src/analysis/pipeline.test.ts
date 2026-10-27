@@ -1,8 +1,8 @@
 import { ApiError } from '../api/client'
-import { GAME, fakeDeps } from '../test/fakes'
-import { type AnalysisStatus, runAnalysis, statusLabel } from './pipeline'
+import { ENGINE_CONFIG, GAME, fakeDeps } from '../test/fakes'
+import { type AnalysisStatus, analyzeGame, runAnalysis, statusLabel } from './pipeline'
 
-const REQUEST = { pgn: '1. e4 e5 2. Nf3 *', user_color: 'white' as const, elo: 1200, playstyle: null }
+const REQUEST = { pgn: '1. e4 e5 2. Nf3 *', user_color: 'white' as const }
 
 test('scans every position, then verifies exactly the positions the backend picks', async () => {
   const deps = fakeDeps()
@@ -62,4 +62,15 @@ test('a game ending in mate is scanned without its final position', async () => 
   const run = await runAnalysis(deps, REQUEST, () => {})
 
   expect(run.scan.map((r) => r.fen)).not.toContain('fen-3 b')
+})
+
+test('resuming after the scan verifies the stored positions without scanning again', async () => {
+  const deps = fakeDeps()
+
+  const run = await analyzeGame(deps, GAME, ENGINE_CONFIG, () => {}, ['fen-2 w'])
+
+  expect(deps.api.submitScan).not.toHaveBeenCalled()
+  expect(run.scan).toEqual([])
+  expect(run.verify.map((r) => [r.fen, r.ply, r.tier])).toEqual([['fen-2 w', 3, 'verify']])
+  expect(deps.api.submitVerify).toHaveBeenCalledWith('game-1', run.verify)
 })

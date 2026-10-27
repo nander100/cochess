@@ -103,6 +103,7 @@ class TestGameDetail:
         assert verified and len(verified[0]["lines"]) == 4
         line = verified[0]["lines"][0]
         assert len(line["moves_san"]) == len(line["moves_uci"]) and line["eval"] == "0.0"
+        assert line["win_pct"] == 50.0
         assert detail["verify_fens"] == [] and detail["synopsis"] is None and detail["chat"] == []
 
     def test_labels_come_from_the_summary(self, client: TestClient, db_session: Session) -> None:

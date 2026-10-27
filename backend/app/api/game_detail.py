@@ -109,6 +109,7 @@ def _stored(result: EngineResult) -> StoredEngineResult:
             StoredLine(
                 rank=line.rank,
                 eval=format_eval(line.evaluation()),
+                win_pct=round(win_percent(line.evaluation()), 1),
                 moves_uci=line.moves_uci,
                 moves_san=uci_line_to_san(result.fen, line.moves_uci),
             )

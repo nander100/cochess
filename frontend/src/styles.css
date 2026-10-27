@@ -21,7 +21,7 @@ body {
 }
 
 main {
-  max-width: 52rem;
+  max-width: 76rem;
   margin: 0 auto;
   padding: 2rem var(--space) 4rem;
 }
@@ -38,6 +38,7 @@ h1 {
 }
 
 .game-input {
+  max-width: 52rem;
   display: grid;
   gap: var(--space);
   background: var(--color-surface);
@@ -365,4 +366,293 @@ button.link-button:hover:not(:disabled) {
   display: grid;
   gap: 0.6rem;
   justify-items: start;
+}
+
+/* v2 — analysis board (SPEC_V2 §5.1). */
+:root {
+  --color-inaccuracy: #8a6d00;
+  --color-mistake: #b5560f;
+  --color-blunder: #a33a2b;
+  --color-board-dark: #2b2f2c;
+}
+
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+}
+
+.panel h2,
+.panel-title {
+  font-size: 1rem;
+  margin: 0 0 0.6rem;
+}
+
+.game-heading h2 {
+  font-size: 1.35rem;
+  margin: 0;
+}
+
+.game-heading p {
+  color: var(--color-muted);
+  margin: 0.2rem 0 1rem;
+}
+
+.game-heading .result {
+  color: var(--color-muted);
+  font-weight: 400;
+  margin-left: 0.4rem;
+}
+
+.analysis-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 34rem) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.board-column,
+.side-column {
+  display: grid;
+  gap: var(--space);
+}
+
+.board-row {
+  display: grid;
+  grid-template-columns: 1.4rem minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.board {
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.board-controls {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.board-controls button {
+  min-width: 3rem;
+  padding: 0.35rem 0.6rem;
+}
+
+.eval-bar {
+  position: relative;
+  background: var(--color-board-dark);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.eval-bar-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #f4f1e8;
+  transition: height 300ms ease-out;
+}
+
+.eval-bar.flipped {
+  background: #f4f1e8;
+}
+
+.eval-bar.flipped .eval-bar-bottom {
+  background: var(--color-board-dark);
+}
+
+.eval-bar.unknown .eval-bar-bottom {
+  opacity: 0.45;
+}
+
+.eval-bar-text {
+  position: absolute;
+  bottom: 0.25rem;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #6b6b6b;
+  mix-blend-mode: difference;
+}
+
+.move-list {
+  max-height: 22rem;
+  overflow-y: auto;
+  line-height: 2;
+}
+
+.move-number {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  margin: 0 0.15rem 0 0.4rem;
+}
+
+button.move {
+  background: none;
+  color: var(--color-ink);
+  border: none;
+  border-radius: 3px;
+  padding: 0.05rem 0.3rem;
+  font-weight: 600;
+}
+
+button.move:hover:not(:disabled) {
+  background: #ecebe4;
+}
+
+button.move[aria-current='step'],
+button.move[aria-current='step']:hover:not(:disabled) {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+button.move.explored {
+  font-weight: 400;
+}
+
+.glyph {
+  margin-left: 0.1rem;
+}
+
+button.move.inaccuracy .glyph {
+  color: var(--color-inaccuracy);
+}
+
+button.move.mistake .glyph {
+  color: var(--color-mistake);
+}
+
+button.move.blunder .glyph,
+button.move.missed_mate .glyph {
+  color: var(--color-blunder);
+}
+
+button.move[aria-current='step'] .glyph {
+  color: inherit;
+}
+
+.variation {
+  margin: 0.15rem 0 0.15rem 1rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--color-line);
+  color: var(--color-muted);
+  font-size: 0.92rem;
+}
+
+.eval-graph {
+  margin: 0;
+}
+
+.eval-graph svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.eval-graph-black {
+  fill: var(--color-board-dark);
+}
+
+.eval-graph-white {
+  fill: #e8e4d8;
+}
+
+.eval-graph-mid {
+  stroke: #9b9b9b;
+  stroke-dasharray: 4 4;
+}
+
+.eval-graph-line {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 1.5;
+}
+
+.eval-graph-current {
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
+
+.eval-graph-hover {
+  stroke: #7a7a7a;
+}
+
+.eval-graph-dot {
+  stroke: #ffffff;
+  stroke-width: 1;
+}
+
+.eval-graph-dot.inaccuracy {
+  fill: var(--color-inaccuracy);
+}
+
+.eval-graph-dot.mistake {
+  fill: var(--color-mistake);
+}
+
+.eval-graph-dot.blunder,
+.eval-graph-dot.missed_mate {
+  fill: var(--color-blunder);
+}
+
+.eval-graph-caption {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  margin-top: 0.3rem;
+}
+
+.resume {
+  display: grid;
+  gap: 0.6rem;
+  justify-items: start;
+  margin-bottom: 1rem;
+}
+
+.games-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+table.games {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table.games th,
+table.games td {
+  text-align: left;
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+table.games td.win {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+table.games td.loss {
+  color: var(--color-blunder);
+}
+
+.button-link {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (max-width: 60rem) {
+  .analysis-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

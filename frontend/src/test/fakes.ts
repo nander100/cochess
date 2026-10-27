@@ -100,7 +100,7 @@ export const DETAIL: GameDetail = {
       fen: movesFor(RUY)[2].fen_before,
       tier: 'verify',
       depth: 18,
-      lines: [{ rank: 1, eval: '+0.3', moves_uci: ['g1f3'], moves_san: ['Nf3'] }],
+      lines: [{ rank: 1, eval: '+0.3', win_pct: 52.8, moves_uci: ['g1f3'], moves_san: ['Nf3'] }],
     },
   ],
   verify_fens: [],

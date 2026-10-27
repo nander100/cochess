@@ -134,6 +134,8 @@ export interface MoveInfo {
 export interface StoredLine {
   rank: number
   eval: string
+  /** White's win%, 0..100 (computed by the backend). */
+  win_pct: number
   moves_uci: string[]
   moves_san: string[]
 }

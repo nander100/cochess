@@ -4,13 +4,15 @@ import type { ChatProgress } from '../analysis/chat'
 
 const MAX_MESSAGE_CHARS = 2000 // mirrors backend CoachSettings.chat_max_message_chars
 
-interface ChatMessage {
+export interface ChatMessage {
   role: 'player' | 'coach'
   text: string
 }
 
 interface ChatPanelProps {
   ask: (message: string, onProgress: (progress: ChatProgress) => void) => Promise<string>
+  /** The conversation so far, when reopening a game. */
+  initial?: readonly ChatMessage[]
 }
 
 const PROGRESS_LABEL: Record<ChatProgress, string> = {
@@ -19,9 +21,9 @@ const PROGRESS_LABEL: Record<ChatProgress, string> = {
 }
 
 /** Follow-up questions about the game, beside the synopsis (SPEC §2, §8). */
-export function ChatPanel({ ask }: ChatPanelProps) {
+export function ChatPanel({ ask, initial = [] }: ChatPanelProps) {
   const id = useId()
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [...initial])
   const [draft, setDraft] = useState('')
   const [progress, setProgress] = useState<ChatProgress | null>(null)
   const [error, setError] = useState<string | null>(null)
