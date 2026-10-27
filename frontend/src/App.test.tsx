@@ -249,9 +249,18 @@ test('a login link redeems the token, then opens my games', async () => {
 
 test('a used login link shows why it failed', async () => {
   const used = new ApiError(400, 'This login link has expired or was already used.')
-  renderApp(fakeDeps({ redeem: vi.fn().mockRejectedValue(used) }), '/redeem#token=abc123')
+  const deps = fakeDeps({ redeem: vi.fn().mockRejectedValue(used), me: vi.fn().mockRejectedValue(LOGGED_OUT) })
+  renderApp(deps, '/redeem#token=abc123')
 
   expect(await screen.findByRole('alert')).toHaveTextContent('expired or was already used')
+})
+
+test('reopening a used login link while logged in just opens my games', async () => {
+  const used = new ApiError(400, 'This login link has expired or was already used.')
+  renderApp(fakeDeps({ redeem: vi.fn().mockRejectedValue(used) }), '/redeem#token=abc123')
+
+  expect(await screen.findByText(/No games yet/)).toBeInTheDocument()
+  expect(screen.queryByText(/expired or was already used/)).not.toBeInTheDocument()
 })
 
 test('a new player fills in the profile first, then sees their games', async () => {

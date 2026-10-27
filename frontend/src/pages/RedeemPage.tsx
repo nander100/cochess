@@ -18,7 +18,11 @@ export function RedeemPage({ api, token, onRedeemed }: RedeemPageProps) {
   useEffect(() => {
     if (started.current || token === null) return
     started.current = true
-    api.redeem(token).then(onRedeemed, (caught: unknown) => setError(errorText(caught)))
+    api.redeem(token).then(onRedeemed, (caught: unknown) => {
+      // A used link opened again in a browser that is already logged in (from history, or a
+      // second click): just go in. Without a valid session the link's error stands.
+      api.me().then(onRedeemed, () => setError(errorText(caught)))
+    })
   }, [api, token, onRedeemed])
 
   if (token === null) {
