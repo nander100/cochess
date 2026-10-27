@@ -17,10 +17,24 @@ from app.db.models import ChatMessageRow, PendingToolCallRow
 CHAT = "chat"
 
 
-def save_turn(session: Session, game_id: str, role: str, blocks: list[dict[str, Any]]) -> None:
-    session.add(
-        ChatMessageRow(game_id=game_id, role=role, content={"type": CHAT, "blocks": blocks})
-    )
+def save_turn(
+    session: Session,
+    game_id: str,
+    role: str,
+    blocks: list[dict[str, Any]],
+    *,
+    display: str | None = None,
+    where: str | None = None,
+    path_uci: list[str] | None = None,
+) -> None:
+    """Store one turn. A player's turn also keeps the plain message (`display`), where on the board
+    it was asked (`where`, e.g. "after 14. Nf3"), and that position's path."""
+    content: dict[str, Any] = {"type": CHAT, "blocks": blocks}
+    if display is not None:
+        content["display"] = display
+    if where is not None:
+        content["where"] = where
+    session.add(ChatMessageRow(game_id=game_id, role=role, content=content, path_uci=path_uci))
     session.commit()
 
 
@@ -47,6 +61,7 @@ class ChatEntry(BaseModel):
 
     role: Literal["player", "coach"]
     text: str
+    where: str | None = None  # the board position a player's message was sent from
 
 
 def chat_history(session: Session, game_id: str) -> list[ChatEntry]:
@@ -62,9 +77,11 @@ def chat_history(session: Session, game_id: str) -> list[ChatEntry]:
         if not texts:
             continue
         if row.role == "user":
-            prompt = _player_prompt(texts[0])
+            # v2 rows keep the plain message; v1 rows only have it inside the payload.
+            prompt = row.content.get("display") or _player_prompt(texts[0])
             if prompt is not None:
-                entries.append(ChatEntry(role="player", text=prompt))
+                where = row.content.get("where")
+                entries.append(ChatEntry(role="player", text=prompt, where=where))
         elif not any(b.get("type") == "tool_use" for b in blocks):
             entries.append(ChatEntry(role="coach", text="".join(texts)))
     return entries
@@ -77,6 +94,24 @@ def _player_prompt(rendered: str) -> str | None:
     except (json.JSONDecodeError, AttributeError):
         return None
     return prompt if isinstance(prompt, str) else None
+
+
+def user_payloads(session: Session, game_id: str) -> list[Any]:
+    """The JSON payload of every player turn (instruction line, blank line, JSON), for validation:
+    a move the coach was shown in an earlier turn is still a move from the data."""
+    payloads = []
+    for row in _chat_rows(session, game_id):
+        if row.role != "user":
+            continue
+        for block in row.content["blocks"]:
+            if block.get("type") != "text":
+                continue
+            _, _, payload = str(block.get("text", "")).partition("\n\n")
+            try:
+                payloads.append(json.loads(payload))
+            except json.JSONDecodeError:
+                continue
+    return payloads
 
 
 def tool_results(session: Session, game_id: str) -> list[str]:

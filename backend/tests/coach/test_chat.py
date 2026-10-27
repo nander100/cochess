@@ -14,7 +14,11 @@ from tests.coach.test_synopsis import sse_events
 from tests.coach_fakes import FakeCoachClient, Reply, ToolCall
 from tests.engine_fakes import fake_result
 
-WHAT_IF = {"ply": 9, "candidate_move_san": "gxf3"}  # Opera Game: 5. gxf3 instead of 5. Qxf3
+WHAT_IF = {"ply": 9, "candidate_moves_san": ["gxf3"]}  # Opera Game: 5. gxf3 instead of 5. Qxf3
+START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+# The Opera Game went 1. e4 e5 2. Nf3 d6; the player explores 2...Nc6 3. Bb5 instead.
+VARIATION = ["e2e4", "e7e5", "g1f3", "b8c6", "f1b5"]
+VARIATION_FEN = "r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3"
 
 
 def setup(
@@ -77,13 +81,18 @@ class TestPlainQuestions:
         assert '"pgn_to_move":"1. e4 e5' in context
         assert '"move_list"' not in context and "eval_curve" not in context
         assert request.system[-1]["cache_control"] == {"type": "ephemeral"}
+        assert [b.get("cache_control") for b in request.system] == [{"type": "ephemeral"}] * 2
         turn = last_user_blocks(fake, 0)[0]["text"]
-        assert json.loads(turn.split("\n\n", 1)[1]) == {
-            "task": "chat",
-            "user_prompt": "Which move won the game?",
-            "player": {"elo": 1350, "color": "white", "rating_band": "intermediate",
-                       "tendencies": []},
-        }  # fmt: skip
+        payload = json.loads(turn.split("\n\n", 1)[1])
+        assert set(payload) == {"task", "user_prompt", "player", "position", "engine_lines"}
+        assert (payload["task"], payload["user_prompt"]) == ("chat", "Which move won the game?")
+        assert payload["player"] == {"elo": 1350, "color": "white", "rating_band": "intermediate",
+                                     "tendencies": []}  # fmt: skip
+        # Null fields are left out of what the coach reads: no branch_ply on the game's mainline.
+        assert payload["position"] == {"path_san": [], "pgn_to_move": "", "fen": START,
+                                       "ply": 0, "on_mainline": True,
+                                       "variation_san": []}  # fmt: skip
+        assert len(payload["engine_lines"]) == 4  # the start position was verified
         with app.state.session_factory() as session:
             assert session.query(LlmUsageRow).one().endpoint == "chat"
 
@@ -136,7 +145,7 @@ class TestWhatIf:
         with app.state.session_factory() as session:
             assert session.query(PendingToolCallRow).count() == 0
             [result] = [json.loads(r) for r in tool_results(session, game_id)]
-        assert result["candidate"]["move_san"] == "gxf3"
+        assert result["candidate"]["moves_san"] == ["gxf3"]
         assert result["played_in_game"] == "Qxf3"
         # question, tool_use, tool_result
         assert [m["role"] for m in fake.requests[1].messages] == ["user", "assistant", "user"]
@@ -219,3 +228,175 @@ class TestValidation:
 
         assert limited.status_code == 429
         assert "limit of 1 questions" in limited.json()["detail"]
+
+
+def ask(
+    client: TestClient,
+    game_id: str,
+    message: str,
+    path: list[str],
+    engine_result: dict[str, Any] | None = None,
+) -> Any:
+    body: dict[str, Any] = {"message": message, "path_uci": path}
+    if engine_result is not None:
+        body["engine_result"] = engine_result
+    return client.post(f"/api/games/{game_id}/chat", json=body)
+
+
+def payload_of(fake: FakeCoachClient, call: int) -> Any:
+    return json.loads(last_user_blocks(fake, call)[0]["text"].split("\n\n", 1)[1])
+
+
+class TestPositions:
+    def test_a_question_from_a_variation_carries_the_position_and_its_engine_lines(self) -> None:
+        client, fake, _, game_id = setup("In your line, 3...a6 asks the bishop a question.")
+        result = fake_result(VARIATION_FEN, "verify", cp=25, lines=4, plies=12)
+
+        response = ask(client, game_id, "Is Bb5 good here?", VARIATION, result)
+
+        assert response.status_code == 200, response.text
+        payload = payload_of(fake, 0)
+        assert payload["position"] == {
+            "path_san": ["e4", "e5", "Nf3", "Nc6", "Bb5"],
+            "pgn_to_move": "1. e4 e5 2. Nf3 Nc6 3. Bb5",
+            "fen": VARIATION_FEN,
+            "ply": 5,
+            "on_mainline": False,
+            "branch_ply": 4,
+            "variation_san": ["Nc6", "Bb5"],
+        }
+        lines = payload["engine_lines"]
+        assert len(lines) == 4 and lines[0]["eval"] == "+0.2"
+        assert {len(line["moves_san"]) for line in lines} == {10}  # trimmed to the verify tier
+        detail = client.get(f"/api/games/{game_id}").json()
+        assert detail["chat"][0] == {
+            "role": "player",
+            "text": "Is Bb5 good here?",
+            "where": "after 3. Bb5, in your line",
+        }
+        assert any(r["fen"] == VARIATION_FEN for r in detail["engine_results"])
+
+    def test_the_stored_result_is_reused_for_the_next_question(self) -> None:
+        client, fake, _, game_id = setup("First.", "Second.")
+        result = fake_result(VARIATION_FEN, "verify", cp=25, lines=4, plies=10)
+        ask(client, game_id, "Is Bb5 good?", VARIATION, result)
+
+        response = ask(client, game_id, "And now?", VARIATION)
+
+        assert response.status_code == 200
+        assert payload_of(fake, 1)["engine_lines"] == payload_of(fake, 0)["engine_lines"]
+
+    def test_a_position_without_analysis_is_refused_before_the_coach_runs(self) -> None:
+        client, fake, _, game_id = setup("unused")
+
+        response = ask(client, game_id, "Is Bb5 good?", VARIATION)
+
+        assert response.status_code == 409
+        assert "hasn't analyzed this position" in response.json()["detail"]
+        assert fake.requests == []
+
+    def test_an_engine_result_for_another_position_is_refused(self) -> None:
+        client, fake, _, game_id = setup("unused")
+        wrong = fake_result(START, "verify", lines=4, plies=10)
+
+        response = ask(client, game_id, "Is Bb5 good?", VARIATION, wrong)
+
+        assert response.status_code == 422
+        assert "different position" in response.json()["detail"]
+        assert fake.requests == []
+
+    def test_an_illegal_path_is_refused(self) -> None:
+        client, fake, _, game_id = setup("unused")
+
+        response = ask(client, game_id, "Hm?", ["e2e4", "e2e4"])
+
+        assert response.status_code == 422
+        assert "isn't legal" in response.json()["detail"]
+        assert fake.requests == []
+
+    def test_a_tool_call_without_a_ply_analyzes_the_board_position(self) -> None:
+        client, _, _, game_id = setup(
+            ToolCall({"candidate_moves_san": ["a6"]}), "After 3...a6 the bishop has to decide."
+        )
+        result = fake_result(VARIATION_FEN, "verify", lines=4, plies=10)
+
+        events = sse_events(ask(client, game_id, "What about a6?", VARIATION, result).text)
+        request = engine_request(events)
+        resumed = answer(client, game_id, request)
+
+        assert request["positions"][0]["fen"] == VARIATION_FEN
+        assert text_of(sse_events(resumed.text)) == "After 3...a6 the bishop has to decide."
+
+    def test_the_player_is_their_profile_today(self) -> None:
+        client, fake, _, game_id = setup("Sure.")
+        client.patch("/api/me", json={"elo": 1750, "playstyle": "positional"})
+
+        ask(client, game_id, "Hi", [])
+
+        assert payload_of(fake, 0)["player"] == {
+            "elo": 1750,
+            "color": "white",
+            "rating_band": "intermediate",
+            "playstyle": "positional",
+            "tendencies": [],
+        }
+
+    def test_the_conversation_so_far_is_cached(self) -> None:
+        client, fake, _, game_id = setup("First answer.", "Second answer.")
+        ask(client, game_id, "First?", [])
+
+        ask(client, game_id, "Second?", [])
+
+        messages = fake.requests[1].messages
+        assert messages[1]["content"][-1]["cache_control"] == {"type": "ephemeral"}  # type: ignore[index]
+        assert "cache_control" not in str(messages[2])
+
+    def test_moves_shown_in_an_earlier_turn_stay_valid(self) -> None:
+        result = fake_result(VARIATION_FEN, "verify", lines=4, plies=10)
+        first_line_move = "a6"  # fake_result's first legal move in UCI order from VARIATION_FEN
+        client, fake, _, game_id = setup("Look at that.", f"Like I said, 3...{first_line_move}.")
+        ask(client, game_id, "Is Bb5 good?", VARIATION, result)
+
+        events = sse_events(ask(client, game_id, "Remind me?", []).text)
+
+        assert first_line_move in text_of(events)
+        assert len(fake.requests) == 2  # no rewrite was needed
+
+
+class TestExplain:
+    def explain(self, client: TestClient, game_id: str, path: list[str]) -> Any:
+        return client.post(f"/api/games/{game_id}/explain", json={"path_uci": path})
+
+    def test_explains_the_board_position_without_tools_and_joins_the_chat(self) -> None:
+        client, fake, app, game_id = setup("### What has happened\nA calm start.")
+
+        response = self.explain(client, game_id, [])
+
+        assert response.status_code == 200, response.text
+        assert text_of(sse_events(response.text)) == "### What has happened\nA calm start."
+        [request] = fake.requests
+        assert "Your task: Explain" in request.system[0]["text"]
+        assert request.tool_choice == {"type": "none"}
+        payload = payload_of(fake, 0)
+        assert (payload["task"], payload.get("user_prompt")) == ("explain", None)
+        assert payload["position"]["ply"] == 0 and len(payload["engine_lines"]) == 4
+        assert client.get(f"/api/games/{game_id}").json()["chat"] == [
+            {"role": "player", "text": "Explain this position", "where": "the start"},
+            {"role": "coach", "text": "### What has happened\nA calm start.", "where": None},
+        ]
+        with app.state.session_factory() as session:
+            assert session.query(LlmUsageRow).one().task == "explain"
+
+    def test_needs_an_analyzed_position(self) -> None:
+        client, fake, _, game_id = setup("unused")
+
+        assert self.explain(client, game_id, VARIATION).status_code == 409
+        assert fake.requests == []
+
+    def test_shares_the_question_limit(self) -> None:
+        client, _, _, game_id = setup("One.", coach=CoachSettings(chat_max_messages=1))
+        self.explain(client, game_id, [])
+
+        response = self.explain(client, game_id, [])
+
+        assert response.status_code == 429

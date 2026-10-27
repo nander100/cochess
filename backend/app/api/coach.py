@@ -16,12 +16,16 @@ from app.analysis.engine import EngineResult, EngineResultError
 from app.api import sse
 from app.api.deps import get_app_settings, get_session
 from app.api.scoping import OwnedGame
+from app.api.turns import prepare_turn
+from app.auth.deps import CurrentUser
 from app.coach.chat import (
     ChatLimitError,
     ChatOutcome,
     EngineRequest,
+    FinalAnswer,
     PendingNotFoundError,
     check_engine_results,
+    explain,
     send_message,
     submit_engine_results,
 )
@@ -51,8 +55,22 @@ def get_coach_client(request: Request) -> CoachClient:
 ClientDep = Annotated[CoachClient, Depends(get_coach_client)]
 
 
+# A path can't be longer than the longest game plus a short variation; the replay checks the limit.
+MAX_PATH = 1000
+
+
 class ChatRequest(BaseModel):
+    """SPEC_V2 §6.2: the message, the board position it's about, and the browser's engine result
+    for that position when the backend doesn't have one yet."""
+
     message: str = Field(min_length=1)
+    path_uci: list[str] = Field(default_factory=list, max_length=MAX_PATH)
+    engine_result: EngineResult | None = None
+
+
+class ExplainRequest(BaseModel):
+    path_uci: list[str] = Field(default_factory=list, max_length=MAX_PATH)
+    engine_result: EngineResult | None = None
 
 
 class EngineResultSubmission(BaseModel):
@@ -73,6 +91,7 @@ def synopsis(
 @router.post("/{game_id}/chat")
 def chat(
     game: OwnedGame,
+    user: CurrentUser,
     body: ChatRequest,
     request: Request,
     session: SessionDep,
@@ -88,15 +107,29 @@ def chat(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Messages can be 1 to {limits.chat_max_message_chars} characters long.",
         )
-    if count_player_messages(session, game_id) >= limits.chat_max_messages:
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=(
-                f"You've reached the limit of {limits.chat_max_messages} questions for this game."
-            ),
-        )
-    work = send_message(client, settings, _sessions(request), game_id, message)
+    _check_message_limit(session, settings, game_id)
+    turn = prepare_turn(session, settings, game, user, body.path_uci, body.engine_result, message)
+    work = send_message(client, settings, _sessions(request), game_id, turn)
     return _stream(work, _chat_events, settings, game_id)
+
+
+@router.post("/{game_id}/explain")
+def explain_position(
+    game: OwnedGame,
+    user: CurrentUser,
+    body: ExplainRequest,
+    request: Request,
+    session: SessionDep,
+    settings: SettingsDep,
+    client: ClientDep,
+) -> StreamingResponse:
+    """SPEC_V2 §6.3: explain the position on the board; the answer joins the chat."""
+    game_id = game.id
+    _require_summary(session, game_id)
+    _check_message_limit(session, settings, game_id)
+    turn = prepare_turn(session, settings, game, user, body.path_uci, body.engine_result, None)
+    work = explain(client, settings, _sessions(request), game_id, turn)
+    return _stream(work, _answer_events, settings, game_id)
 
 
 @router.post("/{game_id}/chat/engine_result")
@@ -121,6 +154,16 @@ def chat_engine_result(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=error.message) from error
     work = submit_engine_results(client, settings, sessions, game_id, body.request_id, results)
     return _stream(work, _chat_events, settings, game_id)
+
+
+def _check_message_limit(session: Session, settings: Settings, game_id: str) -> None:
+    """Questions and Explain requests per game share one limit (PLAN Q27)."""
+    limit = settings.coach.chat_max_messages
+    if count_player_messages(session, game_id) >= limit:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"You've reached the limit of {limit} questions for this game.",
+        )
 
 
 def _require_summary(session: Session, game_id: str) -> None:
@@ -177,6 +220,10 @@ def _text_events(text: str, removed: list[str]) -> list[str]:
 
 def _synopsis_events(result: SynopsisResult) -> list[str]:
     return _text_events(result.text, result.invalid_moves_removed)
+
+
+def _answer_events(answer: FinalAnswer) -> list[str]:
+    return _text_events(answer.text, answer.invalid_moves_removed)
 
 
 def _chat_events(outcome: ChatOutcome) -> list[str]:

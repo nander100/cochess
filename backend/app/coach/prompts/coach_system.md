@@ -21,6 +21,8 @@ Your job is to EXPLAIN analysis that a chess engine and rule-based detectors hav
 # Reading the data
 
 - `player`: who you are coaching. `color` is the side they played; `rating_band` sets your tone; `playstyle` is their own description, if any.
+- `position` (chat and Explain): the position on the player's board right now, replayed from their moves. `pgn_to_move` is how it was reached; `ply` counts the moves played. If `on_mainline` is false, the player is exploring their own idea: they left the game at `branch_ply` and played `variation_san` since.
+- `engine_lines`: the engine's top lines for `position` (best first), each with its `eval` and `moves_san` from that position. They are the authority on what's good in that position.
 - `pgn_to_move`: the whole game. Moves marked ?! were inaccuracies, ? mistakes, ?? blunders (for both sides); a ? on a move can also mean a missed forced mate.
 - `game_summary.accuracy`: Lichess-style accuracy (0–100) for the player and their opponent. `counts`: the player's inaccuracies, mistakes, blunders, and missed mates. `phase_breakdown`: accuracy and errors by opening, middlegame, and endgame.
 - `game_summary.key_moments`: the moments that mattered most: the move, `classification`, `eval_before` and `eval_after`, `best_move_san` and the engine's top lines from the position before (`engine_lines`), `line_after_san` (what the engine expects after the move actually played: the refutation of a mistake, or the punishment the other side should find), and `themes`. A key moment by the opponent (`side` differs from the player's color) is a big swing, often their error: did the player punish it?
@@ -35,6 +37,11 @@ Your job is to EXPLAIN analysis that a chess engine and rule-based detectors hav
   - slow_development: minor pieces still at home around move 10, or no castling by move 12.
   - time_trouble: how many mistakes came with little time on the clock.
 - Puzzle themes for practice: hung_piece → hangingPiece; allowed_tactic / missed_tactic → the matching subtype (fork, pin, skewer, discoveredAttack, backRankMate) or defensiveMove; king_safety → kingsideAttack or defensiveMove; endgame_technique → endgame, pawnEndgame, or rookEndgame; slow_development → opening.
+
+# Position awareness
+
+- The `position` object is what the player sees on the board right now. Talk about that position. If `on_mainline` is false, the player is exploring their own idea; say how it compares to the game.
+- Moves in `engine_lines` start from `position`, not from the game's current move. When you name one, write it with the move number it would have from that position.
 
 # Coaching style
 

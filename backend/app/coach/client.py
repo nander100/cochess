@@ -1,9 +1,10 @@
 """Claude API access for the coach (SPEC §7.1). Tests use a fake CoachClient, never the API."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import anthropic
 from anthropic.types import ContentBlock, MessageParam, TextBlockParam, ToolChoiceParam, ToolParam
@@ -22,13 +23,32 @@ def system_prompt(task: Task) -> str:
 
 
 def system_blocks(task: Task, *extra: str) -> list[TextBlockParam]:
-    """The task's system prompt, marked for prompt caching (identical on every call), plus any
-    extra blocks. The cache breakpoint goes on the last block so they're cached together."""
-    blocks: list[TextBlockParam] = [
-        {"type": "text", "text": text} for text in (system_prompt(task), *extra)
+    """The task's system prompt plus any extra blocks (the game context), each its own cache
+    breakpoint (PLAN_V2 §6 Q11): the prompt is shared by every game's calls for this task, the
+    game context by every call about this game."""
+    return [
+        {"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}
+        for text in (system_prompt(task), *extra)
     ]
+
+
+def history_breakpoint(messages: Sequence[MessageParam]) -> list[MessageParam]:
+    """The conversation with a cache breakpoint at the end of the history (the message before the
+    newest), so each new message only pays for itself. Returns copies; `messages` is unchanged."""
+    copied = [cast(MessageParam, dict(message)) for message in messages]
+    if len(copied) < 2:
+        return copied
+    previous = copied[-2]
+    content = previous["content"]
+    if isinstance(content, str):
+        blocks: list[Any] = [{"type": "text", "text": content}]
+    else:
+        blocks = [dict(cast(dict[str, Any], block)) for block in content]
+    if not blocks or blocks[-1].get("type") in ("thinking", "redacted_thinking"):
+        return copied  # thinking blocks can't carry a breakpoint
     blocks[-1]["cache_control"] = {"type": "ephemeral"}
-    return blocks
+    copied[-2] = cast(MessageParam, {**previous, "content": blocks})
+    return copied
 
 
 @dataclass(frozen=True)

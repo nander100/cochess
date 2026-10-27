@@ -12,7 +12,7 @@ from app.analysis.summary_models import GameSummary, LineSummary, MoveLabel
 from app.config import CoachSettings
 
 RatingBand = Literal["beginner", "intermediate", "advanced"]
-Task = Literal["synopsis", "chat"]
+Task = Literal["synopsis", "chat", "explain"]
 
 # PGN-style annotations, so one compact movetext replaces the per-move list (PLAN cost review).
 ANNOTATION: dict[MoveLabel, str] = {
@@ -36,7 +36,19 @@ class PlayerPayload(BaseModel):
     color: Color
     rating_band: RatingBand
     playstyle: str | None
-    tendencies: list[str] = []  # cross-game tracking is v2; the field keeps the schema stable
+    tendencies: list[str] = []  # filled in by tendency tracking (SPEC_V2 §9, M5)
+
+
+class PositionPayload(BaseModel):
+    """What's on the player's board (SPEC_V2 §6.1), replayed by the backend from the path."""
+
+    path_san: list[str]
+    pgn_to_move: str
+    fen: str
+    ply: int
+    on_mainline: bool
+    branch_ply: int | None  # where the player left the game, if they did
+    variation_san: list[str]
 
 
 class CoachPayload(BaseModel):
@@ -44,8 +56,8 @@ class CoachPayload(BaseModel):
     user_prompt: str | None = None
     player: PlayerPayload
     pgn_to_move: str | None = None  # chat turns leave it out: the game is in the cached context
-    fen: str | None = None
-    engine_lines: list[LineSummary] | None = None
+    position: PositionPayload | None = None
+    engine_lines: list[LineSummary] | None = None  # for `position`: top 4 lines, 10 plies
     game_summary: GameSummary | None = None
 
 
@@ -57,6 +69,12 @@ def rating_band(elo: int) -> RatingBand:
     if elo < BEGINNER_BELOW:
         return "beginner"
     return "intermediate" if elo <= ADVANCED_ABOVE else "advanced"
+
+
+def profile_player(elo: int, playstyle: str | None, color: Color) -> PlayerPayload:
+    """The player as their profile says now (PLAN_V2 §6 Q5): chat and Explain talk to who the
+    player is today, not who they were when the game was analyzed."""
+    return PlayerPayload(elo=elo, color=color, rating_band=rating_band(elo), playstyle=playstyle)
 
 
 def player_payload(summary: GameSummary) -> PlayerPayload:
