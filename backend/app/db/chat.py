@@ -4,9 +4,11 @@ Rows with content {"type": "chat", "blocks": [...]} are replayed to Claude in or
 synopsis row ({"type": "synopsis"}) isn't (it goes into the cached game context instead).
 """
 
-from typing import Any, cast
+import json
+from typing import Any, Literal, cast
 
 from anthropic.types import MessageParam
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -38,6 +40,43 @@ def load_messages(session: Session, game_id: str) -> list[MessageParam]:
         cast(MessageParam, {"role": role, "content": content})
         for role, content in zip(roles, contents, strict=True)
     ]
+
+
+class ChatEntry(BaseModel):
+    """A chat message as the player sees it in the history."""
+
+    role: Literal["player", "coach"]
+    text: str
+
+
+def chat_history(session: Session, game_id: str) -> list[ChatEntry]:
+    """The conversation for display: the player's messages and the coach's final answers.
+
+    Tool calls, tool results and thinking are internal and left out. The player's message is
+    stored inside the rendered payload (an instruction line, then JSON with `user_prompt`).
+    """
+    entries: list[ChatEntry] = []
+    for row in _chat_rows(session, game_id):
+        blocks = row.content["blocks"]
+        texts = [str(b.get("text", "")) for b in blocks if b.get("type") == "text"]
+        if not texts:
+            continue
+        if row.role == "user":
+            prompt = _player_prompt(texts[0])
+            if prompt is not None:
+                entries.append(ChatEntry(role="player", text=prompt))
+        elif not any(b.get("type") == "tool_use" for b in blocks):
+            entries.append(ChatEntry(role="coach", text="".join(texts)))
+    return entries
+
+
+def _player_prompt(rendered: str) -> str | None:
+    _, _, payload = rendered.partition("\n\n")
+    try:
+        prompt = json.loads(payload).get("user_prompt")
+    except (json.JSONDecodeError, AttributeError):
+        return None
+    return prompt if isinstance(prompt, str) else None
 
 
 def tool_results(session: Session, game_id: str) -> list[str]:

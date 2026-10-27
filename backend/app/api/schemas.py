@@ -1,12 +1,14 @@
 """Request and response models for the HTTP API (SPEC §9)."""
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.analysis.engine import EngineResult
+from app.analysis.engine import EngineResult, Tier
 from app.analysis.pgn import PgnErrorCode, Position
-from app.analysis.summary_models import Accuracy, Counts
+from app.analysis.summary_models import Accuracy, Counts, GameInfo, MoveLabel
+from app.db.chat import ChatEntry
 
 # Profile input rules from SPEC_V2 §4.3, not tunable thresholds.
 MIN_ELO = 100
@@ -87,3 +89,79 @@ class VerifyResponse(BaseModel):
     summary_ready: bool
     counts: Counts | None
     accuracy: Accuracy | None
+
+
+GameStatus = Literal["uploaded", "scanned", "analyzed"]
+UserResult = Literal["win", "loss", "draw"]
+
+
+class GameListItem(BaseModel):
+    """One row of "My games" (SPEC_V2 §11)."""
+
+    id: str
+    played_at: datetime
+    opponent: str
+    user_color: Color
+    user_result: UserResult | None
+    time_control: str | None  # the PGN TimeControl header, e.g. "600+5"
+    opening: str | None
+    accuracy: float | None  # the player's, once analyzed
+    status: GameStatus
+
+
+class MoveInfo(BaseModel):
+    """One ply of the game, with its analysis once the engine has run."""
+
+    ply: int
+    move_number: int
+    side: Color
+    san: str
+    uci: str
+    fen_before: str
+    clock_s: float | None
+    eval_after: str | None  # display format, "+0.3" / "-M2"
+    win_pct_after: float | None  # White's win% after the move, 0..100
+    label: MoveLabel | None  # inaccuracy / mistake / blunder / missed_mate, either side
+
+
+class StoredLine(BaseModel):
+    rank: int
+    eval: str
+    moves_uci: list[str]
+    moves_san: list[str]
+
+
+class StoredEngineResult(BaseModel):
+    """The best stored search of one position (deep > verify > scan)."""
+
+    fen: str
+    tier: Tier
+    depth: int
+    lines: list[StoredLine]
+
+
+class StoredSynopsis(BaseModel):
+    text: str
+    invalid_moves_removed: list[str]
+
+
+class GameDetail(BaseModel):
+    """Everything the analysis board needs (SPEC_V2 §5.1): nothing is re-analyzed on open."""
+
+    id: str
+    status: GameStatus
+    user_color: Color
+    elo: int  # the player's Elo when the game was analyzed
+    played_at: datetime
+    info: GameInfo
+    moves: list[MoveInfo]
+    start_win_pct: float | None  # White's win% in the starting position
+    final_fen: str
+    final_is_terminal: bool
+    accuracy: Accuracy | None
+    counts: Counts | None
+    engine_results: list[StoredEngineResult]
+    # While status is "scanned", the positions still to verify, so the analysis can resume.
+    verify_fens: list[str]
+    synopsis: StoredSynopsis | None
+    chat: list[ChatEntry]

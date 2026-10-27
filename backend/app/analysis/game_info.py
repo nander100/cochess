@@ -44,3 +44,10 @@ def _parse(date: str, time: str) -> datetime | None:
     except ValueError:
         clock = datetime.min
     return day.replace(hour=clock.hour, minute=clock.minute, second=clock.second, tzinfo=UTC)
+
+
+def opening_name(headers: Mapping[str, str]) -> str | None:
+    """The `Opening` header, else "ECO B12" from the `ECO` header, else None."""
+    if headers.get("Opening"):
+        return headers["Opening"]
+    return f"ECO {headers['ECO']}" if headers.get("ECO") else None

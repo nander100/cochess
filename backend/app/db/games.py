@@ -1,13 +1,13 @@
 """Game access, always scoped to one user (SPEC_V2 §4.2): another user's game is "not found"."""
 
-from typing import cast
+from typing import Any, cast
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.analysis.evals import Color
 from app.analysis.game_info import played_at, user_result
-from app.db.models import EngineResultRow, Game, LlmUsageRow, User
+from app.db.models import EngineResultRow, Game, GameSummaryRow, LlmUsageRow, User
 
 
 class GameNotFoundError(Exception):
@@ -38,3 +38,20 @@ def assign_unowned_games(session: Session, user: User) -> int:
         )
     session.commit()
     return len(games)
+
+
+def list_games(session: Session, user_id: str) -> list[tuple[Game, float | None]]:
+    """The player's games, most recently played first, with the player's accuracy if analyzed."""
+    rows = session.execute(
+        select(Game, GameSummaryRow.summary)
+        .outerjoin(GameSummaryRow, GameSummaryRow.game_id == Game.id)
+        .where(Game.user_id == user_id)
+        .order_by(Game.played_at.desc(), Game.created_at.desc())
+    )
+    return [(game, _user_accuracy(summary)) for game, summary in rows]
+
+
+def _user_accuracy(summary: dict[str, Any] | None) -> float | None:
+    accuracy = (summary or {}).get("accuracy") or {}
+    value = accuracy.get("user")
+    return float(value) if isinstance(value, int | float) else None

@@ -7,6 +7,7 @@ from app.analysis.detectors import run_detectors
 from app.analysis.detectors.types import GameContext, MoveContext, ThemeFact
 from app.analysis.engine import EngineResult, best_by_fen, uci_line_to_san
 from app.analysis.evals import format_eval, win_percent, winning_chances
+from app.analysis.game_info import opening_name
 from app.analysis.material import line_to_san
 from app.analysis.moves import build_game_context
 from app.analysis.pgn import ParsedGame
@@ -41,7 +42,7 @@ def build_summary(
     )
     user_moves = context.user_moves()
     return GameSummary(
-        game=_game_info(game),
+        game=game_info(game),
         user=user,
         accuracy=Accuracy(
             user=_rounded(aggregate([a for a in accuracies if a.color == user.color])),
@@ -77,15 +78,14 @@ def label(move: MoveContext) -> MoveLabel | None:
     return move.classification
 
 
-def _game_info(game: ParsedGame) -> GameInfo:
+def game_info(game: ParsedGame) -> GameInfo:
     headers = game.headers
-    opening = headers.get("Opening") or (f"ECO {headers['ECO']}" if headers.get("ECO") else None)
     return GameInfo(
         white=headers.get("White", "?"),
         black=headers.get("Black", "?"),
         result=headers.get("Result", "*"),
         time_control=headers.get("TimeControl"),
-        opening=opening,
+        opening=opening_name(headers),
         num_moves=(game.positions[-1].ply + 1) // 2,
     )
 

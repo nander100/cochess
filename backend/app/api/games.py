@@ -1,22 +1,38 @@
 """Game routes (SPEC_V2 §11). Every game belongs to the player who uploaded it."""
 
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.analysis.game_info import played_at, user_result
+from app.analysis.evals import Color
+from app.analysis.game_info import opening_name, played_at, user_result
 from app.analysis.pgn import PgnError, parse_pgn
 from app.api.deps import get_app_settings, get_session
+from app.api.game_detail import build_detail
 from app.api.profile import is_complete
-from app.api.schemas import CreateGameRequest, CreateGameResponse, PgnErrorDetail, PgnErrorResponse
+from app.api.schemas import (
+    CreateGameRequest,
+    CreateGameResponse,
+    GameDetail,
+    GameListItem,
+    GameStatus,
+    PgnErrorDetail,
+    PgnErrorResponse,
+    UserResult,
+)
+from app.api.scoping import OwnedGame
 from app.auth.deps import CurrentUser
 from app.config import Settings
+from app.db.games import list_games
 from app.db.models import Game
 
 router = APIRouter(prefix="/api/games", tags=["games"])
+
+SessionDep = Annotated[Session, Depends(get_session)]
+SettingsDep = Annotated[Settings, Depends(get_app_settings)]
 
 PROFILE_FIRST = "Fill in your profile (rating and time control) before analyzing a game."
 
@@ -71,6 +87,36 @@ def create_game(
         final_fen=parsed.final_fen,
         final_is_terminal=parsed.final_is_terminal,
     )
+
+
+@router.get("")
+def my_games(user: CurrentUser, session: SessionDep) -> list[GameListItem]:
+    """My games (SPEC_V2 §11), most recently played first."""
+    items = []
+    for game, accuracy in list_games(session, user.id):
+        headers = game.headers
+        color = cast(Color, game.user_color)
+        opponent = headers.get("Black" if color == "white" else "White", "?")
+        items.append(
+            GameListItem(
+                id=game.id,
+                played_at=game.played_at or game.created_at,
+                opponent=opponent,
+                user_color=color,
+                user_result=cast(UserResult | None, game.user_result),
+                time_control=headers.get("TimeControl"),
+                opening=opening_name(headers),
+                accuracy=accuracy,
+                status=cast(GameStatus, game.status),
+            )
+        )
+    return items
+
+
+@router.get("/{game_id}")
+def game_detail(game: OwnedGame, session: SessionDep, settings: SettingsDep) -> GameDetail:
+    """Everything the analysis board needs, from the database (SPEC_V2 §5.1)."""
+    return build_detail(session, game, settings)
 
 
 def _check_daily_cap(session: Session, user_id: str, settings: Settings) -> None:
