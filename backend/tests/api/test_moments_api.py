@@ -318,3 +318,36 @@ class TestQuestionsAndWrapUp:
         assert moment["results"] == [
             {"index": 1, "game_move": "5. Qxf3", "outcome": "solved", "attempts": 1}
         ]
+
+
+def test_a_line_is_cut_before_a_withheld_move_not_dropped() -> None:
+    """Real game (M4 checkpoint): the line after 8. Qb3 was 8...Qb6 9. h4 c5 10. Ne5, and 9. h4
+    and 10. Ne5 were among the good 8th moves. The coach still sees 8...Qb6, what happens next."""
+    from app.coach.moments import _scrub
+    from app.coach.payload import MomentCandidate, MomentGameMove, MomentPayload
+
+    moment = MomentPayload(
+        index=1,
+        of=1,
+        state="attempt",
+        game_move=MomentGameMove(
+            san="8. Qb3",
+            classification="mistake",
+            eval_before="+2.2",
+            eval_after="+0.8",
+            themes=[],
+            refutation_san=["Qb6", "h4", "c5", "Ne5", "c4", "Qxb6"],
+        ),
+        candidate=MomentCandidate(
+            san="8. a3", grade="mistake", eval_after="+0.9", themes=[], refutation_san=["Ne5+"]
+        ),
+        attempt_number=1,
+        max_attempts=2,
+        reveal=False,
+    )
+
+    scrubbed = _scrub(moment, ["Ne5", "h4", "a4"])
+
+    assert scrubbed.game_move.refutation_san == ["Qb6"]
+    assert scrubbed.candidate is not None and scrubbed.candidate.refutation_san == []
+    assert "Ne5" not in scrubbed.model_dump_json() and '"h4"' not in scrubbed.model_dump_json()

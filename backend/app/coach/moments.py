@@ -488,12 +488,18 @@ def _call(
 
 
 def _scrub(moment: MomentPayload, banned: list[str]) -> MomentPayload:
-    """Drop any line or hint that happens to contain a banned move (e.g. the opponent's reply has
-    the same SAN), so the payload never carries the answer, even by coincidence (PLAN_V2 §6 Q2)."""
+    """Keep the payload free of the moves the player is meant to find (PLAN_V2 §6 Q2): a line is
+    cut just before the first one (it can come up later, as another move of the line), and a hint
+    that names one is dropped. The line up to there still shows what happens next."""
     targets = {normalize(m) for m in banned}
 
     def clean(moves: list[str]) -> list[str]:
-        return [] if any(normalize(m) in targets for m in moves) else moves
+        kept = []
+        for move in moves:
+            if normalize(move) in targets:
+                break
+            kept.append(move)
+        return kept
 
     game_move = moment.game_move.model_copy(
         update={"refutation_san": clean(moment.game_move.refutation_san)}

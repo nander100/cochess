@@ -331,3 +331,14 @@ If the best move's SAN also appears in a line that is allowed (e.g. a refutation
 - **Caching:** three breakpoints (system prompt, game context, end of the conversation history).
 - **The player in chat and Explain is the current profile** (Q5); the synopsis still uses the Elo stored with the game.
 - **Null fields are left out of what the coach reads** (v1's `render`), so `branch_ply` only appears for variations.
+
+**M4 (critical moments)**
+- **What counts as giving the answer away:** the first move of every engine line for the moment's position that would grade "good" or better. The player's own tries are never counted, so the coach can discuss them.
+- **Leak check by move number:** one of those moves written for the moment's own turn, or with no number, is a leak; the same SAN for another turn ("6. O-O" when the answer is "14...O-O") is not. Regenerate once with a note that names no move, then strip the move and log `moment_leak` (counted on the progress row).
+- **Lines are cut, not dropped:** a line in the payload stops just before the first such move (it can come up later in the line as another move). The intro still shows what happens next. Found on the owner's games at the checkpoint, where whole lines were being removed.
+- **Moment context:** game info, the annotated moves up to the moment, and the list of moments. No synopsis, chat history, key-moment lines or detector details. The system prompt stays shared, so it is cached across moments and games.
+- **Game detail hides an unsolved moment's position:** its stored engine results and best move are left out until the moment is solved or revealed.
+- **Progress keeps the exercise's messages** (`moment_progress.messages`), so a returning player sees where they were. A stored intro or wrap-up is shown again without a new call. The wrap-up is stored with the last moment.
+- **Questions during a moment** get the same per-game allowance as chat questions (30).
+- **The deep search of the moment's position** runs once per page visit and is sent with each attempt or "Show me". The backend checks it against the replayed position and keeps the first one.
+- **`cli backfill`** rebuilds analyzed games' summaries from their stored engine results (no engine runs), so v1 games get their moments.
