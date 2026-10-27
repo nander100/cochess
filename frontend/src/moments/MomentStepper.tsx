@@ -1,4 +1,4 @@
-import { type FormEvent, useId, useState } from 'react'
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import {
   type BeforeSearches,
@@ -128,6 +128,11 @@ export function MomentStepper(props: MomentStepperProps) {
   const finish = () => void step(null, () => coachStep((onEvent) => deps.api.momentWrapUp(gameId, onEvent), setProgress))
 
   const messages = [...moment.messages.filter((m) => m.kind !== 'wrap_up'), ...pending]
+  const log = useRef<HTMLUListElement>(null)
+  // Keep the newest message in view: the log scrolls once the exercise gets long.
+  useEffect(() => {
+    if (log.current) log.current.scrollTop = log.current.scrollHeight
+  }, [messages.length, moment.index])
   const position = moments.indexOf(moment)
   const next = moments[position + 1]
   const open = moment.state === 'intro' || moment.state === 'attempt'
@@ -160,7 +165,7 @@ export function MomentStepper(props: MomentStepperProps) {
       </p>
 
       {messages.length > 0 && (
-        <ul className="chat-log" aria-live="polite">
+        <ul ref={log} className="chat-log" aria-live="polite">
           {messages.map((message, i) => (
             <li key={i} className={`chat-message ${message.role}`}>
               <span className="chat-author">{message.role === 'coach' ? 'Coach' : 'You'}</span>
