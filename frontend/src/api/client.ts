@@ -4,6 +4,8 @@ import type {
   CreateGameResponse,
   EngineConfig,
   EngineResult,
+  GameDetail,
+  GameListItem,
   Profile,
   ProfileUpdate,
   ScanResponse,
@@ -33,6 +35,8 @@ export interface ApiClient {
   me(): Promise<Profile>
   updateMe(update: ProfileUpdate): Promise<Profile>
   createGame(body: CreateGameRequest): Promise<CreateGameResponse>
+  listGames(): Promise<GameListItem[]>
+  getGame(gameId: string): Promise<GameDetail>
   engineConfig(): Promise<EngineConfig>
   submitScan(gameId: string, results: EngineResult[]): Promise<ScanResponse>
   submitVerify(gameId: string, results: EngineResult[]): Promise<VerifyResponse>
@@ -99,6 +103,8 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
     me: () => request('/api/me'),
     updateMe: (update) => request('/api/me', { method: 'PATCH', body: JSON.stringify(update) }),
     createGame: (body) => post('/api/games', body),
+    listGames: () => request('/api/games'),
+    getGame: (gameId) => request(`/api/games/${encodeURIComponent(gameId)}`),
     engineConfig: () => request('/api/engine-config'),
     submitScan: (gameId, results) => post(`/api/games/${gameId}/engine/scan`, { results }),
     submitVerify: (gameId, results) => post(`/api/games/${gameId}/engine/verify`, { results }),

@@ -97,3 +97,84 @@ export interface VerifyResponse {
   counts: Counts | null
   accuracy: Accuracy | null
 }
+
+// GET /api/games and GET /api/games/{id} (backend/app/api/schemas.py).
+
+export type GameStatus = 'uploaded' | 'scanned' | 'analyzed'
+export type UserResult = 'win' | 'loss' | 'draw'
+export type MoveLabel = 'inaccuracy' | 'mistake' | 'blunder' | 'missed_mate'
+
+export interface GameListItem {
+  id: string
+  played_at: string
+  opponent: string
+  user_color: Color
+  user_result: UserResult | null
+  time_control: string | null
+  opening: string | null
+  accuracy: number | null
+  status: GameStatus
+}
+
+export interface MoveInfo {
+  ply: number
+  move_number: number
+  side: Color
+  san: string
+  uci: string
+  fen_before: string
+  clock_s: number | null
+  /** Display format, "+0.3" / "-M2"; null until the engine has run. */
+  eval_after: string | null
+  /** White's win% after the move, 0..100. */
+  win_pct_after: number | null
+  label: MoveLabel | null
+}
+
+export interface StoredLine {
+  rank: number
+  eval: string
+  moves_uci: string[]
+  moves_san: string[]
+}
+
+export interface StoredEngineResult {
+  fen: string
+  tier: Tier
+  depth: number
+  lines: StoredLine[]
+}
+
+export interface GameInfo {
+  white: string
+  black: string
+  result: string
+  time_control: string | null
+  opening: string | null
+  num_moves: number
+}
+
+export interface ChatEntry {
+  role: 'player' | 'coach'
+  text: string
+}
+
+export interface GameDetail {
+  id: string
+  status: GameStatus
+  user_color: Color
+  elo: number
+  played_at: string
+  info: GameInfo
+  moves: MoveInfo[]
+  start_win_pct: number | null
+  final_fen: string
+  final_is_terminal: boolean
+  accuracy: Accuracy | null
+  counts: Counts | null
+  engine_results: StoredEngineResult[]
+  /** While status is "scanned": the positions still to verify. */
+  verify_fens: string[]
+  synopsis: { text: string; invalid_moves_removed: string[] } | null
+  chat: ChatEntry[]
+}
