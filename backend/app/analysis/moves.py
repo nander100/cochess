@@ -10,6 +10,7 @@ from app.analysis.engine import EngineResult, best_by_fen, position_evaluations
 from app.analysis.evals import Color, for_color, winning_chances
 from app.analysis.pgn import ParsedGame
 from app.analysis.phase import game_phase
+from app.analysis.summary_models import MoveLabel
 from app.config import Settings
 
 
@@ -68,3 +69,10 @@ def _best_line(by_fen: dict[str, EngineResult], fen: str) -> tuple[chess.Move, .
     if result is None:  # a terminal final position has no engine result
         return ()
     return tuple(chess.Move.from_uci(uci) for uci in result.lines[0].moves_uci)
+
+
+def label(move: MoveContext) -> MoveLabel | None:
+    """A move's label: its classification, or "missed_mate" (unless it was also a blunder)."""
+    if move.missed_mate and move.classification != "blunder":
+        return "missed_mate"
+    return move.classification

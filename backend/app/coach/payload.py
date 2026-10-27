@@ -62,7 +62,8 @@ class CoachPayload(BaseModel):
 
 
 # Per-move evals and labels are already in the annotated `pgn_to_move` (PLAN Q28, cost review).
-COACH_EXCLUDE = {"game_summary": {"eval_curve", "move_list"}}
+# Moments are left out too: they're taught one at a time, with their own payload (SPEC_V2 §8).
+COACH_EXCLUDE = {"game_summary": {"eval_curve", "move_list", "moments"}}
 
 
 def rating_band(elo: int) -> RatingBand:

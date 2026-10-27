@@ -6,11 +6,17 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.analysis.engine import EngineResult
+from app.analysis.pgn import parse_pgn
+from app.analysis.selection import scan_fens
 from app.auth.service import redeem_invite
 from app.cli import main
 from app.config import Settings
-from app.db.models import EngineResultRow, Game, User
+from app.db.engine_results import load_summary, save_results
+from app.db.models import EngineResultRow, Game, GameSummaryRow, User
 from app.db.session import make_engine
+from tests.engine_fakes import fake_result
+from tests.pgn_fixtures import read_pgn
 
 
 @pytest.fixture
@@ -111,3 +117,32 @@ def test_assign_games_gives_v1_games_to_the_user_with_date_and_result(
         assert (undated.user_result, undated.played_at) == (None, uploaded)
         assert session.scalars(select(EngineResultRow.user_id)).one() == user.id
     assert "Assigned 0 game(s)" in _run(file_settings, "assign-games", "--user", "Alex")[1]
+
+
+def test_backfill_gives_v1_summaries_their_moments(file_settings: Settings) -> None:
+    _run(file_settings, "create-user", "--name", "Alex")
+    parsed = parse_pgn(read_pgn("opera_game.pgn"), max_chars=100_000, max_plies=600)
+    blunder_after = parsed.positions[9].fen_before  # the position after 5. Qxf3 (ply 9)
+    with _session(file_settings) as session:
+        user = session.scalars(select(User)).one()
+        session.add(Game(id="g", user_id=user.id, pgn=parsed.pgn, user_color="white", elo=1400,
+                         headers={}, status="analyzed"))  # fmt: skip
+        session.commit()
+        results = [
+            EngineResult.model_validate(
+                fake_result(fen, "verify", cp=-300 if fen == blunder_after else 0)
+            )
+            for fen in scan_fens(parsed)
+        ]
+        save_results(session, "g", results)
+        session.add(GameSummaryRow(game_id="g", summary={"written_by": "v1"}))  # no moments key
+        session.commit()
+
+    code, output = _run(file_settings, "backfill", "--user", "Alex")
+
+    assert code == 0 and "Rebuilt 1 game summary." in output
+    with _session(file_settings) as session:
+        rebuilt = load_summary(session, "g")
+    assert rebuilt is not None
+    assert [(m.ply, m.san, m.label) for m in rebuilt.moments] == [(9, "Qxf3", "blunder")]
+    assert _run(file_settings, "backfill")[1].strip() == "Rebuilt 1 game summary."  # everyone

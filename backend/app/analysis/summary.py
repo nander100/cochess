@@ -9,7 +9,8 @@ from app.analysis.engine import EngineResult, best_by_fen, uci_line_to_san
 from app.analysis.evals import format_eval, win_percent, winning_chances
 from app.analysis.game_info import opening_name
 from app.analysis.material import line_to_san
-from app.analysis.moves import build_game_context
+from app.analysis.moments import select_moments
+from app.analysis.moves import build_game_context, label
 from app.analysis.pgn import ParsedGame
 from app.analysis.phase import PHASES, Phase
 from app.analysis.summary_models import (
@@ -58,6 +59,7 @@ def build_summary(
         eval_curve=[EvalPoint(ply=m.ply, eval=format_eval(m.eval_after)) for m in context.moves],
         key_moments=_key_moments(context, results, facts, settings),
         theme_facts=facts,
+        moments=select_moments(context, facts, settings.moments),
         move_list=[
             MoveEntry(
                 ply=m.ply,
@@ -70,12 +72,6 @@ def build_summary(
             for m in context.moves
         ],
     )
-
-
-def label(move: MoveContext) -> MoveLabel | None:
-    if move.missed_mate and move.classification != "blunder":
-        return "missed_mate"
-    return move.classification
 
 
 def game_info(game: ParsedGame) -> GameInfo:

@@ -7,6 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.analysis.evals import Color
 from app.analysis.game_info import played_at, user_result
+from app.analysis.pgn import parse_pgn
+from app.analysis.summary import build_summary
+from app.analysis.summary_models import UserInfo
+from app.config import Settings
+from app.db.engine_results import load_results, save_summary
 from app.db.models import EngineResultRow, Game, GameSummaryRow, LlmUsageRow, User
 
 
@@ -55,3 +60,21 @@ def _user_accuracy(summary: dict[str, Any] | None) -> float | None:
     accuracy = (summary or {}).get("accuracy") or {}
     value = accuracy.get("user")
     return float(value) if isinstance(value, int | float) else None
+
+
+def rebuild_summaries(session: Session, settings: Settings, user: User | None = None) -> int:
+    """Rebuild every analyzed game's summary (or one player's) from its stored engine results,
+    so summaries made by older code gain what's been added since (e.g. moments). No engine runs.
+    Returns how many were rebuilt."""
+    query = select(Game).where(Game.status == "analyzed")
+    if user is not None:
+        query = query.where(Game.user_id == user.id)
+    games = list(session.scalars(query))
+    for game in games:
+        parsed = parse_pgn(
+            game.pgn, max_chars=settings.limits.max_pgn_chars, max_plies=settings.limits.max_plies
+        )
+        info = UserInfo(color=cast(Color, game.user_color), elo=game.elo, playstyle=game.playstyle)
+        results = load_results(session, game.id, ["scan", "verify"])
+        save_summary(session, game.id, build_summary(parsed, results, info, settings))
+    return len(games)

@@ -98,6 +98,17 @@ class CoachSettings(BaseModel):
     keepalive_s: float = 10
 
 
+class MomentSettings(BaseModel):
+    """Critical moments (SPEC_V2 §8): which moves become exercises, and how they're graded."""
+
+    min_moments: int = 3  # top up with the biggest inaccuracies to reach this many
+    max_moments: int = 6  # keep the biggest drops beyond this
+    max_attempts: int = 2  # failed attempts before the answer is revealed
+    # A candidate this close to the engine's best (winning-chances drop) counts as "best".
+    best_margin: float = 0.02
+    refutation_plies: int = 6  # how much of the line after a move the coach sees
+
+
 class Limits(BaseModel):
     """Input size limits for user-submitted data."""
 
@@ -138,6 +149,7 @@ class Settings(BaseSettings):
     detectors: DetectorSettings = DetectorSettings()
     coach: CoachSettings = CoachSettings()
     limits: Limits = Limits()
+    moments: MomentSettings = MomentSettings()
 
 
 @lru_cache

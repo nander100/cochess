@@ -85,6 +85,28 @@ class MoveEntry(BaseModel):
     classification: MoveLabel | None
 
 
+class Moment(BaseModel):
+    """A critical moment (SPEC_V2 §8.1): one of the player's own errors, taught as an exercise.
+
+    Only facts about the move the player made: never the engine's best move, which stays out of
+    everything the coach sees until the moment is solved or revealed (SPEC_V2 §8.4).
+    """
+
+    index: int  # 1-based, in game order
+    ply: int
+    move_number: int
+    side: Color
+    san: str
+    uci: str
+    label: MoveLabel
+    drop: float  # the player's winning-chances loss
+    eval_before: str
+    eval_after: str
+    themes: list[ThemeName]
+    refutation_san: list[str]  # the engine's best line after the move: what goes wrong
+    fen_before: str
+
+
 class GameSummary(BaseModel):
     game: GameInfo
     user: UserInfo
@@ -95,3 +117,5 @@ class GameSummary(BaseModel):
     key_moments: list[KeyMoment]
     theme_facts: list[ThemeFact]
     move_list: list[MoveEntry]
+    # Stored with the summary (SPEC_V2 §8.1); empty for v1 summaries until `cli backfill`.
+    moments: list[Moment] = []

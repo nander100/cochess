@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.auth.service import UserExistsError, create_invite, create_user, find_user
 from app.config import Settings, get_settings
-from app.db.games import assign_unowned_games
+from app.db.games import assign_unowned_games, rebuild_summaries
 from app.db.migrate import upgrade
 from app.db.models import User
 from app.db.session import make_engine
@@ -59,6 +59,10 @@ def _run(args: argparse.Namespace, session: Session, settings: Settings) -> str:
         # The token is in the fragment, so it never reaches server logs or Referer headers.
         link = f"{base}/redeem#token={token}"
         return f"Login link for {user.name} (works once, for {days} days):\n{link}"
+    if args.command == "backfill":
+        player = _user(session, args.user) if args.user else None
+        rebuilt = rebuild_summaries(session, settings, player)
+        return f"Rebuilt {rebuilt} game summar{'y' if rebuilt == 1 else 'ies'}."
     user = _user(session, args.user)
     count = assign_unowned_games(session, user)
     return f"Assigned {count} game(s) to {user.name}."
@@ -80,6 +84,10 @@ def _parser() -> argparse.ArgumentParser:
     invite.add_argument("--base-url", help="where players open CoChess (default PUBLIC_BASE_URL)")
     assign = commands.add_parser("assign-games", help="give v1 games without an owner to a player")
     assign.add_argument("--user", required=True)
+    backfill = commands.add_parser(
+        "backfill", help="rebuild analyzed games' summaries from stored engine results"
+    )
+    backfill.add_argument("--user", help="only this player's games (default: everyone's)")
     return parser
 
 
