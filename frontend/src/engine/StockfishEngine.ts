@@ -1,5 +1,6 @@
 import type { EngineConfig, EngineResult, Tier, TierConfig } from '../api/types'
-import { type EngineTransport, search, toEngineResult } from './search'
+import { type EngineTransport, type SearchOutcome, search, toEngineResult } from './search'
+import type { InfoLine } from './uci'
 
 export type EngineBuild = 'stockfish-19-lite' | 'stockfish-19-lite-single'
 
@@ -20,6 +21,16 @@ export interface EngineHandle extends Analyzer {
   readonly build: EngineBuild
   readonly threads: number
   newGame(): Promise<void>
+  /**
+   * The live panel's search (SPEC_V2 §5.5): runs until `signal` aborts or the tier's cap,
+   * reporting lines as they deepen. Any other search or newGame() stops it first.
+   */
+  analyzeLive(
+    fen: string,
+    tier: TierConfig,
+    onUpdate: (lines: InfoLine[], depth: number) => void,
+    signal: AbortSignal,
+  ): Promise<SearchOutcome>
 }
 
 /** Multi-threaded Stockfish needs SharedArrayBuffer, which needs cross-origin isolation (§4.1). */
@@ -85,6 +96,8 @@ export class StockfishEngine implements EngineHandle {
   private readonly worker: Worker | null
   // Searches share one engine, so they run strictly one after another.
   private queue: Promise<unknown> = Promise.resolve()
+  // The running live search, which gives way to any other work.
+  private live: AbortController | null = null
 
   private constructor(
     transport: EngineTransport,
@@ -146,6 +159,7 @@ export class StockfishEngine implements EngineHandle {
   }
 
   analyze(item: AnalysisItem, tierName: Tier, tier: TierConfig): Promise<EngineResult> {
+    this.live?.abort()
     return this.enqueue(async () => {
       const outcome = await search(this.transport, item.fen, tier)
       return toEngineResult(item.fen, item.ply, tierName, tier, outcome)
@@ -153,7 +167,26 @@ export class StockfishEngine implements EngineHandle {
   }
 
   /** Clear the engine's hash between games. */
+  analyzeLive(
+    fen: string,
+    tier: TierConfig,
+    onUpdate: (lines: InfoLine[], depth: number) => void,
+    signal: AbortSignal,
+  ): Promise<SearchOutcome> {
+    this.live?.abort() // one live search at a time
+    const controller = new AbortController()
+    this.live = controller
+    if (signal.aborted) controller.abort()
+    else signal.addEventListener('abort', () => controller.abort(), { once: true })
+    return this.enqueue(() =>
+      search(this.transport, fen, tier, { signal: controller.signal, onInfo: onUpdate }),
+    ).finally(() => {
+      if (this.live === controller) this.live = null
+    })
+  }
+
   newGame(): Promise<void> {
+    this.live?.abort()
     return this.enqueue(async () => {
       this.transport.send('ucinewgame')
       await this.ready()

@@ -18,7 +18,12 @@ export function useArrowKeys(onBack: () => void, onForward: () => void): void {
   }, [onBack, onForward])
 }
 
+// Inputs where ← and → move a text cursor. Checkboxes, radios and buttons don't: arrow keys keep
+// stepping through moves right after the player ticks the engine toggle.
+const TEXT_INPUTS = new Set(['text', 'search', 'number', 'email', 'password', 'url', 'tel'])
+
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
-  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+  if (target.isContentEditable || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return true
+  return target instanceof HTMLInputElement && TEXT_INPUTS.has(target.type)
 }

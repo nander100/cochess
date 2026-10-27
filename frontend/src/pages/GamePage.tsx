@@ -3,8 +3,9 @@ import { useLocation, useParams } from 'react-router'
 import { type ChatDeps, askCoach } from '../analysis/chat'
 import { type AnalysisRun, type AnalysisStatus, type PipelineDeps, analyzeGame, statusLabel } from '../analysis/pipeline'
 import { ApiError, isLoggedOut } from '../api/client'
-import type { CreateGameResponse, EngineConfig, GameDetail } from '../api/types'
+import type { CreateGameResponse, GameDetail } from '../api/types'
 import { Board, type BoardMove } from '../board/Board'
+import { EnginePanel, type LiveEngine } from '../board/EnginePanel'
 import { EvalBar } from '../board/EvalBar'
 import { EvalGraph, type GraphPoint } from '../board/EvalGraph'
 import { MoveList } from '../board/MoveList'
@@ -14,6 +15,7 @@ import { ChatPanel } from '../components/ChatPanel'
 import { EngineStats } from '../components/EngineStats'
 import { ProgressBar } from '../components/ProgressBar'
 import { Synopsis, type SynopsisState } from '../components/Synopsis'
+import type { LiveLine } from '../engine/live'
 import { analyzeAll } from '../engine/runner'
 import { errorText, gameDate } from './util'
 
@@ -83,6 +85,18 @@ function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: Analysi
   const node = tree.nodes[current]
   const stored = useMemo(() => storedByPosition(detail), [detail])
 
+  const [engineOn, setEngineOn] = useState(false)
+  const [live, setLive] = useState<{ fen: string; line: LiveLine } | null>(null)
+  const engine = useRef<Promise<LiveEngine> | null>(null)
+  // The browser engine and tier settings, loaded once and shared by the live panel and the chat.
+  const loadEngine = useCallback((): Promise<LiveEngine> => {
+    engine.current ??= deps.api.engineConfig().then(async (config) => ({ config, engine: await deps.getEngine(config) }))
+    engine.current.catch(() => {
+      engine.current = null // let the next attempt retry
+    })
+    return engine.current
+  }, [deps])
+
   const back = useCallback(() => setCurrent((id) => previous(tree, id)), [tree])
   const forward = useCallback(() => setCurrent((id) => next(tree, id)), [tree])
   useArrowKeys(back, forward)
@@ -94,7 +108,10 @@ function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: Analysi
     setCurrent(result.nodeId)
   }
 
-  const evaluation = positionEval(node, detail, stored)
+  const evaluation =
+    engineOn && live?.fen === node.fen
+      ? { winPct: live.line.winPct, evalText: live.line.evalText }
+      : positionEval(node, detail, stored)
   const points = graphPoints(detail)
   return (
     <section className="analysis" aria-label="Analysis board">
@@ -136,6 +153,7 @@ function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: Analysi
               onSelectPly={(ply) => setCurrent(mainlineNode(tree, ply))}
             />
           )}
+          <EnginePanel fen={node.fen} enabled={engineOn} onToggle={setEngineOn} load={loadEngine} onBest={setLive} />
           {fresh && <EngineStats run={fresh} />}
         </div>
         <div className="side-column">
@@ -144,7 +162,13 @@ function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: Analysi
             <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={setCurrent} />
           </div>
           {detail.status === 'analyzed' && (
-            <Coach detail={detail} deps={deps} autoSynopsis={fresh !== null} onLoggedOut={onLoggedOut} />
+            <Coach
+              detail={detail}
+              deps={deps}
+              loadEngine={loadEngine}
+              autoSynopsis={fresh !== null}
+              onLoggedOut={onLoggedOut}
+            />
           )}
         </div>
       </div>
@@ -217,9 +241,10 @@ function ResumeAnalysis({ detail, deps, onLoggedOut, onDone }: {
 }
 
 /** The synopsis and the chat, for an analyzed game. */
-function Coach({ detail, deps, autoSynopsis, onLoggedOut }: {
+function Coach({ detail, deps, loadEngine, autoSynopsis, onLoggedOut }: {
   detail: GameDetail
   deps: PipelineDeps
+  loadEngine: () => Promise<LiveEngine>
   autoSynopsis: boolean
   onLoggedOut: () => void
 }) {
@@ -227,7 +252,6 @@ function Coach({ detail, deps, autoSynopsis, onLoggedOut }: {
     detail.synopsis ? { status: 'done', text: detail.synopsis.text, error: null } : null,
   )
   const started = useRef(false)
-  const config = useRef<Promise<EngineConfig> | null>(null)
 
   const write = useCallback(async () => {
     setSynopsis({ status: 'writing', text: '', error: null })
@@ -262,10 +286,8 @@ function Coach({ detail, deps, autoSynopsis, onLoggedOut }: {
   const chatDeps: ChatDeps = {
     api: deps.api,
     async analyzeDeep(positions) {
-      config.current ??= deps.api.engineConfig()
-      const engineConfig = await config.current
-      const engine = await deps.getEngine(engineConfig)
-      return analyzeAll(engine, positions.map((p) => ({ fen: p.fen, ply: null })), 'deep', engineConfig.deep)
+      const { engine, config } = await loadEngine()
+      return analyzeAll(engine, positions.map((p) => ({ fen: p.fen, ply: null })), 'deep', config.deep)
     },
   }
 

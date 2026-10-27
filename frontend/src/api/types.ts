@@ -57,6 +57,8 @@ export interface EngineConfig {
   scan: TierConfig
   verify: TierConfig
   deep: TierConfig
+  /** The live engine panel: shown only, never posted. */
+  live: TierConfig
 }
 
 /** One engine line. Scores are from White's point of view; exactly one of eval_cp / mate is set. */

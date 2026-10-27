@@ -19,6 +19,10 @@ export interface SearchOutcome {
 
 export interface SearchOptions {
   now?: () => number
+  /** Stop early (sends `stop`); the search resolves with the lines found so far. */
+  signal?: AbortSignal
+  /** Called on every line update with all current lines (ordered by multipv) and the depth. */
+  onInfo?: (lines: InfoLine[], depth: number) => void
 }
 
 /**
@@ -31,9 +35,13 @@ export function search(
   transport: EngineTransport,
   fen: string,
   tier: TierConfig,
-  { now = () => performance.now() }: SearchOptions = {},
+  { now = () => performance.now(), signal, onInfo }: SearchOptions = {},
 ): Promise<SearchOutcome> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      resolve({ depth: 0, timeMs: 0, lines: [] }) // cancelled before it started: nothing sent
+      return
+    }
     const lines = new Map<number, InfoLine>()
     const timers: ReturnType<typeof setTimeout>[] = []
     const start = now()
@@ -43,13 +51,13 @@ export function search(
     const settle = () => {
       unsubscribe()
       timers.forEach(clearTimeout)
+      signal?.removeEventListener('abort', stopNow)
     }
 
-    const maybeStop = () => {
+    const ordered = () => [...lines.entries()].sort(([a], [b]) => a - b).map(([, info]) => info)
+
+    function stopNow() {
       if (stopSent) return
-      const elapsed = now() - start
-      const satisfied = elapsed >= tier.min_time_ms && depth >= tier.min_depth
-      if (!satisfied && elapsed < tier.hard_cap_ms) return
       stopSent = true
       transport.send('stop')
       timers.push(
@@ -60,14 +68,17 @@ export function search(
       )
     }
 
+    const maybeStop = () => {
+      if (stopSent) return
+      const elapsed = now() - start
+      const satisfied = elapsed >= tier.min_time_ms && depth >= tier.min_depth
+      if (satisfied || elapsed >= tier.hard_cap_ms) stopNow()
+    }
+
     const unsubscribe = transport.onLine((line) => {
       if (line.startsWith('bestmove')) {
         settle()
-        resolve({
-          depth,
-          timeMs: Math.round(now() - start),
-          lines: [...lines.entries()].sort(([a], [b]) => a - b).map(([, info]) => info),
-        })
+        resolve({ depth, timeMs: Math.round(now() - start), lines: ordered() })
         return
       }
       const info = parseInfoLine(line)
@@ -75,9 +86,11 @@ export function search(
       lines.set(info.multipv, info)
       // Iteration depth is complete once the main line (multipv 1) reports it.
       if (info.multipv === 1) depth = Math.max(depth, info.depth)
+      onInfo?.(ordered(), depth)
       maybeStop()
     })
 
+    signal?.addEventListener('abort', stopNow, { once: true })
     timers.push(setTimeout(maybeStop, tier.min_time_ms), setTimeout(maybeStop, tier.hard_cap_ms))
     transport.send(`setoption name MultiPV value ${tier.multipv}`)
     transport.send(`position fen ${fen}`)

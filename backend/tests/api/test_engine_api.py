@@ -43,6 +43,7 @@ def test_engine_config_serves_the_tiers(client: TestClient) -> None:
         "max_line_plies": 1,
     }
     assert (data["verify"]["multipv"], data["deep"]["hard_cap_ms"]) == (4, 8000)
+    assert (data["live"]["multipv"], data["live"]["hard_cap_ms"]) == (3, 10_000)
     assert (data["max_threads"], data["hash_mb"]) == (4, 64)
 
 

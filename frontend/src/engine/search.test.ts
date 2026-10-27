@@ -124,3 +124,44 @@ test('converts an outcome into a White-POV result with lines truncated to the ti
   expect(result.lines[0].moves_uci).toHaveLength(10)
   expect(result.lines[1]).toEqual({ rank: 2, eval_cp: null, mate: 2, moves_uci: ['d7d5'] })
 })
+
+test('aborting stops the search early and keeps the lines found so far', async () => {
+  const controller = new AbortController()
+  const result = search(engine, FEN, VERIFY, { now: () => Date.now(), signal: controller.signal })
+  engine.emit(info(9, 'cp 30', 'e7e5'))
+  await vi.advanceTimersByTimeAsync(100)
+
+  controller.abort()
+
+  expect(engine.sent.filter((c) => c === 'stop')).toHaveLength(1)
+  await expect(result).resolves.toMatchObject({ depth: 9, timeMs: 100 })
+  expect(engine.listenerCount).toBe(0)
+})
+
+test('a search aborted before it starts sends nothing to the engine', async () => {
+  const controller = new AbortController()
+  controller.abort()
+
+  await expect(
+    search(engine, FEN, VERIFY, { signal: controller.signal }),
+  ).resolves.toEqual({ depth: 0, timeMs: 0, lines: [] })
+  expect(engine.sent).toEqual([])
+})
+
+test('onInfo streams every line update, ordered by multipv', () => {
+  const updates: [string[], number][] = []
+  void search(engine, FEN, VERIFY, {
+    now: () => Date.now(),
+    onInfo: (lines, depth) => updates.push([lines.map((l) => l.pv[0]), depth]),
+  })
+
+  engine.emit(info(10, 'cp 30', 'e7e5', 1))
+  engine.emit(info(10, 'cp 10', 'c7c5', 2))
+  engine.emit(info(11, 'cp 35', 'e7e5', 1))
+
+  expect(updates).toEqual([
+    [['e7e5'], 10],
+    [['e7e5', 'c7c5'], 10],
+    [['e7e5', 'c7c5'], 11],
+  ])
+})

@@ -19,6 +19,7 @@ export const ENGINE_CONFIG: EngineConfig = {
   scan: TIER,
   verify: { ...TIER, multipv: 4, max_line_plies: 10 },
   deep: { ...TIER, multipv: 4, max_line_plies: 10 },
+  live: { ...TIER, multipv: 3, max_line_plies: 10 },
 }
 
 export const PROFILE: Profile = {
@@ -113,6 +114,7 @@ export function fakeEngine(): EngineHandle {
     build: 'stockfish-19-lite',
     threads: 3,
     newGame: vi.fn(async () => {}),
+    analyzeLive: vi.fn(async () => ({ depth: 0, timeMs: 0, lines: [] })),
     analyze: vi.fn(
       async (item, tier): Promise<EngineResult> => ({
         ply: item.ply,

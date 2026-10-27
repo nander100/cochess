@@ -31,6 +31,11 @@ class EngineSettings(BaseModel):
     deep: EngineTier = EngineTier(
         multipv=4, min_time_ms=3000, min_depth=22, hard_cap_ms=8000, max_line_plies=10
     )
+    # The live engine panel (SPEC_V2 §5.5): 3 lines, runs until the 10 s cap on one position.
+    # Its results are only shown, never posted to the backend.
+    live: EngineTier = EngineTier(
+        multipv=3, min_time_ms=10_000, min_depth=99, hard_cap_ms=10_000, max_line_plies=10
+    )
 
 
 class Thresholds(BaseModel):

@@ -90,3 +90,37 @@ test('waitForLine times out with a readable error', async () => {
   await failed
   vi.useRealTimers()
 })
+
+const LIVE: TierConfig = { multipv: 3, min_time_ms: 10_000, min_depth: 99, hard_cap_ms: 10_000, max_line_plies: 10 }
+
+test('a live search streams its lines and gives way to a tier search', async () => {
+  const engine = workingEngine()
+  const stockfish = await StockfishEngine.connect(engine, 'stockfish-19-lite-single', 1, 64)
+  const updates: number[] = []
+
+  const live = stockfish.analyzeLive(START, LIVE, (_lines, depth) => updates.push(depth), new AbortController().signal)
+  await vi.waitFor(() => expect(updates).toEqual([1])) // streaming; it would run for 10 s
+  const scan = stockfish.analyze({ fen: AFTER_E4, ply: 2 }, 'scan', QUICK)
+
+  await expect(live).resolves.toMatchObject({ depth: 1 })
+  await expect(scan).resolves.toMatchObject({ fen: AFTER_E4, tier: 'scan' })
+  const searches = engine.sent.filter((c) => c.startsWith('position') || c === 'stop')
+  expect(searches).toEqual([`position fen ${START}`, 'stop', `position fen ${AFTER_E4}`, 'stop'])
+})
+
+test('a new live search replaces the pending one; aborting stops it', async () => {
+  const engine = workingEngine()
+  const stockfish = await StockfishEngine.connect(engine, 'stockfish-19-lite-single', 1, 64)
+  const controller = new AbortController()
+
+  // Stepping through moves quickly: the first search is replaced before it reaches the engine.
+  const first = stockfish.analyzeLive(START, LIVE, () => {}, new AbortController().signal)
+  const second = stockfish.analyzeLive(AFTER_E4, LIVE, () => {}, controller.signal)
+  await expect(first).resolves.toEqual({ depth: 0, timeMs: 0, lines: [] })
+  await vi.waitFor(() => expect(engine.sent).toContain(`position fen ${AFTER_E4}`))
+  controller.abort()
+
+  await expect(second).resolves.toMatchObject({ depth: 1 })
+  expect(engine.sent).not.toContain(`position fen ${START}`)
+  expect(engine.sent.filter((c) => c === 'stop')).toHaveLength(1)
+})
