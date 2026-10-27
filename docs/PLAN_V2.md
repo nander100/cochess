@@ -323,3 +323,11 @@ If the best move's SAN also appears in a line that is allowed (e.g. a refutation
 - **PGN dates are shown as UTC dates.** A date-only header is stored as midnight UTC, which showed the day before in US timezones.
 - **Upload flow:** upload → scan + verify → the game opens on the board, with this run's engine details under it and the synopsis starting by itself (as in v1). Games opened later load everything from the database; without a synopsis they show a "Write a synopsis" button.
 - **The Moments tab** of the §5.1 layout arrives with M4.
+
+**M3 (position-aware chat and Explain)**
+- **Engine results by position:** `engine_results.position_key` is an indexed lookup column, not the unique key the plan said. A position recurs in a game with different move counters (repetitions) and v1's scan stores each occurrence, so uniqueness stays on the full FEN.
+- **A position without verify/deep lines is analyzed in the browser first.** Chat and Explain send the result with the request; the backend checks it's for the replayed position and stores it without ever replacing the game's own analysis. If none is available it answers 409.
+- **Explain runs on the chat's system prompt**, with its own instructions (`explain.md`) at the top of its user turn. A separate system prompt invalidated the whole cached prefix: measured on the owner's game, 0 cached tokens read and 10,963 written per Explain before, 12,435 read and 1,266 written after.
+- **Caching:** three breakpoints (system prompt, game context, end of the conversation history).
+- **The player in chat and Explain is the current profile** (Q5); the synopsis still uses the Elo stored with the game.
+- **Null fields are left out of what the coach reads** (v1's `render`), so `branch_ply` only appears for variations.

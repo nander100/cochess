@@ -23,6 +23,7 @@ from app.coach.client import (
     CoachRequest,
     history_breakpoint,
     system_blocks,
+    task_instructions,
 )
 from app.coach.payload import (
     COACH_EXCLUDE,
@@ -146,7 +147,10 @@ async def explain(
     turn: Turn,
 ) -> FinalAnswer:
     """SPEC_V2 §6.3: what happened, where things stand, the plan. No tools: the position's engine
-    lines are in the payload. The answer joins the conversation like a chat answer."""
+    lines are in the payload. The answer joins the conversation like a chat answer.
+
+    It runs on the chat's system prompt, with its own instructions in its user turn: a different
+    system prompt would invalidate the whole cached prefix (game context and history included)."""
     with sessions() as session:
         context = _load_context(session, settings, game_id)
         _check_limit(session, settings, game_id)
@@ -252,7 +256,8 @@ def _request(
     no_tools = task == "explain" or tool_calls_used >= settings.coach.chat_max_tool_calls
     return CoachRequest(
         model=settings.coach_model_chat,
-        system=system_blocks(task, context.context_block),
+        # Chat and Explain share one system prompt so they share the cached prefix.
+        system=system_blocks("chat", context.context_block),
         messages=history_breakpoint(messages),
         max_tokens=settings.coach.chat_max_tokens,
         effort=settings.coach.chat_effort,
@@ -341,7 +346,10 @@ def _save_player_turn(session: Session, game_id: str, task: Task, turn: Turn, di
         position=PositionPayload.model_validate(path.model_dump(exclude={"path_uci"})),
         engine_lines=turn.engine_lines,
     )
-    instruction = EXPLAIN_INSTRUCTION if task == "explain" else CHAT_INSTRUCTION
+    if task == "explain":
+        instruction = f"{task_instructions('explain')}\n{EXPLAIN_INSTRUCTION}"
+    else:
+        instruction = CHAT_INSTRUCTION
     save_turn(
         session,
         game_id,

@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 
 from app.analysis.pgn import parse_pgn
-from app.coach.client import history_breakpoint, system_blocks, system_prompt
+from app.coach.client import history_breakpoint, system_blocks, system_prompt, task_instructions
 from app.coach.payload import (
     SYNOPSIS_INSTRUCTION,
     annotated_movetext,
@@ -122,14 +122,15 @@ def test_a_string_message_is_turned_into_a_block_for_its_breakpoint() -> None:
 
 
 def test_each_task_gets_only_its_own_instructions() -> None:
-    synopsis, chat, explain = (system_prompt(t) for t in ("synopsis", "chat", "explain"))
+    synopsis, chat = system_prompt("synopsis"), system_prompt("chat")
+    explain = task_instructions("explain")  # sent in Explain's user turn, on the chat prompt
 
-    for prompt in (synopsis, chat, explain):
+    for prompt in (synopsis, chat):
         assert "Never calculate, guess, or propose moves yourself" in prompt
         assert "The `position` object is what the player sees on the board" in prompt
     assert "### Your turn" in synopsis
     assert "candidate_moves_san" in chat
-    assert "Where things stand" in explain
+    assert "Where things stand" in explain and "Never calculate" not in explain
     assert "### Your turn" not in chat + explain and "candidate_moves_san" not in synopsis + explain
 
 

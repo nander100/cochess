@@ -88,7 +88,7 @@ def chat_history(session: Session, game_id: str) -> list[ChatEntry]:
 
 
 def _player_prompt(rendered: str) -> str | None:
-    _, _, payload = rendered.partition("\n\n")
+    _, _, payload = rendered.rpartition("\n\n")  # the JSON is the last paragraph
     try:
         prompt = json.loads(payload).get("user_prompt")
     except (json.JSONDecodeError, AttributeError):
@@ -106,7 +106,7 @@ def user_payloads(session: Session, game_id: str) -> list[Any]:
         for block in row.content["blocks"]:
             if block.get("type") != "text":
                 continue
-            _, _, payload = str(block.get("text", "")).partition("\n\n")
+            _, _, payload = str(block.get("text", "")).rpartition("\n\n")  # JSON is last
             try:
                 payloads.append(json.loads(payload))
             except json.JSONDecodeError:

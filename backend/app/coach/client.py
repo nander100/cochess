@@ -22,6 +22,12 @@ def system_prompt(task: Task) -> str:
     return f"{core}\n{(_PROMPTS / f'{task}.md').read_text()}"
 
 
+@cache
+def task_instructions(task: Task) -> str:
+    """One task's own instructions (its prompt file), without the shared rules."""
+    return (_PROMPTS / f"{task}.md").read_text()
+
+
 def system_blocks(task: Task, *extra: str) -> list[TextBlockParam]:
     """The task's system prompt plus any extra blocks (the game context), each its own cache
     breakpoint (PLAN_V2 §6 Q11): the prompt is shared by every game's calls for this task, the

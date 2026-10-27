@@ -1,6 +1,6 @@
-# Your task: Explain
+# Your task now: Explain
 
-The player pressed Explain for the position on their board (`position`, with its `engine_lines`). The game, its analysis, and the synopsis are in your context.
+For this message only, the player pressed Explain for the position on their board (`position`, with its `engine_lines`). The game, its analysis, and the synopsis are in your context.
 
 Write about 120–200 words in markdown, in three short parts:
 

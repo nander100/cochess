@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.coach.client import system_blocks
 from app.config import CoachSettings, Settings
 from app.db.chat import load_messages, tool_results
 from app.db.models import LlmUsageRow, PendingToolCallRow
@@ -244,7 +245,8 @@ def ask(
 
 
 def payload_of(fake: FakeCoachClient, call: int) -> Any:
-    return json.loads(last_user_blocks(fake, call)[0]["text"].split("\n\n", 1)[1])
+    # The JSON is the turn's last paragraph (Explain's instructions come before it).
+    return json.loads(last_user_blocks(fake, call)[0]["text"].rsplit("\n\n", 1)[1])
 
 
 class TestPositions:
@@ -375,7 +377,10 @@ class TestExplain:
         assert response.status_code == 200, response.text
         assert text_of(sse_events(response.text)) == "### What has happened\nA calm start."
         [request] = fake.requests
-        assert "Your task: Explain" in request.system[0]["text"]
+        # Explain shares the chat's system prompt (and so its cached prefix); its own
+        # instructions are in its user turn.
+        assert request.system == system_blocks("chat", request.system[1]["text"])
+        assert last_user_blocks(fake, 0)[0]["text"].startswith("# Your task now: Explain")
         assert request.tool_choice == {"type": "none"}
         payload = payload_of(fake, 0)
         assert (payload["task"], payload.get("user_prompt")) == ("explain", None)
@@ -386,6 +391,17 @@ class TestExplain:
         ]
         with app.state.session_factory() as session:
             assert session.query(LlmUsageRow).one().task == "explain"
+
+    def test_moves_shown_by_explain_stay_valid_in_later_answers(self) -> None:
+        result = fake_result(VARIATION_FEN, "verify", lines=4, plies=10)
+        client, fake, _, game_id = setup("Here it is.", "As I said, 3...a6 is the line.")
+        body = {"path_uci": VARIATION, "engine_result": result}
+        assert client.post(f"/api/games/{game_id}/explain", json=body).status_code == 200
+
+        events = sse_events(ask(client, game_id, "Remind me?", []).text)
+
+        assert "3...a6" in text_of(events)  # a6 was only in the Explain payload's engine lines
+        assert len(fake.requests) == 2  # no rewrite
 
     def test_needs_an_analyzed_position(self) -> None:
         client, fake, _, game_id = setup("unused")
