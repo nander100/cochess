@@ -115,7 +115,9 @@ def _moments(
                 eval_before=moment.eval_before,
                 eval_after=moment.eval_after,
                 state=cast(MomentState, row.state) if row else "new",
-                attempts=[MomentTry(san=a["san"], grade=a["grade"]) for a in row.attempts]
+                attempts=[
+                    MomentTry(uci=a["uci"], san=a["san"], grade=a["grade"]) for a in row.attempts
+                ]
                 if row
                 else [],
                 messages=[MomentMessage.model_validate(m) for m in row.messages] if row else [],

@@ -6,6 +6,7 @@ import type {
   CreateGameResponse,
   EngineConfig,
   EngineResult,
+  MomentInfo,
   GameDetail,
   MoveInfo,
   Profile,
@@ -107,6 +108,36 @@ export const DETAIL: GameDetail = {
   verify_fens: [],
   synopsis: null,
   chat: [],
+  moments: [],
+}
+
+/** White's 2. Nf3 in DETAIL as a critical moment nobody has opened yet. */
+export const MOMENT: MomentInfo = {
+  index: 1,
+  ply: 3,
+  move_number: 2,
+  side: 'white',
+  san: 'Nf3',
+  uci: 'g1f3',
+  label: 'mistake',
+  eval_before: '+0.3',
+  eval_after: '-1.0',
+  state: 'new',
+  attempts: [],
+  messages: [],
+  best_san: null,
+  best_uci: null,
+}
+
+/** A scripted coach stream: an optional `moment` event, then the text. */
+export function coachSays(text: string, moment?: { grade: string | null; state: string }) {
+  return async (...args: unknown[]) => {
+    const onEvent = args[args.length - 1] as (event: CoachEvent) => void
+    onEvent({ type: 'status', message: 'Coach is writing…' })
+    if (moment) onEvent({ type: 'moment', ...moment })
+    onEvent({ type: 'text', text })
+    onEvent({ type: 'done', invalid_moves_removed: [] })
+  }
 }
 
 export function fakeEngine(): EngineHandle {
@@ -154,6 +185,11 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
       onEvent({ type: 'text', text: 'Here is the position.' })
       onEvent({ type: 'done', invalid_moves_removed: [] })
     }),
+    momentStart: vi.fn(coachSays('What would you play instead, and why?')),
+    momentAttempt: vi.fn(coachSays('Not quite. Look at your queen.', { grade: 'mistake', state: 'attempt' })),
+    momentReveal: vi.fn(coachSays('The move was 2. d4.', { grade: null, state: 'revealed' })),
+    momentAsk: vi.fn(coachSays('Think about the centre.')),
+    momentWrapUp: vi.fn(coachSays('Well done.')),
     ...overrides,
   }
 }

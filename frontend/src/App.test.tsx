@@ -5,7 +5,8 @@ import type { PipelineDeps } from './analysis/pipeline'
 import { ApiError } from './api/client'
 import type { CoachEvent } from './api/sse'
 import type { BoardMove } from './board/Board'
-import { DETAIL, PROFILE, fakeDeps } from './test/fakes'
+import type { GameDetail, MomentInfo } from './api/types'
+import { DETAIL, MOMENT, PROFILE, fakeDeps } from './test/fakes'
 
 // chessground needs real layout; the analysis board is tested with a stand-in that shows the
 // position and can play a move.
@@ -332,5 +333,106 @@ describe('chat and Explain are about the position on the board', () => {
 
     expect(await screen.findByText('Here is the position.')).toBeInTheDocument()
     expect(deps.api.explain).toHaveBeenCalledWith('game-1', { path_uci: ['e2e4', 'e7e5'] }, expect.any(Function))
+  })
+})
+
+describe('critical moments', () => {
+  // The fake game's moment is White's 2. Nf3; the position before it is after 1. e4 e5.
+  const BEFORE_NF3 = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2'
+  const withMoment = (moment: Partial<MomentInfo> = {}, extra: Partial<GameDetail> = {}): GameDetail => ({
+    ...DETAIL,
+    moments: [{ ...MOMENT, ...moment }],
+    ...extra,
+  })
+  const INTRO = { role: 'coach' as const, text: 'What would you play instead, and why?', kind: 'intro' }
+
+  async function openMoments() {
+    fireEvent.click(await screen.findByRole('tab', { name: /Critical moments \(0\/1\)/ }))
+  }
+
+  test('the synopsis is collapsed as a spoiler while a moment is unsolved', async () => {
+    const synopsis = { text: 'You should have played 2. d4.', invalid_moves_removed: [] }
+    const deps = fakeDeps({ getGame: vi.fn(async () => withMoment({}, { synopsis })) })
+    renderApp(deps, '/games/game-1')
+
+    const summary = await screen.findByText(/Show the synopsis \(spoilers/)
+
+    expect(summary.closest('details')).not.toHaveAttribute('open')
+  })
+
+  test('a moment locks the board to its position, and a move there is only a candidate', async () => {
+    const started = withMoment({ state: 'intro', messages: [INTRO] })
+    const deps = fakeDeps({ getGame: vi.fn().mockResolvedValueOnce(withMoment()).mockResolvedValue(started) })
+    renderApp(deps, '/games/game-1')
+    await openMoments()
+
+    expect(screen.getByTestId('board')).toHaveAttribute('data-fen', BEFORE_NF3)
+    expect(screen.queryByRole('region', { name: 'Live engine' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Previous move (←)' })).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start this moment' }))
+    expect(await screen.findByText('What would you play instead, and why?')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'play Bc4' }))
+
+    expect(screen.getByText('Your move:').parentElement).toHaveTextContent('2. Bc4')
+    expect(screen.getByTestId('board').getAttribute('data-fen')).toContain('2B1P3')
+    expect(screen.queryByRole('button', { name: '2. Bc4' })).not.toBeInTheDocument() // not in the tree
+  })
+
+  test('checking a move sends the engine searches before and after it', async () => {
+    const started = withMoment({ state: 'intro', messages: [INTRO] })
+    const deps = fakeDeps({ getGame: vi.fn().mockResolvedValueOnce(started).mockResolvedValue(started) })
+    renderApp(deps, '/games/game-1')
+    fireEvent.click(await screen.findByRole('tab', { name: /Critical moments/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'play Bc4' }))
+    fireEvent.change(screen.getByLabelText('Why this move? (optional)'), { target: { value: 'Aim at f7' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check my move' }))
+
+    expect(await screen.findByText('Mistake')).toBeInTheDocument()
+    const fens = vi.mocked(deps.engine.analyze).mock.calls.map(([item, tier]) => [item.fen, tier])
+    expect(fens).toEqual([
+      [BEFORE_NF3, 'deep'],
+      [expect.stringContaining('2B1P3'), 'deep'],
+    ])
+    const [, index, body] = vi.mocked(deps.api.momentAttempt).mock.calls[0]
+    expect(index).toBe(1)
+    expect(body).toMatchObject({ move_uci: 'f1c4', reasoning: 'Aim at f7' })
+    expect(screen.getByText('Play your move on the board.')).toBeInTheDocument() // the candidate is cleared
+  })
+
+  test('after a reveal the tries and the best move are variations, and the board unlocks', async () => {
+    const started = withMoment({ state: 'attempt', messages: [INTRO], attempts: [{ uci: 'f1c4', san: 'Bc4', grade: 'mistake' }] })
+    const revealed = withMoment({
+      state: 'revealed',
+      messages: [INTRO, { role: 'coach', text: 'The move was 2. d4.', kind: 'reveal' }],
+      attempts: started.moments[0].attempts,
+      best_san: 'd4',
+      best_uci: 'd2d4',
+    })
+    const deps = fakeDeps({ getGame: vi.fn().mockResolvedValueOnce(started).mockResolvedValue(revealed) })
+    renderApp(deps, '/games/game-1')
+    fireEvent.click(await screen.findByRole('tab', { name: /Critical moments/ }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show me' }))
+
+    expect(await screen.findByText(/The engine's move:/)).toHaveTextContent('2. d4')
+    expect(screen.getByRole('button', { name: '2. Bc4' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '2. d4' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Live engine' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Critical moments \(1\/1\)/ })).toBeInTheDocument()
+    expect(deps.api.momentReveal).toHaveBeenCalledWith('game-1', 1, expect.objectContaining({ fen: BEFORE_NF3 }), expect.any(Function))
+  })
+
+  test('leaving the tab pauses the moment and unlocks the board', async () => {
+    const deps = fakeDeps({ getGame: vi.fn(async () => withMoment({ state: 'intro', messages: [INTRO] })) })
+    renderApp(deps, '/games/game-1')
+    await openMoments()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Coach' }))
+
+    expect(screen.getByRole('region', { name: 'Live engine' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Previous move (←)' })).toBeEnabled()
+    expect(screen.getByLabelText('Your question')).toBeInTheDocument()
   })
 })

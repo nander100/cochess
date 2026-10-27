@@ -211,6 +211,10 @@ class TestAttempts:
         assert text_of(events) == "The move was 5. gxf3."  # allowed now: nothing is withheld
         [info] = client.get(f"/api/games/{gid}").json()["moments"]
         assert (info["state"], info["best_san"], info["best_uci"]) == ("revealed", "gxf3", "g2f3")
+        assert info["attempts"] == [
+            {"uci": "a2a3", "san": "a3", "grade": "blunder"},
+            {"uci": "h2h3", "san": "h3", "grade": "blunder"},
+        ]
 
     def test_finding_the_move_solves_it(self) -> None:
         client, fake, app, gid = setup(INTRO, SOLVED)

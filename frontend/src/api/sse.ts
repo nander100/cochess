@@ -6,6 +6,8 @@ export type CoachEvent =
   | { type: 'done'; invalid_moves_removed: string[] }
   | { type: 'error'; message: string }
   | { type: 'engine_request'; request_id: string; positions: EnginePositionRequest[] }
+  /** A critical-moment attempt's grade and the moment's new state, before the coach's text. */
+  | { type: 'moment'; grade: string | null; state: string }
 
 /** A position the coach wants the deep-dive engine tier to analyze (SPEC §8.3). */
 export interface EnginePositionRequest {
@@ -72,6 +74,10 @@ function toCoachEvent(name: string, payload: unknown): CoachEvent | null {
       if (typeof record.request_id !== 'string' || positions.length === 0) return null
       return { type: 'engine_request', request_id: record.request_id, positions }
     }
+    case 'moment':
+      return typeof record.state === 'string'
+        ? { type: 'moment', grade: typeof record.grade === 'string' ? record.grade : null, state: record.state }
+        : null
     default:
       return null
   }

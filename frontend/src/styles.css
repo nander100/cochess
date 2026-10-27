@@ -727,3 +727,149 @@ button.explain {
   font-weight: 400;
   font-size: 0.85rem;
 }
+
+/* Coach / Critical moments tabs (SPEC_V2 §8) */
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.tabs [role='tab'] {
+  background: none;
+  color: var(--color-muted);
+  border: none;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  padding: 0.5rem 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tabs [role='tab'][aria-selected='true'] {
+  color: var(--color-ink);
+  border-bottom-color: var(--color-accent);
+}
+
+.tabs [role='tab']:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.moments {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.moments h2 {
+  font-family: ui-serif, Georgia, 'Times New Roman', serif;
+  font-size: 1.35rem;
+  margin: 0;
+}
+
+.moment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.moment-chip {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.moment-chip[aria-current='step'] {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+.moment-chip.solved::before {
+  content: '✓ ';
+  color: var(--color-accent);
+}
+
+.moment-chip.revealed::before {
+  content: '• ';
+  color: var(--color-muted);
+}
+
+.moment-summary {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.moment-grade {
+  margin: 0;
+  font-weight: 700;
+}
+
+.moment-grade.best,
+.moment-grade.good {
+  color: var(--color-accent);
+}
+
+.moment-grade.mistake,
+.moment-grade.blunder {
+  color: var(--color-danger);
+}
+
+.moment-controls,
+.moment-attempt {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.moment-attempt p {
+  margin: 0;
+}
+
+.moment-attempt textarea {
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  resize: vertical;
+}
+
+.moment-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.moment-controls > button,
+.moment-actions > button {
+  justify-self: start;
+}
+
+.moment-best {
+  margin: 0;
+}
+
+.engine-locked {
+  color: var(--color-muted);
+  font-style: italic;
+  margin: 0;
+}
+
+.synopsis-spoiler summary {
+  cursor: pointer;
+  color: var(--color-muted);
+}
+
+button.secondary {
+  background: var(--color-surface);
+  color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}

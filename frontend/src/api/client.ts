@@ -1,5 +1,6 @@
 import { type CoachEvent, readCoachEvents } from './sse'
 import type {
+  AttemptRequest,
   CreateGameRequest,
   CreateGameResponse,
   EngineConfig,
@@ -54,6 +55,22 @@ export interface ApiClient {
     results: EngineResult[],
     onEvent: (event: CoachEvent) => void,
   ): Promise<void>
+  /** Critical moments (SPEC_V2 §8.2): each step streams the coach's answer back. */
+  momentStart(gameId: string, index: number, onEvent: (event: CoachEvent) => void): Promise<void>
+  momentAttempt(
+    gameId: string,
+    index: number,
+    body: AttemptRequest,
+    onEvent: (event: CoachEvent) => void,
+  ): Promise<void>
+  momentReveal(
+    gameId: string,
+    index: number,
+    engineBefore: EngineResult | null,
+    onEvent: (event: CoachEvent) => void,
+  ): Promise<void>
+  momentAsk(gameId: string, index: number, message: string, onEvent: (event: CoachEvent) => void): Promise<void>
+  momentWrapUp(gameId: string, onEvent: (event: CoachEvent) => void): Promise<void>
 }
 
 export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)): ApiClient {
@@ -117,6 +134,18 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
     explain: (gameId, body, onEvent) => stream(`/api/games/${gameId}/explain`, body, onEvent),
     submitEngineResult: (gameId, requestId, results, onEvent) =>
       stream(`/api/games/${gameId}/chat/engine_result`, { request_id: requestId, results }, onEvent),
+    momentStart: (gameId, index, onEvent) => stream(`/api/games/${gameId}/moments/${index}/start`, null, onEvent),
+    momentAttempt: (gameId, index, body, onEvent) =>
+      stream(`/api/games/${gameId}/moments/${index}/attempt`, body, onEvent),
+    momentReveal: (gameId, index, engineBefore, onEvent) =>
+      stream(
+        `/api/games/${gameId}/moments/${index}/reveal`,
+        engineBefore ? { engine_before: engineBefore } : {},
+        onEvent,
+      ),
+    momentAsk: (gameId, index, message, onEvent) =>
+      stream(`/api/games/${gameId}/moments/${index}/ask`, { message }, onEvent),
+    momentWrapUp: (gameId, onEvent) => stream(`/api/games/${gameId}/moments/wrap_up`, null, onEvent),
   }
 }
 

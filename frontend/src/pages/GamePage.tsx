@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useParams } from 'react-router'
 import { type ChatDeps, type ChatProgress, askCoach, explainPosition } from '../analysis/chat'
+import { BeforeSearches, type MomentDeps, fenAfter } from '../analysis/moments'
 import { type AnalysisRun, type AnalysisStatus, type PipelineDeps, analyzeGame, statusLabel } from '../analysis/pipeline'
 import { ApiError, isLoggedOut } from '../api/client'
-import type { CreateGameResponse, EngineResult, GameDetail } from '../api/types'
+import type { CreateGameResponse, EngineResult, GameDetail, MomentInfo } from '../api/types'
 import { Board, type BoardMove } from '../board/Board'
 import { EnginePanel, type LiveEngine } from '../board/EnginePanel'
 import { EvalBar } from '../board/EvalBar'
@@ -25,6 +26,8 @@ import { useArrowKeys } from '../board/useArrowKeys'
 import { ChatPanel } from '../components/ChatPanel'
 import { EngineStats } from '../components/EngineStats'
 import { ProgressBar } from '../components/ProgressBar'
+import { isUnsolved } from '../moments/moment'
+import { MomentStepper } from '../moments/MomentStepper'
 import { Synopsis, type SynopsisState } from '../components/Synopsis'
 import { type LiveLine, isGameOver } from '../engine/live'
 import { analyzeAll } from '../engine/runner'
@@ -90,9 +93,26 @@ interface AnalysisBoardProps {
   onAnalyzed: () => void
 }
 
+type Tab = 'coach' | 'moments'
+
 function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: AnalysisBoardProps) {
-  const [tree, setTree] = useState<GameTree>(() => fromMoves(detail.moves, detail.final_fen))
+  const [tree, setTree] = useState<GameTree>(() =>
+    detail.moments.filter((m) => !isUnsolved(m)).reduce(withMomentLines, fromMoves(detail.moves, detail.final_fen)),
+  )
   const [current, setCurrent] = useState(ROOT)
+
+  // Critical moments (SPEC_V2 §8.2). While the one on screen is unsolved, the board shows its
+  // position, a move played there is the attempt (not added to the tree), and navigation, the
+  // engine and the chat are locked (PLAN_V2 §6 Q3). Leaving the tab pauses the exercise.
+  const [tab, setTab] = useState<Tab>('coach')
+  const [moments, setMoments] = useState<MomentInfo[]>(detail.moments)
+  const [momentIndex, setMomentIndex] = useState(() => (detail.moments.find(isUnsolved) ?? detail.moments[0])?.index ?? 0)
+  const [candidate, setCandidate] = useState<string | null>(null)
+  const [searches] = useState(() => new BeforeSearches())
+  const moment = tab === 'moments' ? (moments.find((m) => m.index === momentIndex) ?? null) : null
+  const momentNodeId = moment ? mainlineNode(tree, moment.ply - 1) : null
+  const locked = moment !== null && isUnsolved(moment)
+
   const node = tree.nodes[current]
   const stored = useMemo(() => storedByPosition(detail), [detail])
 
@@ -124,19 +144,64 @@ function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: Analysi
     [analyzed, loadEngine],
   )
 
-  const back = useCallback(() => setCurrent((id) => previous(tree, id)), [tree])
-  const forward = useCallback(() => setCurrent((id) => next(tree, id)), [tree])
+  const momentDeps: MomentDeps = {
+    api: deps.api,
+    async analyzeDeep(fen) {
+      const { engine: handle, config } = await loadEngine()
+      return handle.analyze({ fen, ply: null }, 'deep', config.deep)
+    },
+  }
+
+  const navigate = useCallback((id: string) => {
+    if (!locked) setCurrent(id)
+  }, [locked])
+  const back = useCallback(() => navigate(previous(tree, current)), [navigate, tree, current])
+  const forward = useCallback(() => navigate(next(tree, current)), [navigate, tree, current])
   useArrowKeys(back, forward)
 
+  function showMoment(index: number) {
+    setMomentIndex(index)
+    setCandidate(null)
+    const shown = moments.find((m) => m.index === index)
+    if (shown && !isUnsolved(shown)) setCurrent(mainlineNode(tree, shown.ply - 1))
+  }
+
+  function openTab(next: Tab) {
+    setTab(next)
+    setCandidate(null)
+    const shown = moments.find((m) => m.index === momentIndex)
+    if (next === 'moments' && shown && !isUnsolved(shown)) setCurrent(mainlineNode(tree, shown.ply - 1))
+  }
+
+  /** The server's record after a step; a moment that just finished puts its lines on the board. */
+  function momentsUpdated(fresh: MomentInfo[]) {
+    const finished = fresh.filter((m) => !isUnsolved(m) && moments.some((old) => old.index === m.index && isUnsolved(old)))
+    setMoments(fresh)
+    if (finished.length === 0) return
+    const updated = finished.reduce(withMomentLines, tree)
+    setTree(updated)
+    setCurrent(mainlineNode(updated, finished[0].ply - 1))
+  }
+
   function play(move: BoardMove) {
+    if (moment && locked) {
+      if (moment.state === 'intro' || moment.state === 'attempt') setCandidate(toUci(move))
+      return
+    }
     const result = addMove(tree, current, move)
     if (!result) return // chessground only offers legal moves; nothing to do otherwise
     setTree(result.tree)
     setCurrent(result.nodeId)
   }
 
-  const evaluation =
-    engineOn && live?.fen === node.fen
+  const momentFen = momentNodeId !== null ? tree.nodes[momentNodeId].fen : null
+  const boardFen = locked && momentFen ? ((candidate && fenAfter(momentFen, candidate)) ?? momentFen) : node.fen
+  const boardLastMove = locked && momentNodeId !== null ? (candidate ?? tree.nodes[momentNodeId].uci) : node.uci
+  const evaluation = locked
+    ? candidate || momentNodeId === null
+      ? { winPct: null, evalText: null }
+      : positionEval(tree.nodes[momentNodeId], detail, stored)
+    : engineOn && live?.fen === node.fen
       ? { winPct: live.line.winPct, evalText: live.line.evalText }
       : positionEval(node, detail, stored)
   const points = graphPoints(detail)
@@ -151,24 +216,29 @@ function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: Analysi
           <div className="board-row">
             <EvalBar winPct={evaluation.winPct} evalText={evaluation.evalText} orientation={detail.user_color} />
             <Board
-              fen={node.fen}
+              fen={boardFen}
               orientation={detail.user_color}
-              lastMove={node.uci}
-              movable
+              lastMove={boardLastMove}
+              movable={!locked || (candidate === null && (moment?.state === 'intro' || moment?.state === 'attempt'))}
               onMove={play}
             />
           </div>
           <div className="board-controls" role="group" aria-label="Move navigation">
-            <button type="button" onClick={() => setCurrent(ROOT)} aria-label="Start of the game">
+            <button type="button" onClick={() => navigate(ROOT)} disabled={locked} aria-label="Start of the game">
               ⏮
             </button>
-            <button type="button" onClick={back} aria-label="Previous move (←)">
+            <button type="button" onClick={back} disabled={locked} aria-label="Previous move (←)">
               ◀
             </button>
-            <button type="button" onClick={forward} aria-label="Next move (→)">
+            <button type="button" onClick={forward} disabled={locked} aria-label="Next move (→)">
               ▶
             </button>
-            <button type="button" onClick={() => setCurrent(endOfLine(tree, current))} aria-label="End of the line">
+            <button
+              type="button"
+              onClick={() => navigate(endOfLine(tree, current))}
+              disabled={locked}
+              aria-label="End of the line"
+            >
               ⏭
             </button>
           </div>
@@ -177,18 +247,47 @@ function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: Analysi
               points={points}
               userColor={detail.user_color}
               currentPly={branchPly(tree, node)}
-              onSelectPly={(ply) => setCurrent(mainlineNode(tree, ply))}
+              onSelectPly={(ply) => navigate(mainlineNode(tree, ply))}
             />
           )}
-          <EnginePanel fen={node.fen} enabled={engineOn} onToggle={setEngineOn} load={loadEngine} onBest={setLive} />
+          {locked ? (
+            <p className="engine-locked">The engine is off while you work on this moment.</p>
+          ) : (
+            <EnginePanel fen={node.fen} enabled={engineOn} onToggle={setEngineOn} load={loadEngine} onBest={setLive} />
+          )}
           {fresh && <EngineStats run={fresh} />}
         </div>
         <div className="side-column">
           <div className="panel">
             <h2 className="panel-title">Moves</h2>
-            <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={setCurrent} />
+            <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} />
           </div>
-          {detail.status === 'analyzed' && (
+          {detail.status === 'analyzed' && moments.length > 0 && (
+            <div className="tabs" role="tablist" aria-label="Coaching">
+              <button type="button" role="tab" aria-selected={tab === 'coach'} onClick={() => openTab('coach')}>
+                Coach
+              </button>
+              <button type="button" role="tab" aria-selected={tab === 'moments'} onClick={() => openTab('moments')}>
+                Critical moments ({moments.filter((m) => !isUnsolved(m)).length}/{moments.length})
+              </button>
+            </div>
+          )}
+          {detail.status === 'analyzed' && tab === 'moments' && momentFen !== null && (
+            <MomentStepper
+              gameId={detail.id}
+              moments={moments}
+              current={momentIndex}
+              onSelect={showMoment}
+              fen={momentFen}
+              candidate={candidate}
+              onTakeBack={() => setCandidate(null)}
+              deps={momentDeps}
+              searches={searches}
+              onUpdated={momentsUpdated}
+              onLoggedOut={onLoggedOut}
+            />
+          )}
+          {detail.status === 'analyzed' && tab === 'coach' && (
             <Coach
               detail={detail}
               deps={deps}
@@ -196,6 +295,7 @@ function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: Analysi
               ensureAnalyzed={ensureAnalyzed}
               loadEngine={loadEngine}
               autoSynopsis={fresh !== null}
+              spoiler={moments.some(isUnsolved)}
               onLoggedOut={onLoggedOut}
             />
           )}
@@ -270,7 +370,7 @@ function ResumeAnalysis({ detail, deps, onLoggedOut, onDone }: {
 }
 
 /** The synopsis and the chat, for an analyzed game. */
-function Coach({ detail, deps, board, ensureAnalyzed, loadEngine, autoSynopsis, onLoggedOut }: {
+function Coach({ detail, deps, board, ensureAnalyzed, loadEngine, autoSynopsis, spoiler, onLoggedOut }: {
   detail: GameDetail
   deps: PipelineDeps
   /** The position on the board: chat and Explain are about it (SPEC_V2 §6). */
@@ -278,6 +378,8 @@ function Coach({ detail, deps, board, ensureAnalyzed, loadEngine, autoSynopsis, 
   ensureAnalyzed: (fen: string, onProgress: (progress: ChatProgress) => void) => Promise<EngineResult | null>
   loadEngine: () => Promise<LiveEngine>
   autoSynopsis: boolean
+  /** Unsolved critical moments: the synopsis names their answers, so it starts collapsed (Q16). */
+  spoiler: boolean
   onLoggedOut: () => void
 }) {
   const [synopsis, setSynopsis] = useState<SynopsisState | null>(
@@ -325,7 +427,12 @@ function Coach({ detail, deps, board, ensureAnalyzed, loadEngine, autoSynopsis, 
 
   return (
     <>
-      {synopsis ? (
+      {synopsis && spoiler && synopsis.status === 'done' ? (
+        <details className="synopsis-spoiler">
+          <summary>Show the synopsis (spoilers: it names better moves for your critical moments)</summary>
+          <Synopsis state={synopsis} onRetry={() => void write()} />
+        </details>
+      ) : synopsis ? (
         <Synopsis state={synopsis} onRetry={() => void write()} />
       ) : (
         <section className="synopsis" aria-label="Coach's synopsis">
@@ -430,4 +537,19 @@ function mainlineNode(tree: GameTree, ply: number): string {
 function endOfLine(tree: GameTree, nodeId: string): string {
   const line = lineFrom(tree, nodeId)
   return line[line.length - 1].id
+}
+
+function toUci(move: BoardMove): string {
+  return `${move.from}${move.to}${move.promotion ?? ''}`
+}
+
+function fromUci(uci: string): BoardMove {
+  return { from: uci.slice(0, 2), to: uci.slice(2, 4), ...(uci.length > 4 ? { promotion: uci[4] } : {}) }
+}
+
+/** A finished moment's tries and the engine's move, as variations from its position. */
+function withMomentLines(tree: GameTree, moment: MomentInfo): GameTree {
+  const from = mainlineNode(tree, moment.ply - 1)
+  const moves = [...moment.attempts.map((a) => a.uci), ...(moment.best_uci ? [moment.best_uci] : [])]
+  return moves.reduce((acc, uci) => addMove(acc, from, fromUci(uci))?.tree ?? acc, tree)
 }

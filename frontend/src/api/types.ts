@@ -176,6 +176,44 @@ export interface ChatRequest extends PositionRequest {
   message: string
 }
 
+/** "new" until the player opens it (SPEC_V2 §8.2). */
+export type MomentState = 'new' | 'intro' | 'attempt' | 'solved' | 'revealed'
+export type MomentGrade = 'best' | 'good' | 'inaccuracy' | 'mistake' | 'blunder'
+
+export interface MomentMessage {
+  role: 'player' | 'coach'
+  text: string
+  kind: string
+}
+
+/** A critical moment and the player's progress on it. The best move is only there once the
+ * moment is solved or revealed. */
+export interface MomentInfo {
+  index: number
+  ply: number
+  move_number: number
+  side: Color
+  san: string
+  uci: string
+  label: MoveLabel
+  eval_before: string
+  eval_after: string
+  state: MomentState
+  attempts: { uci: string; san: string; grade: MomentGrade }[]
+  messages: MomentMessage[]
+  best_san: string | null
+  best_uci: string | null
+}
+
+/** An attempt at a moment: the move, the player's reasoning, and the browser's deep searches of
+ * the position before (once per moment) and after the move (not when the move ends the game). */
+export interface AttemptRequest {
+  move_uci: string
+  reasoning?: string
+  engine_before?: EngineResult
+  engine_after?: EngineResult
+}
+
 export interface GameDetail {
   id: string
   status: GameStatus
@@ -194,4 +232,5 @@ export interface GameDetail {
   verify_fens: string[]
   synopsis: { text: string; invalid_moves_removed: string[] } | null
   chat: ChatEntry[]
+  moments: MomentInfo[]
 }

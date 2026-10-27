@@ -150,6 +150,7 @@ MomentState = Literal["new", "intro", "attempt", "solved", "revealed"]
 
 
 class MomentTry(BaseModel):
+    uci: str
     san: str
     grade: str  # best / good / inaccuracy / mistake / blunder
 
