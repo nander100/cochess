@@ -311,3 +311,15 @@ If the best move's SAN also appears in a line that is allowed (e.g. a refutation
 **15. v1 data.** There's no local `cochess.db`. **Question:** is v1 deployed somewhere with games you want kept? If so, the plan is: deploy M1 → the stamp-then-upgrade migration runs → `create-user` + `assign-games --user Alex`. If not, I'll still build `assign-games` and test it, but there's nothing to migrate.
 
 **16. Synopsis on the game page vs. moments.** The stored synopsis names better moves, so a user reading it before stepping through moments sees the answers (to the user, not the coach). **Recommendation:** collapse the synopsis by default on games with unsolved moments, with a "spoilers" note. This is cosmetic; say if you'd rather show it as v1 does.
+
+---
+
+## 7. Decisions made while building
+
+**M2 (analysis board)**
+- **Live engine tier** in backend config (`engine.live`: MultiPV 3, runs to its 10 s cap), served by `/api/engine-config` like the other tiers. Live results are shown only, never posted.
+- **Stored engine lines carry `win_pct`** from the backend. The frontend mirrors the win% formula only for live engine lines, with tests pinned to the backend's values.
+- **Promotion on the board is always to a queen.** Under-promotion would need a piece picker; v2 doesn't offer it (an explored variation, not the game itself).
+- **PGN dates are shown as UTC dates.** A date-only header is stored as midnight UTC, which showed the day before in US timezones.
+- **Upload flow:** upload → scan + verify → the game opens on the board, with this run's engine details under it and the synopsis starting by itself (as in v1). Games opened later load everything from the database; without a synopsis they show a "Write a synopsis" button.
+- **The Moments tab** of the §5.1 layout arrives with M4.

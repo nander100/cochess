@@ -48,8 +48,10 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
   await page.getByLabel(/your game/i).fill(PGN)
   const started = Date.now()
   await page.getByRole('button', { name: 'Analyze' }).click()
-  await expect(page.getByText('Analysis complete.')).toBeVisible({ timeout: 9 * 60_000 })
+  // When the engine is done, the game opens on the analysis board with this run's details.
+  await expect(page.locator('.engine-stats summary')).toBeVisible({ timeout: 9 * 60_000 })
   const wallMs = Date.now() - started
+  await expect(page).toHaveURL(/\/games\/[0-9a-f-]+$/)
 
   const summary = (await page.locator('.engine-stats summary').textContent()) ?? ''
   const rows = await page.locator('[data-testid=engine-results] tbody tr').evaluateAll((trs) =>
@@ -87,6 +89,16 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
       writeFileSync(new URL('../test-results/m5-chat.txt', import.meta.url), transcript.join('\n\n'))
     }
   }
+
+  // M2: the analysis board shows the game from the database.
+  await expect(page.locator('cg-board piece')).toHaveCount(32)
+  const moves = page.getByLabel('Moves')
+  expect(await moves.locator('button.move').count()).toBeGreaterThan(10)
+  const marked = await moves.locator('button.move .glyph').count()
+  await expect(page.locator('.eval-graph-dot')).toHaveCount(marked)
+  await moves.locator('button.move').nth(9).click()
+  await page.getByLabel('Engine', { exact: true }).check()
+  await expect(page.getByRole('list', { name: 'Engine lines' }).locator('li')).toHaveCount(3, { timeout: 15_000 })
 
   expect(engineLog.join()).toContain('CoChess engine: stockfish-19-lite,') // multi-threaded build
   expect(rows.some((row) => row.tier === 'verify')).toBe(true)

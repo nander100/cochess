@@ -71,7 +71,7 @@ docker compose exec backend uv run --no-dev python -m app.cli create-user --name
 docker compose exec backend uv run --no-dev python -m app.cli invite --user Alex
 ```
 
-Check it: open your own link, fill in the profile, analyze a game, and open the "Engine details" line under the result. It should say `stockfish-19-lite` with more than one thread. If it says `stockfish-19-lite-single`, the cross-origin isolation headers aren't reaching the browser; it still works, just more slowly.
+Check it: open your own link, fill in the profile, analyze a game, and open the "Engine details" line under the board (or tick "Engine" on any game). It should say `stockfish-19-lite` / Stockfish 19 lite with more than one thread. If it says `stockfish-19-lite-single`, the cross-origin isolation headers aren't reaching the browser; it still works, just more slowly.
 
 ## Day-to-day
 

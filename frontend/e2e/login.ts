@@ -25,12 +25,15 @@ export function newLoginLink(name: string): string {
   return link
 }
 
-/** Open the login link and fill in the profile, landing on the analysis page. */
+/** Open the login link and fill in the profile; the player lands on My games, then goes to the
+ * upload page as a person would. */
 export async function logInWithProfile(page: Page, link: string, elo: number): Promise<void> {
   const url = new URL(link)
   await page.goto(`${url.pathname}${url.hash}`)
   await page.getByLabel(/rating/i).fill(String(elo))
   await page.getByLabel(/time control/i).selectOption('rapid')
   await page.getByRole('button', { name: /^Save/ }).click()
+  await page.getByRole('heading', { name: 'My games' }).waitFor()
+  await page.getByRole('link', { name: 'Analyze a game' }).first().click()
   await page.getByLabel(/your game/i).waitFor()
 }
