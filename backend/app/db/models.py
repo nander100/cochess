@@ -6,6 +6,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     ForeignKey,
     Index,
     Integer,
@@ -187,3 +188,25 @@ class PendingToolCallRow(Base):
     extra_results: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
     tool_calls_used: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+
+
+class MomentProgressRow(Base):
+    """A player's progress on one critical moment (SPEC_V2 §8.2): saved so they can leave and
+    come back to exactly where they were."""
+
+    __tablename__ = "moment_progress"
+    __table_args__ = (UniqueConstraint("game_id", "moment_index"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), index=True)
+    moment_index: Mapped[int] = mapped_column(Integer)  # Moment.index, 1-based
+    state: Mapped[str] = mapped_column(String(10))  # intro / attempt / solved / revealed
+    # [{"uci", "san", "grade", "reasoning", "eval_after"}], in order
+    attempts: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
+    revealed: Mapped[bool] = mapped_column(Boolean, default=False)
+    # The exercise as the player saw it: [{"role": "coach" | "player", "text", "kind"}]
+    messages: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
+    # Answers where the leak check had to remove the move the player was looking for (§8.4).
+    leaks: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)

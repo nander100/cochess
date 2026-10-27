@@ -146,6 +146,40 @@ class StoredSynopsis(BaseModel):
     invalid_moves_removed: list[str]
 
 
+MomentState = Literal["new", "intro", "attempt", "solved", "revealed"]
+
+
+class MomentTry(BaseModel):
+    san: str
+    grade: str  # best / good / inaccuracy / mistake / blunder
+
+
+class MomentMessage(BaseModel):
+    role: Literal["coach", "player"]
+    text: str
+    kind: str
+
+
+class MomentInfo(BaseModel):
+    """A critical moment and the player's progress on it (SPEC_V2 §8.2). The engine's best move
+    appears only once the moment is solved or revealed."""
+
+    index: int
+    ply: int
+    move_number: int
+    side: Literal["white", "black"]
+    san: str
+    uci: str
+    label: MoveLabel
+    eval_before: str
+    eval_after: str
+    state: MomentState  # "new" until the player opens it
+    attempts: list[MomentTry]
+    messages: list[MomentMessage]
+    best_san: str | None = None
+    best_uci: str | None = None
+
+
 class GameDetail(BaseModel):
     """Everything the analysis board needs (SPEC_V2 §5.1): nothing is re-analyzed on open."""
 
@@ -166,3 +200,4 @@ class GameDetail(BaseModel):
     verify_fens: list[str]
     synopsis: StoredSynopsis | None
     chat: list[ChatEntry]
+    moments: list[MomentInfo] = []

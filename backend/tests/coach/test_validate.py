@@ -5,6 +5,7 @@ from app.coach.validate import (
     allowed_moves,
     extract_moves,
     find_invalid,
+    find_leaks,
     normalize,
     strip_moves,
 )
@@ -86,3 +87,29 @@ def test_annotated_moves_in_the_data_are_allowed_without_their_marks() -> None:
     allowed = allowed_moves({"pgn_to_move": "10. d4?? Bb4+ 11. a3?! O-O? 12. Bb5"})
 
     assert allowed == {"d4", "Bb4", "a3", "O-O", "Bb5"}
+
+
+def test_a_moment_answer_named_with_its_move_number_is_a_leak() -> None:
+    text = "The best try was 14...Nxe5, winning a pawn."
+
+    assert find_leaks(text, ["Nxe5"], move_number=14, white_to_move=False) == ["Nxe5"]
+
+
+def test_a_moment_answer_named_without_a_number_is_a_leak() -> None:
+    assert find_leaks("You could play Nxe5+ here.", ["Nxe5"], 14, False) == ["Nxe5+"]
+
+
+def test_the_same_san_for_another_move_of_the_game_is_not_a_leak() -> None:
+    text = "Remember 6. O-O and 9...O-O earlier in the game."
+
+    assert find_leaks(text, ["O-O"], move_number=14, white_to_move=False) == []
+    # The right number but the other side (White's 14th move) isn't the answer either.
+    assert find_leaks("After 14. O-O the game changed.", ["O-O"], 14, False) == []
+
+
+def test_moves_that_are_not_banned_are_never_leaks() -> None:
+    assert find_leaks("14...Qd7 was the game move.", ["Nxe5"], 14, False) == []
+
+
+def test_each_leaked_move_is_reported_once() -> None:
+    assert find_leaks("Nxe5! Yes, Nxe5.", ["Nxe5"], 14, False) == ["Nxe5"]

@@ -7,12 +7,13 @@ from typing import Literal
 from pydantic import BaseModel
 
 from app.analysis.evals import Color
+from app.analysis.moments import Hint
 from app.analysis.pgn import Position
 from app.analysis.summary_models import GameSummary, LineSummary, MoveLabel
 from app.config import CoachSettings
 
 RatingBand = Literal["beginner", "intermediate", "advanced"]
-Task = Literal["synopsis", "chat", "explain"]
+Task = Literal["synopsis", "chat", "explain", "moment_intro", "moment_feedback"]
 
 # PGN-style annotations, so one compact movetext replaces the per-move list (PLAN cost review).
 ANNOTATION: dict[MoveLabel, str] = {
@@ -51,6 +52,70 @@ class PositionPayload(BaseModel):
     variation_san: list[str]
 
 
+class MomentGameMove(BaseModel):
+    """The move the player made in the game: theirs to learn from, so always shown."""
+
+    san: str  # with its move number, e.g. "12...Nxf6"
+    classification: MoveLabel
+    eval_before: str
+    eval_after: str
+    themes: list[str]
+    refutation_san: list[str]  # what the engine shows goes wrong after it
+
+
+class MomentCandidate(BaseModel):
+    """The player's latest attempt, graded by the engine (SPEC_V2 §8.3)."""
+
+    san: str
+    grade: str  # best / good / inaccuracy / mistake / blunder
+    eval_after: str
+    themes: list[str]
+    refutation_san: list[str]  # the engine's best reply line to the attempt
+
+
+class MomentAttempt(BaseModel):
+    san: str
+    grade: str
+    reasoning: str | None
+
+
+class MomentBest(BaseModel):
+    """Only once the moment is solved or revealed (SPEC_V2 §8.4)."""
+
+    san: str
+    eval: str
+    lines: list[LineSummary]
+
+
+class MomentResult(BaseModel):
+    """One moment's outcome, for the wrap-up."""
+
+    index: int
+    game_move: str
+    outcome: Literal["solved", "revealed"]
+    attempts: int
+
+
+class MomentPayload(BaseModel):
+    """SPEC_V2 §8.4. While `reveal` is false, `best` is null and the position's engine lines are
+    left out of the payload altogether: the coach can't reveal what it was never given."""
+
+    index: int
+    of: int
+    state: Literal["intro", "attempt", "solved", "revealed"]
+    game_move: MomentGameMove
+    candidate: MomentCandidate | None = None
+    earlier_attempts: list[MomentAttempt] = []
+    attempt_number: int
+    max_attempts: int
+    hints_allowed: list[Hint] = []
+    same_as_game: bool = False  # the attempt was the move played in the game
+    reveal: bool
+    best: MomentBest | None = None
+    wrap_up: bool = False
+    results: list[MomentResult] = []  # the wrap-up: how every moment went
+
+
 class CoachPayload(BaseModel):
     task: Task
     user_prompt: str | None = None
@@ -59,6 +124,7 @@ class CoachPayload(BaseModel):
     position: PositionPayload | None = None
     engine_lines: list[LineSummary] | None = None  # for `position`: top 4 lines, 10 plies
     game_summary: GameSummary | None = None
+    moment: MomentPayload | None = None
 
 
 # Per-move evals and labels are already in the annotated `pgn_to_move` (PLAN Q28, cost review).

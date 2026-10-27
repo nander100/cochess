@@ -10,9 +10,14 @@ from app.analysis.evals import Color, Evaluation, format_eval, win_percent
 from app.analysis.pgn import ParsedGame, parse_pgn
 from app.analysis.selection import select_verify_plies, verify_fens
 from app.analysis.summary import game_info
+from app.analysis.summary_models import GameSummary
 from app.api.schemas import (
     GameDetail,
     GameStatus,
+    MomentInfo,
+    MomentMessage,
+    MomentState,
+    MomentTry,
     MoveInfo,
     StoredEngineResult,
     StoredLine,
@@ -22,7 +27,8 @@ from app.config import Settings
 from app.db.chat import chat_history
 from app.db.coach import load_synopsis
 from app.db.engine_results import load_results, load_summary
-from app.db.models import Game
+from app.db.models import Game, MomentProgressRow
+from app.db.moments import load_progress
 
 
 def build_detail(session: Session, game: Game, settings: Settings) -> GameDetail:
@@ -35,6 +41,11 @@ def build_detail(session: Session, game: Game, settings: Settings) -> GameDetail
     summary = load_summary(session, game.id)
     labels = {move.ply: move.classification for move in summary.move_list} if summary else {}
     synopsis = load_synopsis(session, game.id)
+    moments = _moments(summary, load_progress(session, game.id), best_by_fen(results))
+    # An unsolved moment's position stays without engine lines: its top line is the answer.
+    hidden = (
+        {m.fen_before for m in summary.moments if not _done(moments, m.index)} if summary else set()
+    )
 
     moves = [
         MoveInfo(
@@ -65,13 +76,58 @@ def build_detail(session: Session, game: Game, settings: Settings) -> GameDetail
         final_is_terminal=parsed.final_is_terminal,
         accuracy=summary.accuracy if summary else None,
         counts=summary.counts if summary else None,
-        engine_results=[_stored(result) for result in best_by_fen(results).values()],
+        engine_results=[
+            _stored(result) for fen, result in best_by_fen(results).items() if fen not in hidden
+        ],
         verify_fens=_pending_verify(parsed, results, user_color, settings, status),
         synopsis=StoredSynopsis(text=synopsis[0], invalid_moves_removed=synopsis[1])
         if synopsis
         else None,
         chat=chat_history(session, game.id),
+        moments=moments,
     )
+
+
+def _moments(
+    summary: GameSummary | None,
+    progress: Mapping[int, MomentProgressRow],
+    by_fen: Mapping[str, EngineResult],
+) -> list[MomentInfo]:
+    if summary is None:
+        return []
+    moments = []
+    for moment in summary.moments:
+        row = progress.get(moment.index)
+        best_uci = best_san = None
+        result = by_fen.get(moment.fen_before)
+        if row is not None and row.revealed and result is not None:
+            best_uci = result.lines[0].moves_uci[0]
+            best_san = uci_line_to_san(moment.fen_before, [best_uci])[0]
+        moments.append(
+            MomentInfo(
+                index=moment.index,
+                ply=moment.ply,
+                move_number=moment.move_number,
+                side=moment.side,
+                san=moment.san,
+                uci=moment.uci,
+                label=moment.label,
+                eval_before=moment.eval_before,
+                eval_after=moment.eval_after,
+                state=cast(MomentState, row.state) if row else "new",
+                attempts=[MomentTry(san=a["san"], grade=a["grade"]) for a in row.attempts]
+                if row
+                else [],
+                messages=[MomentMessage.model_validate(m) for m in row.messages] if row else [],
+                best_san=best_san,
+                best_uci=best_uci,
+            )
+        )
+    return moments
+
+
+def _done(moments: Sequence[MomentInfo], index: int) -> bool:
+    return any(m.index == index and m.state in ("solved", "revealed") for m in moments)
 
 
 def _evaluations(parsed: ParsedGame, by_fen: Mapping[str, EngineResult]) -> list[Evaluation] | None:

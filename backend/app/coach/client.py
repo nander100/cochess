@@ -15,17 +15,21 @@ from app.config import Effort
 _PROMPTS = Path(__file__).parent / "prompts"
 
 
+# Tasks that share one prompt file.
+_PROMPT_FILE: dict[str, str] = {"moment_intro": "moment", "moment_feedback": "moment"}
+
+
 @cache
 def system_prompt(task: Task) -> str:
     """The shared coaching rules plus only this task's instructions (fewer input tokens)."""
     core = (_PROMPTS / "coach_system.md").read_text()
-    return f"{core}\n{(_PROMPTS / f'{task}.md').read_text()}"
+    return f"{core}\n{task_instructions(task)}"
 
 
 @cache
 def task_instructions(task: Task) -> str:
     """One task's own instructions (its prompt file), without the shared rules."""
-    return (_PROMPTS / f"{task}.md").read_text()
+    return (_PROMPTS / f"{_PROMPT_FILE.get(task, task)}.md").read_text()
 
 
 def system_blocks(task: Task, *extra: str) -> list[TextBlockParam]:

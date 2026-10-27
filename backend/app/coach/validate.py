@@ -94,3 +94,30 @@ def strip_moves(text: str, invalid: Iterable[str]) -> str:
             last = end
     pieces.append(text[last:])
     return "".join(pieces)
+
+
+_NUMBER_BEFORE = re.compile(r"(\d+)\s*(\.{1,3}|…)\s*$")
+
+
+def find_leaks(
+    text: str, banned: Iterable[str], move_number: int, white_to_move: bool
+) -> list[str]:
+    """Moves from `banned` that `text` names as the answer to a moment (SPEC_V2 §8.4).
+
+    The coach writes moves with their numbers, so a banned SAN written for another move of the game
+    ("6. O-O" when the answer is "14...O-O") is a reference to that move, not a leak. Written with
+    the moment's own number and side, or with no number at all, it counts.
+    """
+    targets = {normalize(move) for move in banned}
+    leaks: list[str] = []
+    for start, _, token in _matches(text):
+        if normalize(token) not in targets or token in leaks:
+            continue
+        number = _NUMBER_BEFORE.search(text[max(0, start - 12) : start])
+        if number is not None:
+            same_move = int(number.group(1)) == move_number
+            same_side = (number.group(2) == ".") == white_to_move
+            if not (same_move and same_side):
+                continue
+        leaks.append(token)
+    return leaks

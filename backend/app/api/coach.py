@@ -83,9 +83,9 @@ def synopsis(
     game: OwnedGame, request: Request, session: SessionDep, settings: SettingsDep, client: ClientDep
 ) -> StreamingResponse:
     game_id = game.id
-    _require_summary(session, game_id)
-    work = generate_synopsis(client, settings, _sessions(request), game_id)
-    return _stream(work, _synopsis_events, settings, game_id)
+    require_summary(session, game_id)
+    work = generate_synopsis(client, settings, session_factory(request), game_id)
+    return stream_coach(work, _synopsis_events, settings, game_id)
 
 
 @router.post("/{game_id}/chat")
@@ -99,7 +99,7 @@ def chat(
     client: ClientDep,
 ) -> StreamingResponse:
     game_id = game.id
-    _require_summary(session, game_id)
+    require_summary(session, game_id)
     message = body.message.strip()
     limits = settings.coach
     if not message or len(message) > limits.chat_max_message_chars:
@@ -109,8 +109,8 @@ def chat(
         )
     _check_message_limit(session, settings, game_id)
     turn = prepare_turn(session, settings, game, user, body.path_uci, body.engine_result, message)
-    work = send_message(client, settings, _sessions(request), game_id, turn)
-    return _stream(work, _chat_events, settings, game_id)
+    work = send_message(client, settings, session_factory(request), game_id, turn)
+    return stream_coach(work, _chat_events, settings, game_id)
 
 
 @router.post("/{game_id}/explain")
@@ -125,11 +125,11 @@ def explain_position(
 ) -> StreamingResponse:
     """SPEC_V2 §6.3: explain the position on the board; the answer joins the chat."""
     game_id = game.id
-    _require_summary(session, game_id)
+    require_summary(session, game_id)
     _check_message_limit(session, settings, game_id)
     turn = prepare_turn(session, settings, game, user, body.path_uci, body.engine_result, None)
-    work = explain(client, settings, _sessions(request), game_id, turn)
-    return _stream(work, _answer_events, settings, game_id)
+    work = explain(client, settings, session_factory(request), game_id, turn)
+    return stream_coach(work, _answer_events, settings, game_id)
 
 
 @router.post("/{game_id}/chat/engine_result")
@@ -142,8 +142,8 @@ def chat_engine_result(
     client: ClientDep,
 ) -> StreamingResponse:
     game_id = game.id
-    _require_summary(session, game_id)
-    sessions = _sessions(request)
+    require_summary(session, game_id)
+    sessions = session_factory(request)
     try:
         results = check_engine_results(sessions, settings, game_id, body.request_id, body.results)
     except PendingNotFoundError as error:
@@ -153,7 +153,7 @@ def chat_engine_result(
     except EngineResultError as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=error.message) from error
     work = submit_engine_results(client, settings, sessions, game_id, body.request_id, results)
-    return _stream(work, _chat_events, settings, game_id)
+    return stream_coach(work, _chat_events, settings, game_id)
 
 
 def _check_message_limit(session: Session, settings: Settings, game_id: str) -> None:
@@ -166,16 +166,16 @@ def _check_message_limit(session: Session, settings: Settings, game_id: str) -> 
         )
 
 
-def _require_summary(session: Session, game_id: str) -> None:
+def require_summary(session: Session, game_id: str) -> None:
     if load_summary(session, game_id) is None:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Finish the engine analysis first.")
 
 
-def _sessions(request: Request) -> sessionmaker[Session]:
+def session_factory(request: Request) -> sessionmaker[Session]:
     return cast(sessionmaker[Session], request.app.state.session_factory)
 
 
-def _stream[T](
+def stream_coach[T](
     work: Coroutine[Any, Any, T],
     render: Callable[[T], list[str]],
     settings: Settings,
@@ -213,17 +213,17 @@ async def _events[T](
         yield event
 
 
-def _text_events(text: str, removed: list[str]) -> list[str]:
+def text_events(text: str, removed: list[str]) -> list[str]:
     pieces = [sse.event("text", {"text": piece}) for piece in sse.chunks(text)]
     return [*pieces, sse.event("done", {"invalid_moves_removed": removed})]
 
 
 def _synopsis_events(result: SynopsisResult) -> list[str]:
-    return _text_events(result.text, result.invalid_moves_removed)
+    return text_events(result.text, result.invalid_moves_removed)
 
 
 def _answer_events(answer: FinalAnswer) -> list[str]:
-    return _text_events(answer.text, answer.invalid_moves_removed)
+    return text_events(answer.text, answer.invalid_moves_removed)
 
 
 def _chat_events(outcome: ChatOutcome) -> list[str]:
@@ -231,4 +231,4 @@ def _chat_events(outcome: ChatOutcome) -> list[str]:
         positions = [p.model_dump() for p in outcome.positions]
         data = {"request_id": outcome.request_id, "tier": "deep", "positions": positions}
         return [sse.event("engine_request", data)]
-    return _text_events(outcome.text, outcome.invalid_moves_removed)
+    return text_events(outcome.text, outcome.invalid_moves_removed)
