@@ -9,6 +9,7 @@ import {
   mainlineAt,
   next,
   pathTo,
+  positionLabel,
   previous,
 } from './tree'
 
@@ -91,4 +92,13 @@ test('arrow-key navigation: back to the parent, forward along the first child', 
 test('mainlineAt is null past the end of the game', () => {
   expect(mainlineAt(tree, 0)).toBe(ROOT)
   expect(mainlineAt(tree, 7)).toBeNull()
+})
+
+test('position labels match the backend: start, game moves, and the player\'s own line', () => {
+  const variation = addMove(tree, mainlineAt(tree, 2)!, 'Bc4')!
+
+  expect(positionLabel(tree.nodes[ROOT])).toBe('the start')
+  expect(positionLabel(tree.nodes[mainlineAt(tree, 3)!])).toBe('after 2. Nf3')
+  expect(positionLabel(tree.nodes[mainlineAt(tree, 4)!])).toBe('after 2... Nc6')
+  expect(positionLabel(variation.tree.nodes[variation.nodeId])).toBe('after 2. Bc4, in your line')
 })

@@ -3,9 +3,11 @@ import type {
   CreateGameRequest,
   CreateGameResponse,
   EngineConfig,
+  ChatRequest,
   EngineResult,
   GameDetail,
   GameListItem,
+  PositionRequest,
   Profile,
   ProfileUpdate,
   ScanResponse,
@@ -42,7 +44,9 @@ export interface ApiClient {
   submitVerify(gameId: string, results: EngineResult[]): Promise<VerifyResponse>
   /** Resolves when the stream ends; coach failures arrive as an `error` event. */
   streamSynopsis(gameId: string, onEvent: (event: CoachEvent) => void): Promise<void>
-  sendChat(gameId: string, message: string, onEvent: (event: CoachEvent) => void): Promise<void>
+  sendChat(gameId: string, body: ChatRequest, onEvent: (event: CoachEvent) => void): Promise<void>
+  /** Explain the position on the board (SPEC_V2 §6.3); the answer streams back like a chat answer. */
+  explain(gameId: string, body: PositionRequest, onEvent: (event: CoachEvent) => void): Promise<void>
   /** Answer a coach `engine_request` with deep-dive results; the answer streams back. */
   submitEngineResult(
     gameId: string,
@@ -109,8 +113,8 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
     submitScan: (gameId, results) => post(`/api/games/${gameId}/engine/scan`, { results }),
     submitVerify: (gameId, results) => post(`/api/games/${gameId}/engine/verify`, { results }),
     streamSynopsis: (gameId, onEvent) => stream(`/api/games/${gameId}/synopsis`, null, onEvent),
-    sendChat: (gameId, message, onEvent) =>
-      stream(`/api/games/${gameId}/chat`, { message }, onEvent),
+    sendChat: (gameId, body, onEvent) => stream(`/api/games/${gameId}/chat`, body, onEvent),
+    explain: (gameId, body, onEvent) => stream(`/api/games/${gameId}/explain`, body, onEvent),
     submitEngineResult: (gameId, requestId, results, onEvent) =>
       stream(`/api/games/${gameId}/chat/engine_result`, { request_id: requestId, results }, onEvent),
   }

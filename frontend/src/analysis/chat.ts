@@ -1,8 +1,10 @@
 import type { ApiClient } from '../api/client'
 import type { CoachEvent, EnginePositionRequest } from '../api/sse'
-import type { EngineResult } from '../api/types'
+import type { ChatRequest, EngineResult, PositionRequest } from '../api/types'
 
-export type ChatProgress = 'writing' | 'thinking'
+/** looking: the engine analyzes the board position first; writing: the coach is answering;
+ * thinking: the coach asked the engine for a deeper look (a deep-dive). */
+export type ChatProgress = 'looking' | 'writing' | 'thinking'
 
 export interface ChatDeps {
   api: ApiClient
@@ -18,11 +20,11 @@ export interface ChatDeps {
 export async function askCoach(
   deps: ChatDeps,
   gameId: string,
-  message: string,
+  request: ChatRequest,
   onProgress: (progress: ChatProgress) => void,
 ): Promise<string> {
   onProgress('writing')
-  let outcome = await collect((onEvent) => deps.api.sendChat(gameId, message, onEvent))
+  let outcome = await collect((onEvent) => deps.api.sendChat(gameId, request, onEvent))
   while (outcome.kind === 'engine') {
     const { requestId, positions } = outcome
     onProgress('thinking')
@@ -32,6 +34,20 @@ export async function askCoach(
       deps.api.submitEngineResult(gameId, requestId, results, onEvent),
     )
   }
+  return outcome.text
+}
+
+/** Explain the position on the board (SPEC_V2 §6.3). No engine round trip: the position's lines
+ * are already in the request or stored. */
+export async function explainPosition(
+  deps: ChatDeps,
+  gameId: string,
+  request: PositionRequest,
+  onProgress: (progress: ChatProgress) => void,
+): Promise<string> {
+  onProgress('writing')
+  const outcome = await collect((onEvent) => deps.api.explain(gameId, request, onEvent))
+  if (outcome.kind !== 'text') throw new Error('The coach asked for an engine analysis while explaining.')
   return outcome.text
 }
 

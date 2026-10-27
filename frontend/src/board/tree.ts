@@ -136,6 +136,15 @@ export function lineFrom(tree: GameTree, firstId: string): TreeNode[] {
   return line
 }
 
+/** Where a position is, in the backend's chat-history wording: "the start", "after 14. Nf3",
+ * "after 15... Qd7, in your line". */
+export function positionLabel(node: TreeNode): string {
+  if (node.ply === 0 || node.san === null) return 'the start'
+  const number = Math.floor((node.ply + 1) / 2)
+  const move = node.ply % 2 === 1 ? `${number}. ${node.san}` : `${number}... ${node.san}`
+  return node.mainline ? `after ${move}` : `after ${move}, in your line`
+}
+
 function childId(parentId: string, uci: string): string {
   return parentId === ROOT ? uci : `${parentId} ${uci}`
 }

@@ -698,3 +698,32 @@ table.games td.loss {
   min-width: 3.4rem;
   font-weight: 700;
 }
+
+/* M3: chat about the position on the board. */
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.chat-header h2 {
+  margin: 0;
+}
+
+button.explain {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+.chat-where-now {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  margin: 0.3rem 0 0.6rem;
+}
+
+.chat-where {
+  color: var(--color-muted);
+  font-weight: 400;
+  font-size: 0.85rem;
+}

@@ -161,6 +161,19 @@ export interface GameInfo {
 export interface ChatEntry {
   role: 'player' | 'coach'
   text: string
+  /** Where on the board a player's message was sent from ("after 14. Nf3"); null for v1 chats. */
+  where: string | null
+}
+
+/** A chat message or Explain request: the board position as UCI moves from the start
+ * (SPEC_V2 §5.2), and the browser's engine result for it when the backend has none yet. */
+export interface PositionRequest {
+  path_uci: string[]
+  engine_result?: EngineResult
+}
+
+export interface ChatRequest extends PositionRequest {
+  message: string
 }
 
 export interface GameDetail {

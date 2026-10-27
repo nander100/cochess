@@ -1,21 +1,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useParams } from 'react-router'
-import { type ChatDeps, askCoach } from '../analysis/chat'
+import { type ChatDeps, type ChatProgress, askCoach, explainPosition } from '../analysis/chat'
 import { type AnalysisRun, type AnalysisStatus, type PipelineDeps, analyzeGame, statusLabel } from '../analysis/pipeline'
 import { ApiError, isLoggedOut } from '../api/client'
-import type { CreateGameResponse, GameDetail } from '../api/types'
+import type { CreateGameResponse, EngineResult, GameDetail } from '../api/types'
 import { Board, type BoardMove } from '../board/Board'
 import { EnginePanel, type LiveEngine } from '../board/EnginePanel'
 import { EvalBar } from '../board/EvalBar'
 import { EvalGraph, type GraphPoint } from '../board/EvalGraph'
 import { MoveList } from '../board/MoveList'
-import { type GameTree, ROOT, type TreeNode, addMove, fromMoves, lineFrom, next, previous } from '../board/tree'
+import {
+  type GameTree,
+  ROOT,
+  type TreeNode,
+  addMove,
+  fromMoves,
+  lineFrom,
+  next,
+  pathTo,
+  positionLabel,
+  previous,
+} from '../board/tree'
 import { useArrowKeys } from '../board/useArrowKeys'
 import { ChatPanel } from '../components/ChatPanel'
 import { EngineStats } from '../components/EngineStats'
 import { ProgressBar } from '../components/ProgressBar'
 import { Synopsis, type SynopsisState } from '../components/Synopsis'
-import type { LiveLine } from '../engine/live'
+import { type LiveLine, isGameOver } from '../engine/live'
 import { analyzeAll } from '../engine/runner'
 import { errorText, gameDate } from './util'
 
@@ -97,6 +108,22 @@ function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: Analysi
     return engine.current
   }, [deps])
 
+  // Positions the backend has verify or deep lines for; chat and Explain analyze others first.
+  const [analyzed, setAnalyzed] = useState(
+    () => new Set(detail.engine_results.filter((r) => r.tier !== 'scan').map((r) => positionKey(r.fen))),
+  )
+  const ensureAnalyzed = useCallback(
+    async (fen: string, onProgress: (progress: ChatProgress) => void): Promise<EngineResult | null> => {
+      if (analyzed.has(positionKey(fen)) || isGameOver(fen)) return null
+      onProgress('looking')
+      const { engine: handle, config } = await loadEngine()
+      const result = await handle.analyze({ fen, ply: null }, 'verify', config.verify)
+      setAnalyzed((keys) => new Set(keys).add(positionKey(fen)))
+      return result
+    },
+    [analyzed, loadEngine],
+  )
+
   const back = useCallback(() => setCurrent((id) => previous(tree, id)), [tree])
   const forward = useCallback(() => setCurrent((id) => next(tree, id)), [tree])
   useArrowKeys(back, forward)
@@ -165,6 +192,8 @@ function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: Analysi
             <Coach
               detail={detail}
               deps={deps}
+              board={node}
+              ensureAnalyzed={ensureAnalyzed}
               loadEngine={loadEngine}
               autoSynopsis={fresh !== null}
               onLoggedOut={onLoggedOut}
@@ -241,9 +270,12 @@ function ResumeAnalysis({ detail, deps, onLoggedOut, onDone }: {
 }
 
 /** The synopsis and the chat, for an analyzed game. */
-function Coach({ detail, deps, loadEngine, autoSynopsis, onLoggedOut }: {
+function Coach({ detail, deps, board, ensureAnalyzed, loadEngine, autoSynopsis, onLoggedOut }: {
   detail: GameDetail
   deps: PipelineDeps
+  /** The position on the board: chat and Explain are about it (SPEC_V2 §6). */
+  board: TreeNode
+  ensureAnalyzed: (fen: string, onProgress: (progress: ChatProgress) => void) => Promise<EngineResult | null>
   loadEngine: () => Promise<LiveEngine>
   autoSynopsis: boolean
   onLoggedOut: () => void
@@ -305,10 +337,29 @@ function Coach({ detail, deps, loadEngine, autoSynopsis, onLoggedOut }: {
       )}
       <ChatPanel
         initial={detail.chat}
-        ask={(message, onProgress) => askCoach(chatDeps, detail.id, message, onProgress)}
+        where={positionLabel(board)}
+        ask={async (message, onProgress) => {
+          const position = await positionRequest(board, ensureAnalyzed, onProgress)
+          return askCoach(chatDeps, detail.id, { message, ...position }, onProgress)
+        }}
+        explain={async (onProgress) => {
+          const position = await positionRequest(board, ensureAnalyzed, onProgress)
+          return explainPosition(chatDeps, detail.id, position, onProgress)
+        }}
       />
     </>
   )
+}
+
+/** The board position for the backend: its UCI path, plus the browser's verify result when the
+ * backend has no lines for it yet. */
+async function positionRequest(
+  node: TreeNode,
+  ensureAnalyzed: (fen: string, onProgress: (progress: ChatProgress) => void) => Promise<EngineResult | null>,
+  onProgress: (progress: ChatProgress) => void,
+): Promise<{ path_uci: string[]; engine_result?: EngineResult }> {
+  const result = await ensureAnalyzed(node.fen, onProgress)
+  return { path_uci: pathTo(node.id), ...(result ? { engine_result: result } : {}) }
 }
 
 /** The game as POST /api/games returned it, for the engine pipeline. */

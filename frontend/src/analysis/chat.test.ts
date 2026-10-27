@@ -1,7 +1,7 @@
 import type { CoachEvent, EnginePositionRequest } from '../api/sse'
 import type { EngineResult } from '../api/types'
 import { fakeApi } from '../test/fakes'
-import { type ChatProgress, askCoach } from './chat'
+import { type ChatProgress, askCoach, explainPosition } from './chat'
 
 type Emit = (event: CoachEvent) => void
 
@@ -9,6 +9,8 @@ const POSITIONS: EnginePositionRequest[] = [
   { fen: 'fen-a w', label: 'position' },
   { fen: 'fen-b b', label: 'after_candidate' },
 ]
+
+const ASK = { message: 'Why did I lose?', path_uci: ['e2e4'] }
 
 function deepResult(fen: string): EngineResult {
   return { ply: null, fen, tier: 'deep', depth: 22, time_ms: 3000, lines: [] }
@@ -18,10 +20,10 @@ test('a plain question returns the coach text', async () => {
   const progress: ChatProgress[] = []
   const deps = { api: fakeApi(), analyzeDeep: vi.fn() }
 
-  const reply = await askCoach(deps, 'g1', 'Why did I lose?', (p) => progress.push(p))
+  const reply = await askCoach(deps, 'g1', ASK, (p) => progress.push(p))
 
   expect(reply).toBe('Good question.')
-  expect(deps.api.sendChat).toHaveBeenCalledWith('g1', 'Why did I lose?', expect.any(Function))
+  expect(deps.api.sendChat).toHaveBeenCalledWith('g1', ASK, expect.any(Function))
   expect(deps.analyzeDeep).not.toHaveBeenCalled()
   expect(progress).toEqual(['writing'])
 })
@@ -29,7 +31,7 @@ test('a plain question returns the coach text', async () => {
 test('an engine request runs the deep dive and sends the results back', async () => {
   const progress: ChatProgress[] = []
   const api = fakeApi({
-    sendChat: vi.fn(async (_g: string, _m: string, emit: Emit) => {
+    sendChat: vi.fn(async (_g: string, _m: unknown, emit: Emit) => {
       emit({ type: 'status', message: 'Coach is writing…' })
       emit({ type: 'engine_request', request_id: 'r1', positions: POSITIONS })
     }),
@@ -42,7 +44,7 @@ test('an engine request runs the deep dive and sends the results back', async ()
     positions.map((p) => deepResult(p.fen)),
   )
 
-  const reply = await askCoach({ api, analyzeDeep }, 'g1', 'What if Nxe5?', (p) => progress.push(p))
+  const reply = await askCoach({ api, analyzeDeep }, 'g1', ASK, (p) => progress.push(p))
 
   expect(reply).toBe('With 14. Nxe5 you win a pawn.')
   expect(analyzeDeep).toHaveBeenCalledWith(POSITIONS)
@@ -57,12 +59,12 @@ test('an engine request runs the deep dive and sends the results back', async ()
 
 test('a coach error is thrown with its message', async () => {
   const api = fakeApi({
-    sendChat: vi.fn(async (_g: string, _m: string, emit: Emit) => {
+    sendChat: vi.fn(async (_g: string, _m: unknown, emit: Emit) => {
       emit({ type: 'error', message: 'The coach is unavailable right now.' })
     }),
   })
 
-  await expect(askCoach({ api, analyzeDeep: vi.fn() }, 'g1', 'Hi', () => {})).rejects.toThrow(
+  await expect(askCoach({ api, analyzeDeep: vi.fn() }, 'g1', ASK, () => {})).rejects.toThrow(
     'The coach is unavailable right now.',
   )
 })
@@ -70,7 +72,17 @@ test('a coach error is thrown with its message', async () => {
 test('a stream that ends without an answer is a lost connection', async () => {
   const api = fakeApi({ sendChat: vi.fn(async () => {}) })
 
-  await expect(askCoach({ api, analyzeDeep: vi.fn() }, 'g1', 'Hi', () => {})).rejects.toThrow(
+  await expect(askCoach({ api, analyzeDeep: vi.fn() }, 'g1', ASK, () => {})).rejects.toThrow(
     'The connection to the coach was lost.',
   )
+})
+
+test('explain sends the board position and returns the coach text', async () => {
+  const deps = { api: fakeApi(), analyzeDeep: vi.fn() }
+  const position = { path_uci: ['e2e4', 'e7e5'] }
+
+  const reply = await explainPosition(deps, 'g1', position, () => {})
+
+  expect(reply).toBe('Here is the position.')
+  expect(deps.api.explain).toHaveBeenCalledWith('g1', position, expect.any(Function))
 })

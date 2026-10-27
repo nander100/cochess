@@ -124,8 +124,8 @@ test('a reopened game shows its stored synopsis and chat', async () => {
       ...DETAIL,
       synopsis: { text: '### Overall\nStored synopsis.', invalid_moves_removed: [] },
       chat: [
-        { role: 'player' as const, text: 'Why was Nf3 a mistake?' },
-        { role: 'coach' as const, text: 'It allowed a pin.' },
+        { role: 'player' as const, text: 'Why was Nf3 a mistake?', where: 'after 2. Nf3' },
+        { role: 'coach' as const, text: 'It allowed a pin.', where: null },
       ],
     })),
   })
@@ -191,7 +191,7 @@ test("a game that isn't yours or doesn't exist says so", async () => {
 
 test('a what-if question in the chat runs the deep tier on the engine', async () => {
   const deps = fakeDeps({
-    sendChat: vi.fn(async (_g: string, _m: string, emit: (event: CoachEvent) => void) => {
+    sendChat: vi.fn(async (_g: string, _m: unknown, emit: (event: CoachEvent) => void) => {
       emit({ type: 'engine_request', request_id: 'r1', positions: [{ fen: 'fen-1 b', label: 'position' }] })
     }),
     submitEngineResult: vi.fn(async (_g: string, _r: string, _res: unknown, emit: (event: CoachEvent) => void) => {
@@ -278,5 +278,59 @@ test('a new player fills in the profile first, then sees their games', async () 
     elo: 1450,
     time_control: 'blitz',
     playstyle: '',
+  })
+})
+
+describe('chat and Explain are about the position on the board', () => {
+  async function askHere(deps: ReturnType<typeof fakeDeps>, message: string) {
+    fireEvent.change(await screen.findByLabelText('Your question'), { target: { value: message } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await screen.findByText('Good question.')
+    return vi.mocked(deps.api.sendChat).mock.calls.at(-1)![1]
+  }
+
+  test('a game position the backend has lines for: just the path', async () => {
+    const deps = fakeDeps()
+    renderApp(deps, '/games/game-1')
+    // DETAIL stores a verify result for the position after 1... e5.
+    fireEvent.click(await screen.findByRole('button', { name: '1... e5' }))
+
+    const body = await askHere(deps, 'What now?')
+
+    expect(body).toEqual({ message: 'What now?', path_uci: ['e2e4', 'e7e5'] })
+    expect(deps.engine.analyze).not.toHaveBeenCalled()
+    expect(screen.getByText('You').parentElement).toHaveTextContent('after 1... e5')
+  })
+
+  test('a variation: the browser analyzes it first and sends its result', async () => {
+    const deps = fakeDeps()
+    renderApp(deps, '/games/game-1')
+    fireEvent.click(await screen.findByRole('button', { name: '1... e5' }))
+    fireEvent.click(screen.getByRole('button', { name: 'play Bc4' }))
+
+    const body = await askHere(deps, 'Is Bc4 better?')
+
+    expect(deps.engine.analyze).toHaveBeenCalledWith(
+      { fen: expect.stringContaining('2B1P3'), ply: null },
+      'verify',
+      expect.objectContaining({ multipv: 4 }),
+    )
+    expect(body).toMatchObject({
+      message: 'Is Bc4 better?',
+      path_uci: ['e2e4', 'e7e5', 'f1c4'],
+      engine_result: expect.objectContaining({ tier: 'verify' }),
+    })
+    expect(screen.getByText('You').parentElement).toHaveTextContent('after 2. Bc4, in your line')
+  })
+
+  test('Explain sends the board position and the answer appears in the chat', async () => {
+    const deps = fakeDeps()
+    renderApp(deps, '/games/game-1')
+    fireEvent.click(await screen.findByRole('button', { name: '1... e5' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Explain this position' }))
+
+    expect(await screen.findByText('Here is the position.')).toBeInTheDocument()
+    expect(deps.api.explain).toHaveBeenCalledWith('game-1', { path_uci: ['e2e4', 'e7e5'] }, expect.any(Function))
   })
 })
