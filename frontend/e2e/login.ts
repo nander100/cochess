@@ -25,15 +25,22 @@ export function newLoginLink(name: string): string {
   return link
 }
 
-/** Open the login link and fill in the profile; the player lands on My games, then goes to the
- * upload page as a person would. */
+/** Open the login link and fill in the profile; the player lands on the onboarding assessment,
+ * which they skip for now, then goes to the upload page as a person would. */
 export async function logInWithProfile(page: Page, link: string, elo: number): Promise<void> {
+  await logIn(page, link, elo)
+  await page.getByRole('link', { name: 'Skip for now' }).click()
+  await page.getByRole('heading', { name: 'My games' }).waitFor()
+  await page.getByRole('link', { name: 'Analyze a game' }).first().click()
+  await page.getByLabel(/your game/i).waitFor()
+}
+
+/** Open the login link and fill in the profile; the player lands on the onboarding page. */
+export async function logIn(page: Page, link: string, elo: number): Promise<void> {
   const url = new URL(link)
   await page.goto(`${url.pathname}${url.hash}`)
   await page.getByLabel(/rating/i).fill(String(elo))
   await page.getByLabel(/time control/i).selectOption('rapid')
   await page.getByRole('button', { name: /^Save/ }).click()
-  await page.getByRole('heading', { name: 'My games' }).waitFor()
-  await page.getByRole('link', { name: 'Analyze a game' }).first().click()
-  await page.getByLabel(/your game/i).waitFor()
+  await page.getByRole('heading', { name: 'Your baseline assessment' }).waitFor()
 }

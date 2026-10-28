@@ -16,11 +16,13 @@ export interface QueueProgress {
 export async function runOnboardingQueue(
   deps: PipelineDeps,
   onProgress: (progress: QueueProgress) => void,
+  onStatus: (status: OnboardingStatus) => void = () => {},
 ): Promise<OnboardingStatus> {
   let config: EngineConfig | null = null
   const tried = new Set<string>()
   for (;;) {
     const status = await deps.api.onboardingStatus()
+    onStatus(status) // after each game: the page's count goes up as games finish
     const index = status.games.findIndex((game) => game.status !== 'analyzed')
     if (index < 0) return status
     const next = status.games[index]

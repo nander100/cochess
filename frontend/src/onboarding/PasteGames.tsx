@@ -6,7 +6,9 @@ import { CATEGORY_LABEL, PICKABLE, SLOT_LABEL, reasonText } from './labels'
 
 interface PasteGamesProps {
   api: ApiClient
-  onAdded: () => void
+  /** Called with a confirmation ("Added 3 games."); the page shows it, since this form goes
+   * away once every slot is filled. */
+  onAdded: (message: string) => void
   onLoggedOut: () => void
 }
 
@@ -19,7 +21,6 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
   const [choices, setChoices] = useState<(GameChoice | null)[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [added, setAdded] = useState<string | null>(null)
 
   async function run<T>(work: () => Promise<T>): Promise<T | null> {
     setBusy(true)
@@ -38,7 +39,6 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
   async function check(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!text.trim()) return
-    setAdded(null)
     const response = await run(() => api.onboardingParse(text, []))
     if (response) {
       setParsed(response)
@@ -64,11 +64,10 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
     const response = await run(() => api.onboardingSubmit(games))
     if (!response) return
     const count = response.results.filter((result) => result.game_id !== null).length
-    setAdded(`Added ${count} game${count === 1 ? '' : 's'}.`)
     setText('')
     setParsed(null)
     setChoices([])
-    onAdded()
+    onAdded(`Added ${count} game${count === 1 ? '' : 's'}.`)
   }
 
   return (
@@ -96,7 +95,6 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
           {error}
         </p>
       )}
-      {added && <p role="status">{added}</p>}
       {parsed && (
         <>
           <table className="paste-table">

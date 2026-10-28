@@ -25,6 +25,7 @@ export function OnboardingPage({ deps, onLoggedOut }: OnboardingPageProps) {
   const [writing, setWriting] = useState(false)
   const [report, setReport] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const running = useRef(false)
 
   const fail = useCallback(
@@ -42,7 +43,7 @@ export function OnboardingPage({ deps, onLoggedOut }: OnboardingPageProps) {
     running.current = true
     setError(null)
     try {
-      setStatus(await runOnboardingQueue(deps, setProgress))
+      setStatus(await runOnboardingQueue(deps, setProgress, setStatus))
     } catch (caught) {
       fail(caught)
       api.onboardingStatus().then(setStatus, () => undefined)
@@ -106,7 +107,17 @@ export function OnboardingPage({ deps, onLoggedOut }: OnboardingPageProps) {
         <SlotChecklist slots={status.slots} />
       </section>
 
-      {!status.complete && <PasteGames api={api} onAdded={() => void refresh()} onLoggedOut={onLoggedOut} />}
+      {!status.complete && (
+        <PasteGames
+          api={api}
+          onAdded={(message) => {
+            setNotice(message)
+            void refresh()
+          }}
+          onLoggedOut={onLoggedOut}
+        />
+      )}
+      {notice && <p role="status">{notice}</p>}
 
       {status.games.length > 0 && (
         <section className="panel" aria-label="Your onboarding games">

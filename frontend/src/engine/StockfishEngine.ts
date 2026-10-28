@@ -1,6 +1,8 @@
 import type { EngineConfig, EngineResult, Tier, TierConfig } from '../api/types'
 import { type EngineTransport, type SearchOutcome, search, toEngineResult } from './search'
 import type { InfoLine } from './uci'
+// The Stockfish Web Worker; end-to-end tests alias this to a scripted engine (vite.config.ts).
+import { openTransport } from '@engine-transport'
 
 export type EngineBuild = 'stockfish-19-lite' | 'stockfish-19-lite-single'
 
@@ -67,33 +69,11 @@ export function waitForLine(
   })
 }
 
-class WorkerTransport implements EngineTransport {
-  private readonly listeners = new Set<(line: string) => void>()
-  private readonly worker: Worker
-
-  constructor(worker: Worker) {
-    this.worker = worker
-    worker.onmessage = (event: MessageEvent) => {
-      const line = String(event.data)
-      this.listeners.forEach((listener) => listener(line))
-    }
-  }
-
-  send(command: string): void {
-    this.worker.postMessage(command)
-  }
-
-  onLine(listener: (line: string) => void): () => void {
-    this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
-  }
-}
-
 export class StockfishEngine implements EngineHandle {
   readonly build: EngineBuild
   readonly threads: number
   private readonly transport: EngineTransport
-  private readonly worker: Worker | null
+  private readonly terminate: (() => void) | null
   // Searches share one engine, so they run strictly one after another.
   private queue: Promise<unknown> = Promise.resolve()
   // The running live search, which gives way to any other work.
@@ -103,12 +83,12 @@ export class StockfishEngine implements EngineHandle {
     transport: EngineTransport,
     build: EngineBuild,
     threads: number,
-    worker: Worker | null,
+    terminate: (() => void) | null,
   ) {
     this.transport = transport
     this.build = build
     this.threads = threads
-    this.worker = worker
+    this.terminate = terminate
   }
 
   /** Start the right Stockfish build in a Web Worker and complete the UCI handshake. */
@@ -121,21 +101,17 @@ export class StockfishEngine implements EngineHandle {
     }
     const build = chooseBuild(globalThis.crossOriginIsolated === true)
     const threads = threadCount(build, navigator.hardwareConcurrency || 2, config.max_threads)
-    const worker = new Worker(`/engine/${build}.js`)
-    const loadFailed = new Promise<never>((_, reject) => {
-      worker.onerror = () => reject(new Error("The chess engine couldn't be loaded."))
-    })
-    loadFailed.catch(() => undefined) // only matters while racing the handshake below
+    const opened = openTransport(build)
+    opened.loadFailed.catch(() => undefined) // only matters while racing the handshake below
     try {
-      const transport = new WorkerTransport(worker)
       const engine = await Promise.race([
-        StockfishEngine.connect(transport, build, threads, config.hash_mb, worker),
-        loadFailed,
+        StockfishEngine.connect(opened.transport, build, threads, config.hash_mb, opened.terminate),
+        opened.loadFailed,
       ])
       console.info(`CoChess engine: ${build}, ${threads} thread(s)`)
       return engine
     } catch (error) {
-      worker.terminate()
+      opened.terminate()
       throw error
     }
   }
@@ -146,14 +122,14 @@ export class StockfishEngine implements EngineHandle {
     build: EngineBuild,
     threads: number,
     hashMb: number,
-    worker: Worker | null = null,
+    terminate: (() => void) | null = null,
   ): Promise<StockfishEngine> {
     const uciOk = waitForLine(transport, 'uciok', LOAD_TIMEOUT_MS)
     transport.send('uci')
     await uciOk
     if (build === 'stockfish-19-lite') transport.send(`setoption name Threads value ${threads}`)
     transport.send(`setoption name Hash value ${hashMb}`)
-    const engine = new StockfishEngine(transport, build, threads, worker)
+    const engine = new StockfishEngine(transport, build, threads, terminate)
     await engine.ready()
     return engine
   }
@@ -194,7 +170,7 @@ export class StockfishEngine implements EngineHandle {
   }
 
   dispose(): void {
-    this.worker?.terminate()
+    this.terminate?.()
   }
 
   private ready(): Promise<void> {

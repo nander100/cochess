@@ -21,7 +21,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    /* The engine transport (vite.config.ts aliases it to a scripted engine in end-to-end tests) */
+    "paths": { "@engine-transport": ["./src/engine/workerTransport.ts"] }
   },
   "include": ["src"]
 }

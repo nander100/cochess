@@ -61,3 +61,22 @@ describe('queueLabel', () => {
     )
   })
 })
+
+describe('progress', () => {
+  it('reports the server status before each game, so the count goes up as games finish', async () => {
+    const statuses = [
+      statusWith(game('a', 'uploaded'), game('b', 'uploaded')),
+      statusWith(game('a', 'analyzed'), game('b', 'uploaded')),
+      statusWith(game('a', 'analyzed'), game('b', 'analyzed')),
+    ]
+    const deps = fakeDeps({
+      onboardingStatus: vi.fn(async () => statuses.shift() ?? statusWith()),
+      getGame: vi.fn(async (id: string) => ({ ...DETAIL, id, status: 'uploaded' as const })),
+    })
+    const seen: number[] = []
+
+    await runOnboardingQueue(deps, () => {}, (status) => seen.push(status.analyzed))
+
+    expect(seen).toEqual([0, 1, 2])
+  })
+})
