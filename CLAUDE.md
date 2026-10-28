@@ -52,7 +52,7 @@ cochess/
 │   │   ├── config.py            # every threshold, engine tier, coach and limit setting
 │   │   ├── cli.py               # + create-user, invite, assign-games, backfill
 │   │   ├── auth/                # + invites, sessions, get_current_user
-│   │   ├── api/                 # games, engine, coach + moments (SSE), tendencies routes; schemas; sse
+│   │   ├── api/                 # games, engine, coach + moments (SSE), tendencies, onboarding routes; schemas; sse
 │   │   ├── analysis/
 │   │   │   ├── pgn.py           # PGN parsing + validation
 │   │   │   ├── paths.py         # + replay UCI paths → FEN/SAN/PGN
@@ -76,6 +76,7 @@ cochess/
 │   │   │   ├── service.py       # synopsis
 │   │   │   ├── chat.py          # chat + analyze_position round trip
 │   │   │   ├── moments.py       # + critical-moment exercise: payloads, leak check, progress
+│   │   │   ├── baseline.py      # + the baseline report after onboarding
 │   │   │   ├── tools.py         # analyze_position input checks and tool result
 │   │   │   └── validate.py      # move validation + moment leak check
 │   │   └── db/                  # models, session, persistence helpers per area
@@ -84,9 +85,10 @@ cochess/
 └── frontend/
     └── src/
         ├── engine/              # worker wrapper, search control, tiers, live analysis
-        ├── analysis/            # analysis pipeline (scan → verify), chat round trip
+        ├── analysis/            # analysis pipeline (scan → verify), chat round trip, onboarding queue
         ├── board/               # + chessground wrapper, game tree, move list, eval graph
         ├── moments/             # + critical-moment stepper
+        ├── onboarding/          # + paste-and-check table, slot checklist, baseline report panel
         ├── pages/               # + Games, Analysis, Onboarding, Profile, Redeem
         ├── components/          # v1 components (ChatPanel, Synopsis, ProgressBar, ...)
         ├── api/                 # typed client, SSE reader, TS mirrors of backend schemas
