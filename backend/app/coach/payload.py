@@ -10,12 +10,12 @@ from app.analysis.evals import Color
 from app.analysis.moments import Hint
 from app.analysis.pgn import Position
 from app.analysis.phase import Phase
-from app.analysis.summary_models import GameSummary, LineSummary, MoveLabel
+from app.analysis.summary_models import Counts, GameSummary, KeyMoment, LineSummary, MoveLabel
 from app.analysis.tendencies import Example, TendencyReport, Trend
 from app.config import CoachSettings, TendencySettings
 
 RatingBand = Literal["beginner", "intermediate", "advanced"]
-Task = Literal["synopsis", "chat", "explain", "moment_intro", "moment_feedback"]
+Task = Literal["synopsis", "chat", "explain", "moment_intro", "moment_feedback", "baseline_report"]
 
 # PGN-style annotations, so one compact movetext replaces the per-move list (PLAN cost review).
 ANNOTATION: dict[MoveLabel, str] = {
@@ -48,7 +48,7 @@ class PlayerTendency(BaseModel):
 
 class PlayerPayload(BaseModel):
     elo: int
-    color: Color
+    color: Color | None  # the side they played; None for the baseline report (both colors)
     rating_band: RatingBand
     playstyle: str | None
     # Across the player's analyzed games (SPEC_V2 §9.3): the top themes, then accuracy.
@@ -133,6 +133,26 @@ class MomentPayload(BaseModel):
     results: list[MomentResult] = []  # the wrap-up: how every moment went
 
 
+class BaselineGame(BaseModel):
+    """One onboarding game, compactly (SPEC_V2 §10.4)."""
+
+    number: int  # 1-based, oldest first: how the report refers to the game
+    date: str  # YYYY-MM-DD
+    opponent: str
+    color: Color
+    result: Literal["win", "loss"]
+    opening: str | None  # from the headers
+    opening_moves: str  # the first moves, e.g. "1. e4 e5 2. Nf3 Nc6"
+    accuracy: float | None
+    opening_accuracy: float | None
+    counts: Counts
+    key_moments: list[KeyMoment]  # the player's own worst moments, with engine lines
+
+
+class BaselinePayload(BaseModel):
+    games: list[BaselineGame]
+
+
 class CoachPayload(BaseModel):
     task: Task
     user_prompt: str | None = None
@@ -142,6 +162,7 @@ class CoachPayload(BaseModel):
     engine_lines: list[LineSummary] | None = None  # for `position`: top 4 lines, 10 plies
     game_summary: GameSummary | None = None
     moment: MomentPayload | None = None
+    baseline: BaselinePayload | None = None
 
 
 # Per-move evals and labels are already in the annotated `pgn_to_move` (PLAN Q28, cost review).
@@ -155,7 +176,7 @@ def rating_band(elo: int) -> RatingBand:
     return "intermediate" if elo <= ADVANCED_ABOVE else "advanced"
 
 
-def profile_player(elo: int, playstyle: str | None, color: Color) -> PlayerPayload:
+def profile_player(elo: int, playstyle: str | None, color: Color | None) -> PlayerPayload:
     """The player as their profile says now (PLAN_V2 §6 Q5): chat and Explain talk to who the
     player is today, not who they were when the game was analyzed."""
     return PlayerPayload(elo=elo, color=color, rating_band=rating_band(elo), playstyle=playstyle)

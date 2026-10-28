@@ -10,13 +10,20 @@ SYNOPSIS = "synopsis"
 
 
 def record_usage(
-    session: Session, game_id: str | None, endpoint: str, model: str, usage: Usage
+    session: Session,
+    game_id: str | None,
+    endpoint: str,
+    model: str,
+    usage: Usage,
+    *,
+    user_id: str | None = None,
 ) -> None:
+    """One call's tokens, for the game's owner, or `user_id` for a call about no one game."""
     game = session.get(Game, game_id) if game_id is not None else None
     session.add(
         LlmUsageRow(
             game_id=game_id,
-            user_id=game.user_id if game is not None else None,
+            user_id=game.user_id if game is not None else user_id,
             endpoint=endpoint,
             task=endpoint,  # v1's two endpoints are also the task names (SPEC_V2 §6.1)
             model=model,

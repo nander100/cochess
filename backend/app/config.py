@@ -84,6 +84,11 @@ class CoachSettings(BaseModel):
     synopsis_effort: Effort = "low"
     # The prompt asks for <= 300 words; past this ceiling the backend logs a warning.
     synopsis_max_words: int = 350
+    # The baseline report after onboarding (SPEC_V2 §10.4): asks for 400-600 words.
+    baseline_max_tokens: int = 12000
+    baseline_effort: Effort = "medium"
+    baseline_max_words: int = 700
+    baseline_moments_per_game: int = 3  # the player's worst moments in each game's summary
     # What the coach sees of each key moment's engine lines. The full lines stay in the stored
     # summary; the coach only needs enough to explain the idea (input tokens are most of the cost).
     coach_engine_lines: int = 2

@@ -250,3 +250,16 @@ class TendencySnapshotRow(Base):
     games_analyzed: Mapped[int] = mapped_column(Integer)
     report: Mapped[dict[str, Any]] = mapped_column(JSON)  # app.analysis.tendencies.TendencyReport
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+
+
+class BaselineReportRow(Base):
+    """The baseline report written after onboarding (SPEC_V2 §10.4); the latest is shown."""
+
+    __tablename__ = "baseline_reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    text: Mapped[str] = mapped_column(Text)
+    invalid_moves_removed: Mapped[list[str]] = mapped_column(JSON)
+    game_ids: Mapped[list[str]] = mapped_column(JSON)  # the onboarding games it covers
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)

@@ -4,7 +4,13 @@ from typing import Any
 
 import pytest
 
-from app.analysis.onboarding import Candidate, assign_slots, split_games, time_control_category
+from app.analysis.onboarding import (
+    Candidate,
+    assign_slots,
+    split_games,
+    suggest_colors,
+    time_control_category,
+)
 from app.analysis.pgn import PgnError
 from app.config import Limits, OnboardingSettings
 from tests.pgn_fixtures import USER_FIXTURES
@@ -137,3 +143,25 @@ class TestSlots:
         decisions = assign_slots({}, candidates, "rapid", SETTINGS)
 
         assert [d.slot for d in decisions] == [None, "white_win", "white_win", "white_win"]
+
+
+def _games(*pairs: tuple[str, str]) -> list[Any]:
+    paste = "\n\n".join(f'[White "{w}"]\n[Black "{b}"]\n\n1. e4 e5 *' for w, b in pairs)
+    return [g.game for g in split_games(paste, LIMITS, SETTINGS)]
+
+
+class TestSuggestColors:
+    def test_the_name_in_most_games_is_the_players(self) -> None:
+        games = _games(("nander100", "A"), ("B", "Nander100"), ("C", "D"))
+
+        assert suggest_colors(games) == ["white", "black", None]
+
+    def test_no_suggestion_without_a_clear_name(self) -> None:
+        assert suggest_colors(_games(("A", "B"))) == [None]  # one game
+        assert suggest_colors(_games(("A", "B"), ("A", "B"))) == [None, None]  # both every time
+        assert suggest_colors(_games(("A", "B"), ("A", "C"), ("D", "E"), ("F", "G"))) == [None] * 4
+
+    def test_anonymous_and_unknown_names_are_ignored(self) -> None:
+        games = _games(("Anonymous", "x"), ("Anonymous", "x"), ("?", "y"))
+
+        assert suggest_colors([*games, None]) == ["black", "black", None, None]

@@ -1,5 +1,6 @@
 """Game access, always scoped to one user (SPEC_V2 §4.2): another user's game is "not found"."""
 
+from datetime import UTC, datetime
 from typing import Any, cast
 
 from sqlalchemy import select, update
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.analysis.evals import Color
 from app.analysis.game_info import fingerprint, played_at, user_result
-from app.analysis.pgn import parse_pgn
+from app.analysis.pgn import ParsedGame, parse_pgn
 from app.analysis.summary import build_summary
 from app.analysis.summary_models import GameSummary, UserInfo
 from app.config import Settings
@@ -27,6 +28,40 @@ def get_game(session: Session, user_id: str, game_id: str) -> Game:
     return game
 
 
+def new_game(
+    session: Session,
+    user: User,
+    parsed: ParsedGame,
+    color: Color,
+    *,
+    source: str,
+    category: str | None = None,
+) -> Game:
+    """Store an uploaded game for `user` (the caller commits). Elo and playstyle are the
+    profile's at upload: the Elo at analysis, kept even if the profile changes later."""
+    now = datetime.now(UTC)
+    game = Game(
+        user_id=user.id,
+        pgn=parsed.pgn,
+        user_color=color,
+        elo=user.elo,
+        playstyle=user.playstyle,
+        headers=parsed.headers,
+        played_at=played_at(parsed.headers) or now,
+        user_result=user_result(parsed.headers.get("Result"), color),
+        time_control_category=category,
+        source=source,
+        fingerprint=game_fingerprint(parsed),
+        created_at=now,
+    )
+    session.add(game)
+    return game
+
+
+def game_fingerprint(parsed: ParsedGame) -> str:
+    return fingerprint(parsed.headers, [p.uci for p in parsed.positions])
+
+
 def find_duplicate(session: Session, user_id: str, key: str) -> Game | None:
     """The player's game with this fingerprint, if they've uploaded it before."""
     return session.scalars(
@@ -41,7 +76,7 @@ def fill_fingerprints(session: Session, settings: Settings) -> list[list[Game]]:
         parsed = parse_pgn(
             game.pgn, max_chars=settings.limits.max_pgn_chars, max_plies=settings.limits.max_plies
         )
-        game.fingerprint = fingerprint(parsed.headers, [p.uci for p in parsed.positions])
+        game.fingerprint = game_fingerprint(parsed)
     session.commit()
     groups: dict[tuple[str | None, str | None], list[Game]] = {}
     for game in session.scalars(select(Game).order_by(Game.created_at)):

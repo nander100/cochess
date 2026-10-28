@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.analysis.evals import Color
-from app.analysis.game_info import fingerprint, opening_name, played_at, user_result
+from app.analysis.game_info import opening_name
 from app.analysis.pgn import PgnError, parse_pgn
 from app.api.deps import get_app_settings, get_session
 from app.api.game_detail import build_detail
@@ -26,7 +26,7 @@ from app.api.schemas import (
 from app.api.scoping import OwnedGame
 from app.auth.deps import CurrentUser
 from app.config import Settings
-from app.db.games import find_duplicate, list_games
+from app.db.games import find_duplicate, game_fingerprint, list_games, new_game
 from app.db.models import Game
 
 router = APIRouter(prefix="/api/games", tags=["games"])
@@ -66,25 +66,9 @@ def create_game(
             status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail.model_dump()
         ) from error
 
-    key = fingerprint(parsed.headers, [p.uci for p in parsed.positions])
-    if find_duplicate(session, user.id, key) is not None:
+    if find_duplicate(session, user.id, game_fingerprint(parsed)) is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=DUPLICATE)
-
-    now = datetime.now(UTC)
-    game = Game(
-        user_id=user.id,
-        pgn=parsed.pgn,
-        user_color=body.user_color,
-        elo=user.elo,  # the Elo at analysis time; the profile can change later
-        playstyle=user.playstyle,
-        headers=parsed.headers,
-        played_at=played_at(parsed.headers) or now,
-        user_result=user_result(parsed.headers.get("Result"), body.user_color),
-        source="single",
-        fingerprint=key,
-        created_at=now,
-    )
-    session.add(game)
+    game = new_game(session, user, parsed, body.user_color, source="single")
     session.commit()
 
     return CreateGameResponse(

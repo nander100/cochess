@@ -163,3 +163,33 @@ def _decide(
     if counts[slot] >= settings.games_per_slot:
         return rejected("slot_full")
     return SlotDecision(slot=slot, reason=None)
+
+
+def suggest_colors(games: Sequence[ParsedGame | None]) -> list[Color | None]:
+    """The side the player probably played in each game: the name that appears in more than
+    half the pasted games (and at least two) is taken to be theirs. The player confirms."""
+    names: Counter[str] = Counter()
+    for game in games:
+        if game is not None:
+            names.update({_name(game, "White"), _name(game, "Black")} - {""})
+    common = [(name, count) for name, count in names.most_common(2)]
+    parsed = sum(game is not None for game in games)
+    if not common or common[0][1] < 2 or common[0][1] * 2 <= parsed:
+        return [None] * len(games)
+    if len(common) > 1 and common[1][1] == common[0][1]:
+        return [None] * len(games)  # two players in every game: can't tell which is theirs
+    name = common[0][0]
+    suggestions: list[Color | None] = []
+    for game in games:
+        if game is not None and _name(game, "White") == name:
+            suggestions.append("white")
+        elif game is not None and _name(game, "Black") == name:
+            suggestions.append("black")
+        else:
+            suggestions.append(None)
+    return suggestions
+
+
+def _name(game: ParsedGame, side: str) -> str:
+    name = game.headers.get(side, "").strip()
+    return "" if name in ("?", "Anonymous") else name.casefold()
