@@ -1,17 +1,23 @@
 import { type CoachEvent, readCoachEvents } from './sse'
 import type {
   AttemptRequest,
+  BaselineReport,
   CreateGameRequest,
   CreateGameResponse,
   EngineConfig,
   ChatRequest,
   EngineResult,
+  GameChoice,
   GameDetail,
   GameListItem,
+  OnboardingStatus,
+  ParseResponse,
   PositionRequest,
   Profile,
   ProfileUpdate,
   ScanResponse,
+  SubmitGame,
+  SubmitResponse,
   VerifyResponse,
 } from './types'
 
@@ -71,6 +77,14 @@ export interface ApiClient {
   ): Promise<void>
   momentAsk(gameId: string, index: number, message: string, onEvent: (event: CoachEvent) => void): Promise<void>
   momentWrapUp(gameId: string, onEvent: (event: CoachEvent) => void): Promise<void>
+  /** Onboarding (SPEC_V2 §10): the pasted games as a table, with the slot each would fill. */
+  onboardingParse(pgnText: string, choices: (GameChoice | null)[]): Promise<ParseResponse>
+  onboardingSubmit(games: SubmitGame[]): Promise<SubmitResponse>
+  onboardingStatus(): Promise<OnboardingStatus>
+  /** Write the baseline report (or show the stored one); it streams back like a synopsis. */
+  streamBaselineReport(onEvent: (event: CoachEvent) => void): Promise<void>
+  /** The latest baseline report, or null before the first one. */
+  baselineReport(): Promise<BaselineReport | null>
 }
 
 export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)): ApiClient {
@@ -146,6 +160,18 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
     momentAsk: (gameId, index, message, onEvent) =>
       stream(`/api/games/${gameId}/moments/${index}/ask`, { message }, onEvent),
     momentWrapUp: (gameId, onEvent) => stream(`/api/games/${gameId}/moments/wrap_up`, null, onEvent),
+    onboardingParse: (pgnText, choices) => post('/api/onboarding/parse', { pgn_text: pgnText, choices }),
+    onboardingSubmit: (games) => post('/api/onboarding/submit', { games }),
+    onboardingStatus: () => request('/api/onboarding/status'),
+    streamBaselineReport: (onEvent) => stream('/api/onboarding/report', null, onEvent),
+    baselineReport: async () => {
+      try {
+        return await request<BaselineReport>('/api/onboarding/report')
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) return null
+        throw error
+      }
+    },
   }
 }
 

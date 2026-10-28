@@ -4,6 +4,7 @@ import type {
   CreateGameResponse,
   EngineConfig,
   EngineResult,
+  GameDetail,
   VerifyResponse,
 } from '../api/types'
 import { analyzeAll, itemsForFens, moveNumber, scanItems } from '../engine/runner'
@@ -97,6 +98,27 @@ export async function analyzeGame(
     scanMs,
     verifyMs,
     outcome,
+  }
+}
+
+/** Finish analyzing a game already uploaded (e.g. the tab closed mid-analysis, or an onboarding
+ * game queued for analysis): the whole run, or just the verify step if its scan is stored. */
+export function resumeGame(
+  deps: PipelineDeps,
+  detail: GameDetail,
+  config: EngineConfig,
+  onStatus: (status: AnalysisStatus) => void,
+): Promise<AnalysisRun> {
+  const pending = detail.status === 'scanned' ? detail.verify_fens : null
+  return analyzeGame(deps, asUploadedGame(detail), config, onStatus, pending)
+}
+
+function asUploadedGame(detail: GameDetail): CreateGameResponse {
+  return {
+    game_id: detail.id,
+    positions: detail.moves.map(({ ply, fen_before, san, uci, clock_s }) => ({ ply, fen_before, san, uci, clock_s })),
+    final_fen: detail.final_fen,
+    final_is_terminal: detail.final_is_terminal,
   }
 }
 

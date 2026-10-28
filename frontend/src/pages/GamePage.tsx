@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useParams } from 'react-router'
 import { type ChatDeps, type ChatProgress, askCoach, explainPosition } from '../analysis/chat'
 import { BeforeSearches, type MomentDeps, fenAfter } from '../analysis/moments'
-import { type AnalysisRun, type AnalysisStatus, type PipelineDeps, analyzeGame, statusLabel } from '../analysis/pipeline'
+import { type AnalysisRun, type AnalysisStatus, type PipelineDeps, resumeGame, statusLabel } from '../analysis/pipeline'
 import { ApiError, isLoggedOut } from '../api/client'
-import type { CreateGameResponse, EngineResult, GameDetail, MomentInfo } from '../api/types'
+import type { EngineResult, GameDetail, MomentInfo } from '../api/types'
 import { Board, type BoardMove } from '../board/Board'
 import { EnginePanel, type LiveEngine } from '../board/EnginePanel'
 import { EvalBar } from '../board/EvalBar'
@@ -338,8 +338,7 @@ function ResumeAnalysis({ detail, deps, onLoggedOut, onDone }: {
     setStatus({ phase: 'starting' })
     try {
       const config = await deps.api.engineConfig()
-      const pending = detail.status === 'scanned' ? detail.verify_fens : null
-      await analyzeGame(deps, asUploadedGame(detail), config, setStatus, pending)
+      await resumeGame(deps, detail, config, setStatus)
       onDone()
     } catch (caught) {
       if (isLoggedOut(caught)) onLoggedOut()
@@ -470,15 +469,6 @@ async function positionRequest(
 }
 
 /** The game as POST /api/games returned it, for the engine pipeline. */
-function asUploadedGame(detail: GameDetail): CreateGameResponse {
-  return {
-    game_id: detail.id,
-    positions: detail.moves.map(({ ply, fen_before, san, uci, clock_s }) => ({ ply, fen_before, san, uci, clock_s })),
-    final_fen: detail.final_fen,
-    final_is_terminal: detail.final_is_terminal,
-  }
-}
-
 /** A position's identity for matching stored engine results: FEN without the move counters. */
 function positionKey(fen: string): string {
   return fen.split(' ').slice(0, 4).join(' ')

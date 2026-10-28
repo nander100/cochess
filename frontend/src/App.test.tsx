@@ -264,7 +264,7 @@ test('reopening a used login link while logged in just opens my games', async ()
   expect(screen.queryByText(/expired or was already used/)).not.toBeInTheDocument()
 })
 
-test('a new player fills in the profile first, then sees their games', async () => {
+test('a new player fills in the profile first, then sees the assessment (which they can skip)', async () => {
   const blank = { ...PROFILE, elo: null, time_control: null, complete: false }
   const deps = fakeDeps({ me: vi.fn(async () => blank) })
   renderApp(deps, '/')
@@ -273,6 +273,8 @@ test('a new player fills in the profile first, then sees their games', async () 
   fireEvent.change(screen.getByLabelText(/time control/i), { target: { value: 'blitz' } })
   fireEvent.click(screen.getByRole('button', { name: 'Save and continue' }))
 
+  expect(await screen.findByRole('heading', { name: 'Your baseline assessment' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('link', { name: 'Skip for now' }))
   expect(await screen.findByText(/No games yet/)).toBeInTheDocument()
   expect(deps.api.updateMe).toHaveBeenCalledWith({
     name: 'Alex',

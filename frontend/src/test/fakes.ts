@@ -9,7 +9,9 @@ import type {
   MomentInfo,
   GameDetail,
   MoveInfo,
+  OnboardingStatus,
   Profile,
+  SlotCount,
 } from '../api/types'
 import type { EngineHandle } from '../engine/StockfishEngine'
 
@@ -129,6 +131,22 @@ export const MOMENT: MomentInfo = {
   best_uci: null,
 }
 
+export const EMPTY_SLOTS: SlotCount[] = (['white_win', 'white_loss', 'black_win', 'black_loss'] as const).map(
+  (slot) => ({ slot, filled: 0, of: 3 }),
+)
+
+export const EMPTY_ONBOARDING: OnboardingStatus = {
+  primary_time_control: 'rapid',
+  slots: EMPTY_SLOTS,
+  games: [],
+  complete: false,
+  analyzed: 0,
+  report_ready: false,
+  report: null,
+}
+
+export const REPORT_TEXT = '### Overview\nYou are a solid rapid player.'
+
 /** A scripted coach stream: an optional `moment` event, then the text. */
 export function coachSays(text: string, moment?: { grade: string | null; state: string }) {
   return async (...args: unknown[]) => {
@@ -190,6 +208,11 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     momentReveal: vi.fn(coachSays('The move was 2. d4.', { grade: null, state: 'revealed' })),
     momentAsk: vi.fn(coachSays('Think about the centre.')),
     momentWrapUp: vi.fn(coachSays('Well done.')),
+    onboardingParse: vi.fn(async () => ({ primary_time_control: 'rapid' as const, games: [], slots: EMPTY_SLOTS })),
+    onboardingSubmit: vi.fn(async () => ({ results: [], slots: EMPTY_SLOTS })),
+    onboardingStatus: vi.fn(async () => EMPTY_ONBOARDING),
+    streamBaselineReport: vi.fn(coachSays(REPORT_TEXT)),
+    baselineReport: vi.fn(async () => null),
     ...overrides,
   }
 }

@@ -234,3 +234,87 @@ export interface GameDetail {
   chat: ChatEntry[]
   moments: MomentInfo[]
 }
+
+// Onboarding (SPEC_V2 §10), mirroring backend/app/api/onboarding_schemas.py.
+export type Category = TimeControl | 'correspondence'
+export type Slot = 'white_win' | 'white_loss' | 'black_win' | 'black_loss'
+export type SlotReason =
+  | 'invalid_pgn'
+  | 'duplicate'
+  | 'needs_color'
+  | 'needs_time_control'
+  | 'wrong_time_control'
+  | 'unfinished'
+  | 'draw'
+  | 'slot_full'
+
+export interface GameChoice {
+  user_color?: Color | null
+  time_control_category?: TimeControl | null
+}
+
+export interface ParsedRow {
+  index: number
+  pgn: string | null
+  white: string | null
+  black: string | null
+  result: string | null
+  date: string | null
+  time_control: string | null
+  category: Category | null
+  error: { code: string; message: string; move_number: number | null } | null
+  suggested_color: Color | null
+  user_color: Color | null
+  user_result: UserResult | null
+  slot: Slot | null
+  reason: SlotReason | null
+}
+
+export interface SlotCount {
+  slot: Slot
+  filled: number
+  of: number
+}
+
+export interface ParseResponse {
+  primary_time_control: TimeControl
+  games: ParsedRow[]
+  slots: SlotCount[]
+}
+
+export interface SubmitGame {
+  pgn: string
+  user_color: Color
+  time_control_category?: TimeControl | null
+}
+
+export interface SubmitResponse {
+  results: { index: number; slot: Slot | null; reason: SlotReason | null; game_id: string | null }[]
+  slots: SlotCount[]
+}
+
+export interface OnboardingGame {
+  id: string
+  slot: Slot
+  status: GameStatus
+  opponent: string
+  played_at: string
+  opening: string | null
+}
+
+export interface BaselineReport {
+  text: string
+  invalid_moves_removed: string[]
+  game_ids: string[]
+  created_at: string
+}
+
+export interface OnboardingStatus {
+  primary_time_control: TimeControl | null
+  slots: SlotCount[]
+  games: OnboardingGame[]
+  complete: boolean
+  analyzed: number
+  report_ready: boolean
+  report: BaselineReport | null
+}

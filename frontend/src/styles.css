@@ -873,3 +873,96 @@ button.secondary {
   color: var(--color-accent);
   box-shadow: inset 0 0 0 1px var(--color-accent);
 }
+
+/* Onboarding (SPEC_V2 §10) */
+.onboarding {
+  display: grid;
+  gap: var(--space);
+}
+
+.slot-checklist {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.5rem;
+  list-style: none;
+  margin: var(--space) 0 0;
+  padding: 0;
+}
+
+.slot-checklist li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-paper);
+}
+
+.slot-checklist li.full {
+  border-color: var(--color-accent);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.slot-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.slot-checklist li.full .slot-count::after {
+  content: ' ✓';
+  color: var(--color-accent);
+}
+
+.paste-games form {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+
+.paste-games textarea {
+  width: 100%;
+}
+
+table.paste-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space) 0;
+  font-size: 0.9rem;
+}
+
+table.paste-table th,
+table.paste-table td {
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+table.paste-table tr.unused td {
+  color: var(--color-muted);
+}
+
+.slot-reason {
+  color: var(--color-danger);
+}
+
+.onboarding-games {
+  margin: 0.5rem 0 0;
+  padding-left: 1.5rem;
+}
+
+.onboarding-games li {
+  padding: 0.15rem 0;
+}
+
+.slot-tag {
+  display: inline-block;
+  min-width: 6.5rem;
+  font-weight: 600;
+}
+
+.report-date {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}

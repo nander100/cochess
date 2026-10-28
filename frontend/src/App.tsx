@@ -7,6 +7,8 @@ import { type EngineHandle, StockfishEngine } from './engine/StockfishEngine'
 import { GamePage } from './pages/GamePage'
 import { GamesPage } from './pages/GamesPage'
 import { NewGamePage } from './pages/NewGamePage'
+import { OnboardingPage } from './pages/OnboardingPage'
+import { BaselineReportPanel } from './onboarding/BaselineReportPanel'
 import { ProfilePage } from './pages/ProfilePage'
 import { RedeemPage } from './pages/RedeemPage'
 import { errorText, tokenFromHash } from './pages/util'
@@ -93,16 +95,20 @@ export default function App({ deps }: AppProps) {
           <Route
             path="/profile"
             element={
-              <ProfilePage
-                api={pipeline.api}
-                profile={session.profile}
-                onSaved={(profile) => {
-                  const firstTime = !session.profile.complete
-                  setSession({ kind: 'in', profile })
-                  if (firstTime && profile.complete) navigate('/games')
-                }}
-                onLoggedOut={loggedOut}
-              />
+              <>
+                <ProfilePage
+                  api={pipeline.api}
+                  profile={session.profile}
+                  onSaved={(profile) => {
+                    const firstTime = !session.profile.complete
+                    setSession({ kind: 'in', profile })
+                    // After the first login: the onboarding assessment, which can be skipped.
+                    if (firstTime && profile.complete) navigate('/onboarding')
+                  }}
+                  onLoggedOut={loggedOut}
+                />
+                {session.profile.complete && <BaselineReportPanel api={pipeline.api} onLoggedOut={loggedOut} />}
+              </>
             }
           />
           {session.profile.complete ? (
@@ -111,6 +117,7 @@ export default function App({ deps }: AppProps) {
               <Route path="/games" element={<GamesPage api={pipeline.api} onLoggedOut={loggedOut} />} />
               <Route path="/games/:gameId" element={<GamePage deps={pipeline} onLoggedOut={loggedOut} />} />
               <Route path="/new" element={<NewGamePage deps={pipeline} onLoggedOut={loggedOut} />} />
+              <Route path="/onboarding" element={<OnboardingPage deps={pipeline} onLoggedOut={loggedOut} />} />
             </>
           ) : (
             <Route path="/" element={<Navigate to="/profile" replace />} />
@@ -137,6 +144,7 @@ function Header({ session, onLogOut }: HeaderProps) {
           <span className="signed-in">{session.profile.name}</span>
           <Link to="/games">My games</Link>
           <Link to="/new">Analyze a game</Link>
+          <Link to="/onboarding">Assessment</Link>
           <Link to="/profile">Profile</Link>
           <button type="button" className="link-button" onClick={onLogOut}>
             Log out
