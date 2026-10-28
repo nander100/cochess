@@ -1,6 +1,8 @@
 """Persistence for the coach: the stored synopsis and per-call token usage."""
 
-from sqlalchemy import select
+from datetime import datetime
+
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.coach.client import Usage
@@ -53,3 +55,21 @@ def load_synopsis(session: Session, game_id: str) -> tuple[str, list[str]] | Non
         if row.content.get("type") == SYNOPSIS:
             return str(row.content["text"]), list(row.content.get("invalid_moves_removed", []))
     return None
+
+
+def tokens_used_since(session: Session, user_id: str, since: datetime) -> int:
+    """All of a player's Claude tokens since `since`: input, output, and cache reads and writes."""
+    total = session.scalar(
+        select(
+            func.coalesce(
+                func.sum(
+                    LlmUsageRow.input_tokens
+                    + LlmUsageRow.output_tokens
+                    + LlmUsageRow.cache_read_tokens
+                    + LlmUsageRow.cache_write_tokens
+                ),
+                0,
+            )
+        ).where(LlmUsageRow.user_id == user_id, LlmUsageRow.created_at >= since)
+    )
+    return int(total or 0)

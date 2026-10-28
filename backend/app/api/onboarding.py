@@ -23,6 +23,7 @@ from app.analysis.onboarding import (
     time_control_category,
 )
 from app.analysis.pgn import ParsedGame, PgnError, parse_pgn
+from app.api.budget import check_token_budget
 from app.api.coach import ClientDep, session_factory, stream_coach, text_events
 from app.api.deps import get_app_settings, get_session
 from app.api.games import PROFILE_FIRST
@@ -148,7 +149,7 @@ def get_report(user: CurrentUser, session: SessionDep) -> BaselineReport:
     return _report(report)
 
 
-@router.post("/report")
+@router.post("/report", dependencies=[Depends(check_token_budget)])
 def write_report(
     user: CurrentUser,
     request: Request,

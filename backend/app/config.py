@@ -178,6 +178,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./cochess.db"
     # Where players open CoChess; invite links are built from it.
     public_base_url: str = "http://localhost:5173"
+    # Optional safety valve (SPEC_V2 §12), off by default: Claude tokens one player may use in a
+    # rolling 24 hours (input, output and cache, all counted). v4 replaces it with credits.
+    user_daily_token_limit: int | None = None
 
     auth: AuthSettings = AuthSettings()
     engine: EngineSettings = EngineSettings()

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.analysis.engine import EngineResult, EngineResultError
 from app.api import sse
+from app.api.budget import check_token_budget
 from app.api.deps import get_app_settings, get_session
 from app.api.scoping import OwnedGame
 from app.api.turns import prepare_turn
@@ -36,7 +37,7 @@ from app.db.chat import count_player_messages
 from app.db.engine_results import load_summary
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/games", tags=["coach"])
+router = APIRouter(prefix="/api/games", tags=["coach"], dependencies=[Depends(check_token_budget)])
 
 SessionDep = Annotated[Session, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_app_settings)]

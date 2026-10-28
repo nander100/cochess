@@ -4,13 +4,14 @@ called; the answer streams as SSE like the other coach routes. An attempt's firs
 
 from collections.abc import Callable
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.analysis.engine import EngineResult
 from app.api import sse
+from app.api.budget import check_token_budget
 from app.api.coach import (
     ClientDep,
     SessionDep,
@@ -38,7 +39,9 @@ from app.coach.moments import (
 from app.config import Settings
 from app.db.moments import load_progress
 
-router = APIRouter(prefix="/api/games", tags=["moments"])
+router = APIRouter(
+    prefix="/api/games", tags=["moments"], dependencies=[Depends(check_token_budget)]
+)
 
 
 class AttemptRequest(BaseModel):
