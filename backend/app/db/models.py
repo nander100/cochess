@@ -210,3 +210,37 @@ class MomentProgressRow(Base):
     # Answers where the leak check had to remove the move the player was looking for (§8.4).
     leaks: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)
+
+
+class GameThemeFactRow(Base):
+    """One of the player's theme facts from one game (SPEC_V2 §9.1): what tendencies are counted
+    from. Rebuilt with the game's summary."""
+
+    __tablename__ = "game_theme_facts"
+    __table_args__ = (Index("ix_game_theme_facts_user_id_theme", "user_id", "theme"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), index=True)
+    theme: Mapped[str] = mapped_column(String(32))
+    subtype: Mapped[str | None] = mapped_column(String(32))
+    ply: Mapped[int | None] = mapped_column(Integer)  # null for game-level facts
+    move_number: Mapped[int | None] = mapped_column(Integer)
+    move_san: Mapped[str | None] = mapped_column(String(10))
+    severity: Mapped[str] = mapped_column(String(10))  # inaccuracy/mistake/blunder/note/concern
+    phase: Mapped[str | None] = mapped_column(String(10))  # of the position before the move
+    user_color: Mapped[str] = mapped_column(String(5))
+    details: Mapped[dict[str, Any]] = mapped_column(JSON)
+
+
+class TendencySnapshotRow(Base):
+    """The player's tendencies after each analyzed game (SPEC_V2 §9.2), kept for the v3 charts."""
+
+    __tablename__ = "tendency_snapshots"
+    __table_args__ = (Index("ix_tendency_snapshots_user_id_created_at", "user_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    games_analyzed: Mapped[int] = mapped_column(Integer)
+    report: Mapped[dict[str, Any]] = mapped_column(JSON)  # app.analysis.tendencies.TendencyReport
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)

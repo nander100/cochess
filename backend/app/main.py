@@ -9,6 +9,7 @@ from app.api import coach as coach_routes
 from app.api import engine as engine_routes
 from app.api import games, profile
 from app.api import moments as moment_routes
+from app.api import tendencies as tendency_routes
 from app.auth import routes as auth_routes
 from app.coach.client import AnthropicCoachClient, CoachClient
 from app.config import Settings, get_settings
@@ -58,4 +59,5 @@ def create_app(
     app.include_router(engine_routes.router)
     app.include_router(coach_routes.router)
     app.include_router(moment_routes.router)
+    app.include_router(tendency_routes.router)
     return app

@@ -109,6 +109,25 @@ class MomentSettings(BaseModel):
     refutation_plies: int = 6  # how much of the line after a move the coach sees
 
 
+class TendencySettings(BaseModel):
+    """Tendency tracking (SPEC_V2 §9.2): mistake themes across games, recent games weighted most."""
+
+    half_life_games: float = 10  # a game this many games back counts half as much as the latest
+    top_n: int = 5  # tendencies the coach receives
+    provisional_below_games: int = 5  # fewer analyzed games than this: tendencies are provisional
+    trend_window_games: int = 5  # the last N games against the N before them
+    trend_margin: float = 0.25  # occurrences per game: a smaller change is "steady"
+    # Each fact counts with its severity's weight when ranking (PLAN_V2 §6 Q9). Game-level facts
+    # are "concern" or "note"; notes (always-on summaries) never count.
+    severity_weights: dict[str, float] = {
+        "blunder": 3,
+        "mistake": 2,
+        "inaccuracy": 1,
+        "concern": 2,
+        "note": 0,
+    }
+
+
 class Limits(BaseModel):
     """Input size limits for user-submitted data."""
 
@@ -150,6 +169,7 @@ class Settings(BaseSettings):
     coach: CoachSettings = CoachSettings()
     limits: Limits = Limits()
     moments: MomentSettings = MomentSettings()
+    tendencies: TendencySettings = TendencySettings()
 
 
 @lru_cache

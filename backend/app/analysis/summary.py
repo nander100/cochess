@@ -68,6 +68,7 @@ def build_summary(
                 san=m.san,
                 eval_after=format_eval(m.eval_after),
                 classification=label(m),
+                phase=m.phase,
             )
             for m in context.moves
         ],

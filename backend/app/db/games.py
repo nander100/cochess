@@ -9,10 +9,11 @@ from app.analysis.evals import Color
 from app.analysis.game_info import played_at, user_result
 from app.analysis.pgn import parse_pgn
 from app.analysis.summary import build_summary
-from app.analysis.summary_models import UserInfo
+from app.analysis.summary_models import GameSummary, UserInfo
 from app.config import Settings
 from app.db.engine_results import load_results, save_summary
 from app.db.models import EngineResultRow, Game, GameSummaryRow, LlmUsageRow, User
+from app.db.tendencies import refresh_tendencies, save_theme_facts
 
 
 class GameNotFoundError(Exception):
@@ -62,10 +63,21 @@ def _user_accuracy(summary: dict[str, Any] | None) -> float | None:
     return float(value) if isinstance(value, int | float) else None
 
 
+def record_analysis(session: Session, settings: Settings, game: Game, summary: GameSummary) -> None:
+    """Store an analyzed game's summary and theme facts, then refresh the player's tendencies
+    (SPEC_V2 §9.2: recomputed after every analyzed game). The caller commits."""
+    save_summary(session, game.id, summary)
+    save_theme_facts(session, game, summary)
+    game.status = "analyzed"
+    if game.user_id is not None:
+        refresh_tendencies(session, settings.tendencies, game.user_id)
+
+
 def rebuild_summaries(session: Session, settings: Settings, user: User | None = None) -> int:
     """Rebuild every analyzed game's summary (or one player's) from its stored engine results,
-    so summaries made by older code gain what's been added since (e.g. moments). No engine runs.
-    Returns how many were rebuilt."""
+    so summaries made by older code gain what's been added since (e.g. moments, theme facts).
+    No engine runs. Each player's tendencies are refreshed once at the end. Returns how many
+    were rebuilt."""
     query = select(Game).where(Game.status == "analyzed")
     if user is not None:
         query = query.where(Game.user_id == user.id)
@@ -76,5 +88,10 @@ def rebuild_summaries(session: Session, settings: Settings, user: User | None = 
         )
         info = UserInfo(color=cast(Color, game.user_color), elo=game.elo, playstyle=game.playstyle)
         results = load_results(session, game.id, ["scan", "verify"])
-        save_summary(session, game.id, build_summary(parsed, results, info, settings))
+        summary = build_summary(parsed, results, info, settings)
+        save_summary(session, game.id, summary)
+        save_theme_facts(session, game, summary)
+    for user_id in sorted({game.user_id for game in games if game.user_id is not None}):
+        refresh_tendencies(session, settings.tendencies, user_id)
+    session.commit()
     return len(games)

@@ -83,6 +83,7 @@ class MoveEntry(BaseModel):
     san: str
     eval_after: str
     classification: MoveLabel | None
+    phase: Phase | None = None  # of the position before the move; None in summaries before v2 M5
 
 
 class Moment(BaseModel):

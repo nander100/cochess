@@ -13,7 +13,14 @@ from app.auth.service import redeem_invite
 from app.cli import main
 from app.config import Settings
 from app.db.engine_results import load_summary, save_results
-from app.db.models import EngineResultRow, Game, GameSummaryRow, User
+from app.db.models import (
+    EngineResultRow,
+    Game,
+    GameSummaryRow,
+    GameThemeFactRow,
+    TendencySnapshotRow,
+    User,
+)
 from app.db.session import make_engine
 from tests.engine_fakes import fake_result
 from tests.pgn_fixtures import read_pgn
@@ -145,4 +152,15 @@ def test_backfill_gives_v1_summaries_their_moments(file_settings: Settings) -> N
         rebuilt = load_summary(session, "g")
     assert rebuilt is not None
     assert [(m.ply, m.san, m.label) for m in rebuilt.moments] == [(9, "Qxf3", "blunder")]
+    with _session(file_settings) as session:
+        facts = list(session.scalars(select(GameThemeFactRow)))
+        snapshots = list(session.scalars(select(TendencySnapshotRow)))
+    # The fake engine lines are too short for per-move detectors: only the game-level note.
+    assert [(f.theme, f.ply, f.severity, f.user_color) for f in facts] == [
+        ("pawn_structure", None, "note", "white")
+    ]
+    assert [s.games_analyzed for s in snapshots] == [1]
+
     assert _run(file_settings, "backfill")[1].strip() == "Rebuilt 1 game summary."  # everyone
+    with _session(file_settings) as session:
+        assert len(list(session.scalars(select(GameThemeFactRow)))) == len(facts)  # replaced

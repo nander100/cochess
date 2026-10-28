@@ -55,6 +55,7 @@ def test_eval_curve_and_move_list_cover_every_ply() -> None:
         "san": "e4",
         "eval_after": "0.0",
         "classification": None,
+        "phase": "opening",
     }
 
 
