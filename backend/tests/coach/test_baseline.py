@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from app.coach.baseline import _game
+from app.coach.baseline import _game, opening_groups
 from app.config import Settings
 from app.db.models import Game
 from tests.analysis.test_summary import opera_summary
@@ -46,3 +46,29 @@ def test_at_most_the_three_worst_moments_per_game() -> None:
         (5, "mistake"),
         (9, "blunder"),
     ]
+
+
+def test_openings_are_counted_by_the_backend() -> None:
+    summary = opera_summary()
+    base = _game(1, _opera_game(), summary, SETTINGS)
+    games = [
+        base.model_copy(update={"opening_moves": "1. d4 d5 2. Bf4", "result": "win",
+                                "opening_accuracy": 90.0, "opponent": "A"}),
+        base.model_copy(update={"opening_moves": "1. d4 Nf6 2. Bf4", "result": "loss",
+                                "opening_accuracy": 70.0, "opponent": "B"}),
+        base.model_copy(update={"opening_moves": "1. e4 e5", "result": "loss",
+                                "opening_accuracy": None, "opponent": "C"}),
+        base.model_copy(update={"color": "black", "opening_moves": "1. e4 c6 2. d4 d5",
+                                "result": "win", "opening_accuracy": 60.0, "opponent": "D"}),
+        base.model_copy(update={"color": "black", "opening_moves": "1. e4 c6 2. Nf3 d5",
+                                "result": "loss", "opening_accuracy": 50.0, "opponent": "E"}),
+    ]  # fmt: skip
+
+    groups = opening_groups(games)
+
+    assert [(g.color, g.start, g.games, g.wins, g.losses, g.opening_accuracy, g.opponents)
+            for g in groups] == [
+        ("white", "1. d4", 2, 1, 1, 80.0, ["A", "B"]),
+        ("white", "1. e4", 1, 0, 1, None, ["C"]),
+        ("black", "1. e4 c6", 2, 1, 1, 55.0, ["D", "E"]),
+    ]  # fmt: skip

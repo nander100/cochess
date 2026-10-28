@@ -15,6 +15,7 @@ from app.coach.payload import (
     BaselineGame,
     BaselinePayload,
     CoachPayload,
+    OpeningGroup,
     coach_view,
     profile_player,
     render,
@@ -60,16 +61,40 @@ def build_baseline_payload(
         settings.tendencies,
     )
     ordered = sorted(games, key=lambda pair: pair[0].played_at or pair[0].created_at)
+    summaries = [
+        _game(number, game, summary, settings)
+        for number, (game, summary) in enumerate(ordered, start=1)
+    ]
     return CoachPayload(
         task="baseline_report",
         player=player,
-        baseline=BaselinePayload(
-            games=[
-                _game(number, game, summary, settings)
-                for number, (game, summary) in enumerate(ordered, start=1)
-            ]
-        ),
+        baseline=BaselinePayload(games=summaries, openings=opening_groups(summaries)),
     )
+
+
+def opening_groups(games: list[BaselineGame]) -> list[OpeningGroup]:
+    """Results and opening accuracy by how the games started, White's groups first, then the
+    most played."""
+    groups: dict[tuple[Color, str], list[BaselineGame]] = {}
+    for game in games:
+        tokens = game.opening_moves.split()
+        start = " ".join(tokens[:2] if game.color == "white" else tokens[:3])
+        groups.setdefault((game.color, start), []).append(game)
+    result = []
+    for (color, start), members in groups.items():
+        known = [g.opening_accuracy for g in members if g.opening_accuracy is not None]
+        result.append(
+            OpeningGroup(
+                color=color,
+                start=start,
+                games=len(members),
+                wins=sum(g.result == "win" for g in members),
+                losses=sum(g.result == "loss" for g in members),
+                opening_accuracy=round(sum(known) / len(known), 1) if known else None,
+                opponents=[g.opponent for g in members],
+            )
+        )
+    return sorted(result, key=lambda g: (g.color != "white", -g.games, g.start))
 
 
 def _game(number: int, game: Game, summary: GameSummary, settings: Settings) -> BaselineGame:

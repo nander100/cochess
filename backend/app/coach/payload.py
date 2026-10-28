@@ -149,8 +149,22 @@ class BaselineGame(BaseModel):
     key_moments: list[KeyMoment]  # the player's own worst moments, with engine lines
 
 
+class OpeningGroup(BaseModel):
+    """The player's games that start the same way, counted by the backend so the coach doesn't
+    have to: White by the player's first move, Black by the first move and the player's reply."""
+
+    color: Color
+    start: str  # "1. d4", or "1. e4 c6"
+    games: int
+    wins: int
+    losses: int
+    opening_accuracy: float | None  # the games' mean
+    opponents: list[str]
+
+
 class BaselinePayload(BaseModel):
     games: list[BaselineGame]
+    openings: list[OpeningGroup] = []
 
 
 class CoachPayload(BaseModel):
