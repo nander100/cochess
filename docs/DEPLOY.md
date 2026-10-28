@@ -25,7 +25,7 @@ ANTHROPIC_API_KEY=<your key>
 PUBLIC_BASE_URL=https://coach.example.com    # login links are built from it
 ```
 
-Players log in with one-time links you create (step 5). Session cookies are `Secure`, so CoChess must be served over HTTPS (step 4).
+Players log in with one-time links you create (step 5); links are built from `PUBLIC_BASE_URL`, so set it to the HTTPS address players use. Session cookies are `Secure`, so CoChess must be served over HTTPS (step 4): over plain HTTP on a non-localhost address the browser drops the cookie and every login seems to fail.
 
 Keep the app off the public interface so only the HTTPS proxy can reach it:
 
@@ -84,7 +84,15 @@ docker compose up --build -d
 
 The database lives on the `cochess-data` volume and survives rebuilds, and new migrations run when the backend starts. **Back up the database before updating** (below).
 
-**Upgrading from v1**: v1's games have no owner, so nobody sees them until you give them to a player: `create-user` for yourself, then `docker compose exec backend uv run --no-dev python -m app.cli assign-games --user Alex`. v1's `ACCESS_CODE` setting is no longer used; you can delete it from `backend/.env`.
+**Upgrading from v1**: v1's games have no owner, so nobody sees them until you give them to a player. Back up first, then:
+
+```bash
+docker compose exec backend uv run --no-dev python -m app.cli create-user --name "Alex"
+docker compose exec backend uv run --no-dev python -m app.cli assign-games --user Alex
+docker compose exec backend uv run --no-dev python -m app.cli backfill
+```
+
+`backfill` rebuilds analyzed games' summaries from their stored engine results (no engine runs), so v1 games get critical moments, theme facts and tendencies, and lists any game uploaded more than once (it deletes nothing). Run it again after any update whose notes say summaries changed. v1's `ACCESS_CODE` setting is no longer used; you can delete it from `backend/.env`.
 
 **Logs**
 
@@ -92,7 +100,10 @@ The database lives on the `cochess-data` volume and survives rebuilds, and new m
 docker compose logs -f backend
 ```
 
-Warnings worth watching for: `coach moves removed` (the coach wrote a move that wasn't in the data, even after a retry, and it was removed) and `synopsis too long`.
+Warnings worth watching for:
+- `coach moves removed`: the coach wrote a move that wasn't in the data, even after a retry, and it was removed.
+- `moment_leak`: during a critical-moment exercise the coach named the move the player was meant to find, and it was removed. This should never happen; if it does, the exercise's `moment_progress.leaks` count says where.
+- `synopsis too long`, `baseline report too long`.
 
 **Back up the database** (safe while running; uses SQLite's backup API):
 
@@ -116,5 +127,6 @@ Multiply by the current per-token prices for each model to get the cost.
 ## Limits
 
 - Login links from the owner only; Google sign-in arrives in v4.
-- At most 10 new games a day per player and 30 questions per game (see the configuration table in the README to change them).
+- At most 10 new games a day per player (onboarding's 12 don't count) and 30 questions per game (see the configuration table in the README to change them).
+- Optional: `USER_DAILY_TOKEN_LIMIT` in `backend/.env` caps each player's Claude tokens per rolling 24 hours (off by default).
 - SQLite and a single backend process: fine for a few testers, not for public traffic.

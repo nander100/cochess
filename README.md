@@ -6,14 +6,15 @@ An AI chess coach for intermediate players (roughly 1000–1800 Elo). Paste a ga
 
 ## How it works
 
-1. You enter your rating, the color you played, an optional description of your style, and the PGN.
-2. The backend validates the game (python-chess) and returns every position.
-3. Stockfish (WASM, multi-threaded where the browser allows) **scans** every position, then **verifies** the moments that matter with a deeper, 4-line search.
-4. The backend classifies every move (Lichess winning-chances model), computes Lichess-style accuracy, and runs nine theme detectors: hung piece, allowed tactic, missed tactic, missed capture/check, king safety, pawn structure, endgame technique, slow development, and time trouble.
-5. The coach (Claude Sonnet) writes a short synopsis from that data. Every move it mentions is validated before it's shown.
-6. In the chat (Claude Haiku) you can ask anything about the game. When you ask about a move the analysis doesn't cover, the coach asks your browser's engine for a **deep-dive** and answers from the result.
+1. **Log in** with a one-time link from the owner, then fill in your profile: rating, the time control you play most, and (optionally) your style.
+2. **Onboarding assessment (optional).** Paste 12 games in your main time control: 3 wins and 3 losses with each color. CoChess checks which slot each fills, analyzes them one by one in your browser (about 10 minutes; closing the tab and coming back picks up where it stopped), and your coach writes a **baseline report**: your strengths, the top 3 things to work on with examples from your games, how your openings are going, and a 2–4 week plan. It's kept on your profile.
+3. **Analyze any game.** Paste a PGN. Stockfish (WASM, multi-threaded where the browser allows) **scans** every position, then **verifies** the moments that matter with a deeper 4-line search. The backend classifies every move (Lichess winning-chances model), computes Lichess-style accuracy, and runs nine theme detectors (hung piece, allowed tactic, missed tactic, missed capture/check, king safety, pawn structure, endgame technique, slow development, time trouble).
+4. **The analysis board.** Step through the game with the arrow keys, see the eval graph and a live engine panel, and play your own variations on the board.
+5. **Your coach** (Claude) writes a short synopsis, answers questions about whatever position is on the board, including your own variations, and explains a position on request. When a question needs analysis the game doesn't have, the coach asks your browser's engine for a deeper look first.
+6. **Critical moments.** Your biggest mistakes become exercises: find a better move yourself, get graded by the engine, get hints if you're stuck, then see the engine's move. The coach never sees the answer before you've found it or asked for it.
+7. **Tendencies.** Your mistake themes are tracked across games, recent games counting most, so the coach can say "this is the third game where a loose knight cost you material".
 
-Full product spec: [`SPEC.md`](SPEC.md). Implementation plan and every design decision: [`docs/PLAN.md`](docs/PLAN.md). Conventions and commands for contributors: [`CLAUDE.md`](CLAUDE.md).
+Specs: [`SPEC_V2.md`](SPEC_V2.md) (current) and [`SPEC.md`](SPEC.md) (v1). Implementation plans and every design decision: [`docs/PLAN_V2.md`](docs/PLAN_V2.md) and [`docs/PLAN.md`](docs/PLAN.md). Conventions and commands for contributors: [`CLAUDE.md`](CLAUDE.md).
 
 ## Quick start (Docker)
 
@@ -27,7 +28,7 @@ docker compose exec backend uv run --no-dev python -m app.cli create-user --name
 docker compose exec backend uv run --no-dev python -m app.cli invite --user Alex
 ```
 
-Open the login link it prints, fill in your profile, and paste a game.
+Open the login link it prints, fill in your profile, then do the onboarding assessment or skip it and paste a game.
 
 To put it on a server for your testers, follow [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
@@ -43,8 +44,9 @@ Settings come from `backend/.env` (never commit it). Nested settings use `__`.
 | `COACH_MODEL_SYNOPSIS` | `claude-sonnet-5-5` | Model for the synopsis (low effort). `claude-opus-5-5` writes deeper synopses at about 2× the cost. |
 | `COACH_MODEL_CHAT` | `claude-haiku-5-5` | Model for the chat. `claude-sonnet-5-5` reasons more carefully at about 20× the cost per message. |
 | `DATABASE_URL` | `sqlite:///./cochess.db` | Docker overrides it to a file on the `cochess-data` volume. |
-| `LIMITS__MAX_GAMES_PER_DAY` | `10` | New games per player per rolling 24 hours. |
-| `COACH__CHAT_MAX_MESSAGES` | `30` | Questions per game. |
+| `LIMITS__MAX_GAMES_PER_DAY` | `10` | New single games per player per rolling 24 hours (onboarding games don't count). |
+| `USER_DAILY_TOKEN_LIMIT` | *(off)* | Claude tokens one player may use in a rolling 24 hours; past it, coach requests are refused until the next day. |
+| `COACH__CHAT_MAX_MESSAGES` | `30` | Questions per game (chat and critical moments together). |
 | `COACH__SYNOPSIS_EFFORT`, `COACH__CHAT_EFFORT` | `low`, `medium` | Claude effort level (`low` … `max`): trades depth for speed and cost. |
 | `THRESHOLDS__INACCURACY` / `__MISTAKE` / `__BLUNDER` | `0.10` / `0.20` / `0.30` | Winning-chances drop for each label. |
 | `COCHESS_PORT` | `8080` | Host port for `docker compose` (an env var for compose, not in `backend/.env`). |
@@ -82,28 +84,31 @@ npm run build
 
 ### End-to-end tests
 
-`npm run e2e` (from `frontend/`) drives the real stack in your installed Chrome: it starts the backend and Vite, pastes one of the owner's games, and runs Stockfish for real (about 40–90 seconds). The coach is **off** by default because it calls the paid API.
+`npm run e2e` (from `frontend/`) drives the real backend and frontend in your installed Chrome, with a **scripted engine** (real chess rules, material-only evaluation) and a **scripted coach**: free, the same every run, about 40 seconds. It covers login → upload → board → synopsis, chat and Explain → a critical moment; onboarding through the baseline report (with a reload mid-analysis); and the error states (used login link, illegal or non-standard PGN, duplicate upload, another player's game).
+
+`npm run e2e:real` runs the original test instead: real Stockfish on one of the owner's games (40–90 seconds), with the coach off unless you ask for it, because it calls the paid API.
 
 ```bash
-npm run e2e                                         # engine only, free
-E2E_GAME=game3w.txt npm run e2e                     # another game
-E2E_COACH=1 npm run e2e                             # + a real synopsis (~$0.05)
-E2E_COACH=1 E2E_QUESTIONS="What if I had played 31...Kf7?" npm run e2e   # + chat
-E2E_BASE_URL=http://localhost:8080 E2E_LOGIN_LINK=<link from app.cli invite> npm run e2e   # against docker compose
+npm run e2e                                         # scripted engine and coach, free
+npm run e2e:real                                    # real Stockfish, no coach
+E2E_GAME=game3w.txt npm run e2e:real                # another game
+E2E_COACH=1 npm run e2e:real                        # + a real synopsis (~$0.02)
+E2E_BASE_URL=http://localhost:8080 E2E_LOGIN_LINK=<link from app.cli invite> npm run e2e:real   # against docker compose
 ```
 
-Evidence (depth/time per search, the synopsis, the chat transcript) is written to `frontend/test-results/`.
+Outputs go to `frontend/test-results/`. `npm run e2e:real` also rewrites `backend/tests/fixtures/engine/<game>.json` with that run's engine results; restore the committed file unless you mean to re-capture it.
 
-Two scripts help when tuning the analysis on real games (from `backend/`):
+Owner scripts for tuning analysis on real games (from `backend/`):
 
 ```bash
 uv run python -m scripts.print_summary game1w --compact   # the summary the coach sees
 uv run python -m scripts.synopsis game5b --elo 1400       # a real synopsis (calls the API)
+uv run python -m scripts.print_tendencies --user "Alex"   # tendencies with the math shown
 ```
 
 ## Cost
 
-With the default models, a game costs about **$0.02**: the synopsis (Claude Sonnet 5.5 at low effort, about 4.7k input / 0.7k output tokens, ~$0.018) plus well under a cent per chat question (Claude Haiku 5.5). The coach only sees a compact view of the analysis (an annotated move list and trimmed engine lines), and the system prompt and game context are prompt-cached. Every call's token usage is logged in the `llm_usage` table, and `uv run python -m scripts.synopsis game5b --elo 1400 --model claude-haiku-5-5` estimates the cost of a synopsis for any model.
+With the default models, a game costs about **$0.02**: the synopsis (Claude Sonnet 5.5 at low effort, about 4.7k input / 0.7k output tokens) plus well under a cent per chat question or critical-moment step (Claude Haiku 5.5). The baseline report is one Sonnet call over all 12 games (about 13k input / 1.2k output tokens), a few cents, written once. The coach only sees a compact view of the analysis, and the system prompt and game context are prompt-cached. Every call's token usage is logged in the `llm_usage` table, per player and task, and `USER_DAILY_TOKEN_LIMIT` caps it per player if you need to.
 
 ## Licensing
 
