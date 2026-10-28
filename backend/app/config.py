@@ -128,6 +128,18 @@ class TendencySettings(BaseModel):
     }
 
 
+class OnboardingSettings(BaseModel):
+    """The onboarding assessment (SPEC_V2 §10)."""
+
+    games_per_slot: int = 3  # White wins, White losses, Black wins, Black losses
+    max_paste_games: int = 40  # games in one paste
+    max_paste_chars: int = 600_000
+    # Lichess's categories, by estimated duration = base + 40 x increment (seconds).
+    bullet_below_s: int = 180
+    blitz_below_s: int = 480
+    rapid_below_s: int = 1500
+
+
 class Limits(BaseModel):
     """Input size limits for user-submitted data."""
 
@@ -170,6 +182,7 @@ class Settings(BaseSettings):
     limits: Limits = Limits()
     moments: MomentSettings = MomentSettings()
     tendencies: TendencySettings = TendencySettings()
+    onboarding: OnboardingSettings = OnboardingSettings()
 
 
 @lru_cache
