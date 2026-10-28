@@ -52,7 +52,7 @@ cochess/
 │   │   ├── config.py            # every threshold, engine tier, coach and limit setting
 │   │   ├── cli.py               # + create-user, invite, assign-games, backfill
 │   │   ├── auth/                # + invites, sessions, get_current_user
-│   │   ├── api/                 # games, engine, coach + moments (SSE) routes; schemas; sse
+│   │   ├── api/                 # games, engine, coach + moments (SSE), tendencies routes; schemas; sse
 │   │   ├── analysis/
 │   │   │   ├── pgn.py           # PGN parsing + validation
 │   │   │   ├── paths.py         # + replay UCI paths → FEN/SAN/PGN
@@ -79,7 +79,7 @@ cochess/
 │   │   │   ├── tools.py         # analyze_position input checks and tool result
 │   │   │   └── validate.py      # move validation + moment leak check
 │   │   └── db/                  # models, session, persistence helpers per area
-│   ├── scripts/                 # print_summary, synopsis (owner tools, not the app)
+│   ├── scripts/                 # print_summary, print_tendencies, synopsis (owner tools, not the app)
 │   └── tests/                   # fixtures/pgn/user = owner games, fixtures/engine = real results
 └── frontend/
     └── src/
@@ -107,9 +107,10 @@ Backend (run from `backend/`):
 - Types: `uv run mypy app` (strict)
 - Config: copy `.env.example` to `.env`. Nested settings use `__`, e.g. `THRESHOLDS__BLUNDER=0.35`.
 - Migrations: `uv run alembic upgrade head` / `uv run alembic revision --autogenerate -m "..."`
-- Users: `uv run python -m app.cli create-user --name "..."`, `uv run python -m app.cli invite --user "..."` (prints a one-time `PUBLIC_BASE_URL/redeem#token=…` link), `uv run python -m app.cli assign-games --user "..."` (gives ownerless v1 games to a player), `uv run python -m app.cli backfill [--user "..."]` (rebuilds analyzed games' summaries from their stored engine results, no engine runs; gives v1 games their critical moments). In Docker: `docker compose exec backend uv run --no-dev python -m app.cli …`. The app also runs migrations itself at startup.
+- Users: `uv run python -m app.cli create-user --name "..."`, `uv run python -m app.cli invite --user "..."` (prints a one-time `PUBLIC_BASE_URL/redeem#token=…` link), `uv run python -m app.cli assign-games --user "..."` (gives ownerless v1 games to a player), `uv run python -m app.cli backfill [--user "..."]` (rebuilds analyzed games' summaries from their stored engine results, no engine runs; gives v1 games their critical moments, theme facts, and a tendency snapshot). In Docker: `docker compose exec backend uv run --no-dev python -m app.cli …`. The app also runs migrations itself at startup.
 - Real synopsis for an owner game (calls the Claude API, needs `ANTHROPIC_API_KEY` in `.env`): `uv run python -m scripts.synopsis game5b --elo 800` (`--model`, `--effort` override; prints a cost estimate)
 - Game summary for an owner game: `uv run python -m scripts.print_summary game1w [--elo 1400] [--compact]` (built from `tests/fixtures/engine/<game>.json`, real engine results captured by the frontend E2E)
+- Tendencies with the math (per-game age and weight, per-theme counts and sums, then the report): `uv run python -m scripts.print_tendencies --user "..."` (reads `DATABASE_URL`; run `app.cli backfill` first for v1 games)
 
 Frontend (run from `frontend/`):
 - Install: `npm install` (its `postinstall` copies the Stockfish lite builds into `public/engine/`, which is gitignored)

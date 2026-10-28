@@ -46,6 +46,7 @@ class GameFacts(BaseModel):
 
     game_id: str
     played_at: datetime  # the PGN date, else the upload time
+    uploaded_at: datetime  # breaks ties: PGN dates often have no time of day
     user_color: Color
     accuracy: float | None
     phase_accuracy: dict[Phase, float | None]
@@ -100,7 +101,7 @@ class ThemeSums(BaseModel):
 
 def weigh(games: Sequence[GameFacts], settings: TendencySettings) -> list[WeightedGame]:
     """The games most recent first, each weighted 0.5 ** (age / half-life)."""
-    ordered = sorted(games, key=lambda g: (g.played_at, g.game_id), reverse=True)
+    ordered = sorted(games, key=lambda g: (g.played_at, g.uploaded_at, g.game_id), reverse=True)
     return [
         WeightedGame(game=game, age=age, weight=0.5 ** (age / settings.half_life_games))
         for age, game in enumerate(ordered)

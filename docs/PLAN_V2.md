@@ -342,3 +342,12 @@ If the best move's SAN also appears in a line that is allowed (e.g. a refutation
 - **Questions during a moment** get the same per-game allowance as chat questions (30).
 - **The deep search of the moment's position** runs once per page visit and is sent with each attempt or "Show me". The backend checks it against the replayed position and keeps the first one.
 - **`cli backfill`** rebuilds analyzed games' summaries from their stored engine results (no engine runs), so v1 games get their moments.
+
+**M5 (tendencies)**
+- **Ranking (§6 Q9 as approved):** each fact counts with its own severity weight (blunder 3, mistake 2, inaccuracy 1, game-level concern 2); game-level notes never count. Score = Σ(w × severity) / Σw ranks the themes; `rate_per_game` = Σ(w × count) / Σw is what the coach sees. A game-level theme counts 1 per game.
+- **Game order:** date played (`played_at`), ties broken by upload time, since PGN dates often have no time of day.
+- **Trend:** the weighted rate over ages 0–4 against ages 5–9, using the same weights; `null` under 10 games. More occurrences per game = worsening; margin 0.25.
+- **Accuracy across games:** the decay-weighted mean of each game's accuracy (overall, per color, per phase), skipping games without one. A game counts the same whatever the number of moves in that phase.
+- **Snapshots:** one after every analyzed game, and one per player after `cli backfill` (not one per backfilled game). `GET /api/tendencies` returns the latest, or an empty report.
+- **The coach's `player`:** the top 5 tendencies without `score`, plus `accuracy_by_phase` and `accuracy_by_color`, in every task (synopsis, chat, Explain, moments). Example moves are allowed by the validator, because they're in the payload. In a moment, an example whose SAN matches a withheld move loses its move, so quoting it can't look like a leak.
+- **Per-move `phase`** was added to `move_list` in the summary (filled in by `backfill`), for the theme-fact rows.

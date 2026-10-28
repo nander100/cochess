@@ -72,6 +72,7 @@ def game_facts(session: Session, user_id: str) -> list[GameFacts]:
             GameFacts(
                 game_id=game.id,
                 played_at=game.played_at or game.created_at,
+                uploaded_at=game.created_at,
                 user_color=cast(Color, game.user_color),
                 accuracy=summary.accuracy.user,
                 phase_accuracy={

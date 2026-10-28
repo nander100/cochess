@@ -33,6 +33,7 @@ def game(
     return GameFacts(
         game_id=game_id,
         played_at=DAY0 - timedelta(days=days_ago),
+        uploaded_at=DAY0,
         user_color=color,
         accuracy=accuracy,
         phase_accuracy={"opening": opening, "middlegame": None, "endgame": None},
@@ -84,6 +85,15 @@ def test_games_are_ordered_by_date_played() -> None:
     weighted = weigh(three_games(), HALVING)
 
     assert [(g.game.game_id, g.weight) for g in weighted] == [("g0", 1), ("g1", 0.5), ("g2", 0.25)]
+
+
+def test_games_played_the_same_day_are_ordered_by_upload() -> None:
+    first = game("first", 0).model_copy(update={"uploaded_at": DAY0 - timedelta(hours=1)})
+    second = game("a-second", 0)  # uploaded later; its id sorts first
+
+    weighted = weigh([first, second], HALVING)
+
+    assert [g.game.game_id for g in weighted] == ["a-second", "first"]
 
 
 def test_rates_and_scores() -> None:
