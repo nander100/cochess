@@ -164,3 +164,24 @@ def test_backfill_gives_v1_summaries_their_moments(file_settings: Settings) -> N
     assert _run(file_settings, "backfill")[1].strip() == "Rebuilt 1 game summary."  # everyone
     with _session(file_settings) as session:
         assert len(list(session.scalars(select(GameThemeFactRow)))) == len(facts)  # replaced
+
+
+def test_backfill_fingerprints_old_games_and_lists_duplicates(file_settings: Settings) -> None:
+    _run(file_settings, "create-user", "--name", "Alex")
+    pgn = read_pgn("opera_game.pgn")
+    with _session(file_settings) as session:
+        user = session.scalars(select(User)).one()
+        for game_id, color in (("a", "white"), ("b", "black"), ("c", "white")):
+            other = "1. d4 d5 *" if game_id == "c" else pgn
+            session.add(Game(id=game_id, user_id=user.id, pgn=other, user_color=color, elo=1400,
+                             headers={}))  # fmt: skip
+        session.commit()
+
+    code, output = _run(file_settings, "backfill")
+
+    assert code == 0
+    assert "Duplicate uploads of one game: a (white), b (black)" in output
+    with _session(file_settings) as session:
+        prints = {g.id: g.fingerprint for g in session.scalars(select(Game))}
+    assert prints["a"] == prints["b"] != prints["c"]
+    assert all(prints.values())

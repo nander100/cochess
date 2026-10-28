@@ -85,7 +85,10 @@ class AuthSession(Base):
 class Game(Base):
     __tablename__ = "games"
 
-    __table_args__ = (Index("ix_games_user_id_played_at", "user_id", "played_at"),)
+    __table_args__ = (
+        Index("ix_games_user_id_played_at", "user_id", "played_at"),
+        Index("ix_games_user_id_fingerprint", "user_id", "fingerprint"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
     # Null only for v1 games not yet given to a user (`cli assign-games`); those are invisible.
@@ -100,6 +103,9 @@ class Game(Base):
     played_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     status: Mapped[str] = mapped_column(String(10), default="uploaded", server_default="uploaded")
     source: Mapped[str] = mapped_column(String(10), default="single", server_default="single")
+    # app.analysis.game_info.fingerprint: a player can't upload the same game twice. Null for
+    # games uploaded before v2 M5 until `cli backfill`.
+    fingerprint: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
 
 

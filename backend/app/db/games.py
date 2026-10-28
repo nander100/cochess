@@ -6,7 +6,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.analysis.evals import Color
-from app.analysis.game_info import played_at, user_result
+from app.analysis.game_info import fingerprint, played_at, user_result
 from app.analysis.pgn import parse_pgn
 from app.analysis.summary import build_summary
 from app.analysis.summary_models import GameSummary, UserInfo
@@ -25,6 +25,28 @@ def get_game(session: Session, user_id: str, game_id: str) -> Game:
     if game is None or game.user_id != user_id:
         raise GameNotFoundError(game_id)
     return game
+
+
+def find_duplicate(session: Session, user_id: str, key: str) -> Game | None:
+    """The player's game with this fingerprint, if they've uploaded it before."""
+    return session.scalars(
+        select(Game).where(Game.user_id == user_id, Game.fingerprint == key).limit(1)
+    ).first()
+
+
+def fill_fingerprints(session: Session, settings: Settings) -> list[list[Game]]:
+    """Fingerprint games uploaded before fingerprints existed. Returns the duplicate groups this
+    reveals (same player, same fingerprint), oldest upload first, for the owner to review."""
+    for game in session.scalars(select(Game).where(Game.fingerprint.is_(None))):
+        parsed = parse_pgn(
+            game.pgn, max_chars=settings.limits.max_pgn_chars, max_plies=settings.limits.max_plies
+        )
+        game.fingerprint = fingerprint(parsed.headers, [p.uci for p in parsed.positions])
+    session.commit()
+    groups: dict[tuple[str | None, str | None], list[Game]] = {}
+    for game in session.scalars(select(Game).order_by(Game.created_at)):
+        groups.setdefault((game.user_id, game.fingerprint), []).append(game)
+    return [games for games in groups.values() if len(games) > 1]
 
 
 def assign_unowned_games(session: Session, user: User) -> int:

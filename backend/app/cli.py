@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.auth.service import UserExistsError, create_invite, create_user, find_user
 from app.config import Settings, get_settings
-from app.db.games import assign_unowned_games, rebuild_summaries
+from app.db.games import assign_unowned_games, fill_fingerprints, rebuild_summaries
 from app.db.migrate import upgrade
 from app.db.models import User
 from app.db.session import make_engine
@@ -62,7 +62,12 @@ def _run(args: argparse.Namespace, session: Session, settings: Settings) -> str:
     if args.command == "backfill":
         player = _user(session, args.user) if args.user else None
         rebuilt = rebuild_summaries(session, settings, player)
-        return f"Rebuilt {rebuilt} game summar{'y' if rebuilt == 1 else 'ies'}."
+        lines = [f"Rebuilt {rebuilt} game summar{'y' if rebuilt == 1 else 'ies'}."]
+        for games in fill_fingerprints(session, settings):
+            if player is None or games[0].user_id == player.id:
+                ids = ", ".join(f"{g.id} ({g.user_color})" for g in games)
+                lines.append(f"Duplicate uploads of one game: {ids}")
+        return "\n".join(lines)
     user = _user(session, args.user)
     count = assign_unowned_games(session, user)
     return f"Assigned {count} game(s) to {user.name}."

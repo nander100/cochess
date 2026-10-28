@@ -1,6 +1,7 @@
 """Facts read from a game's PGN headers: when it was played, and how it ended for the user."""
 
-from collections.abc import Mapping
+import hashlib
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -21,6 +22,17 @@ def played_at(headers: Mapping[str, str]) -> datetime | None:
         if parsed is not None:
             return parsed
     return None
+
+
+# The headers that tell two games with the same moves apart. The user's color isn't one: the
+# same game uploaded as the other side is still the same game.
+_IDENTITY_HEADERS = ("White", "Black", "UTCDate", "UTCTime", "Date", "Result")
+
+
+def fingerprint(headers: Mapping[str, str], moves_uci: Sequence[str]) -> str:
+    """Identifies a game for duplicate checks: its players, date and time, result, and moves."""
+    parts = [headers.get(key, "").strip() for key in _IDENTITY_HEADERS]
+    return hashlib.sha256("\n".join([*parts, " ".join(moves_uci)]).encode()).hexdigest()
 
 
 def user_result(result: str | None, user_color: Color) -> UserResult | None:

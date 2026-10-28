@@ -16,6 +16,11 @@ from tests.pgn_fixtures import USER_FIXTURES, owner_color, read_pgn
 SHORT_GAME = {"pgn": "1. e4 e5 *", "user_color": "white"}
 
 
+def short_game(n: int) -> dict[str, Any]:
+    """A different short game for each `n`: the same game twice is a duplicate."""
+    return {"pgn": f'[White "Player {n}"]\n\n1. e4 e5 *', "user_color": "white"}
+
+
 def game_body(**overrides: Any) -> dict[str, Any]:
     body: dict[str, Any] = {"pgn": read_pgn("annotated_clock_game.pgn"), "user_color": "black"}
     return {**body, **overrides}
@@ -134,10 +139,10 @@ class TestDailyGameCap:
     def test_new_games_stop_at_the_daily_cap(self, app: FastAPI, client: TestClient) -> None:
         app.state.settings.limits.max_games_per_day = 2
 
-        statuses = [client.post("/api/games", json=SHORT_GAME).status_code for _ in range(3)]
+        statuses = [client.post("/api/games", json=short_game(n)).status_code for n in range(3)]
 
         assert statuses == [201, 201, 429]
-        detail = client.post("/api/games", json=SHORT_GAME).json()["detail"]
+        detail = client.post("/api/games", json=short_game(3)).json()["detail"]
         assert "at most 2 new games a day per player" in detail
 
     def test_the_cap_is_per_player(self, app: FastAPI, client: TestClient) -> None:
@@ -166,3 +171,39 @@ class TestDailyGameCap:
         db_session.commit()
 
         assert client.post("/api/games", json=SHORT_GAME).status_code == 201
+
+
+class TestDuplicates:
+    def test_the_same_game_twice_is_rejected(self, client: TestClient, db_session: Session) -> None:
+        assert client.post("/api/games", json=game_body()).status_code == 201
+
+        again = client.post("/api/games", json=game_body())
+
+        assert again.status_code == 409
+        assert again.json()["detail"] == "You've already uploaded this game. Open it from My games."
+        assert len(db_session.scalars(select(Game)).all()) == 1
+
+    def test_the_same_game_as_the_other_color_is_rejected(self, client: TestClient) -> None:
+        client.post("/api/games", json=game_body(user_color="black"))
+
+        assert client.post("/api/games", json=game_body(user_color="white")).status_code == 409
+
+    def test_comments_and_clocks_dont_make_it_a_different_game(self, client: TestClient) -> None:
+        client.post("/api/games", json={"pgn": "1. e4 { best } e5 *", "user_color": "white"})
+
+        assert client.post("/api/games", json=SHORT_GAME).status_code == 409
+
+    def test_same_moves_with_other_players_or_dates_are_different_games(
+        self, client: TestClient
+    ) -> None:
+        dated = '[Date "2026.10.01"]\n\n1. e4 e5 *'
+        bodies = [SHORT_GAME, short_game(1), {"pgn": dated, "user_color": "white"}]
+
+        assert [client.post("/api/games", json=b).status_code for b in bodies] == [201] * 3
+
+    def test_another_player_can_upload_the_same_game(
+        self, app: FastAPI, client: TestClient
+    ) -> None:
+        client.post("/api/games", json=SHORT_GAME)
+
+        assert log_in(app, "Sam").post("/api/games", json=SHORT_GAME).status_code == 201
