@@ -193,13 +193,27 @@ class TestDuplicates:
 
         assert client.post("/api/games", json=SHORT_GAME).status_code == 409
 
-    def test_same_moves_with_other_players_or_dates_are_different_games(
+    def test_same_moves_with_other_players_or_results_are_different_games(
         self, client: TestClient
     ) -> None:
-        dated = '[Date "2026.10.01"]\n\n1. e4 e5 *'
-        bodies = [SHORT_GAME, short_game(1), {"pgn": dated, "user_color": "white"}]
+        won = '[Result "1-0"]\n\n1. e4 e5 1-0'
+        bodies = [SHORT_GAME, short_game(1), {"pgn": won, "user_color": "white"}]
 
         assert [client.post("/api/games", json=b).status_code for b in bodies] == [201] * 3
+
+    def test_the_same_game_exported_with_other_headers_is_a_duplicate(
+        self, client: TestClient
+    ) -> None:
+        download = '[White "A"]\n[Black "B"]\n[Date "2026.10.25"]\n\n1. e4 e5 *'
+        api = (
+            '[White "A"]\n[Black "B"]\n[Date "2026.10.25"]\n[UTCDate "2026.10.25"]\n'
+            '[UTCTime "18:44:31"]\n[Link "https://example.test/1"]\n\n1. e4 e5 *'
+        )
+        client.post("/api/games", json={"pgn": download, "user_color": "white"})
+
+        assert (
+            client.post("/api/games", json={"pgn": api, "user_color": "white"}).status_code == 409
+        )
 
     def test_another_player_can_upload_the_same_game(
         self, app: FastAPI, client: TestClient

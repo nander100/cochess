@@ -24,13 +24,14 @@ def played_at(headers: Mapping[str, str]) -> datetime | None:
     return None
 
 
-# The headers that tell two games with the same moves apart. The user's color isn't one: the
-# same game uploaded as the other side is still the same game.
-_IDENTITY_HEADERS = ("White", "Black", "UTCDate", "UTCTime", "Date", "Result")
+# The headers that tell two games with the same moves apart. Not dates or times: exports of the
+# same game differ there (Chess.com's API adds UTCDate/UTCTime, its download doesn't). Not the
+# user's color either: the same game uploaded as the other side is still the same game.
+_IDENTITY_HEADERS = ("White", "Black", "Result")
 
 
 def fingerprint(headers: Mapping[str, str], moves_uci: Sequence[str]) -> str:
-    """Identifies a game for duplicate checks: its players, date and time, result, and moves."""
+    """Identifies a game for duplicate checks: its players, result, and moves."""
     parts = [headers.get(key, "").strip() for key in _IDENTITY_HEADERS]
     return hashlib.sha256("\n".join([*parts, " ".join(moves_uci)]).encode()).hexdigest()
 

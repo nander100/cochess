@@ -70,9 +70,10 @@ def find_duplicate(session: Session, user_id: str, key: str) -> Game | None:
 
 
 def fill_fingerprints(session: Session, settings: Settings) -> list[list[Game]]:
-    """Fingerprint games uploaded before fingerprints existed. Returns the duplicate groups this
-    reveals (same player, same fingerprint), oldest upload first, for the owner to review."""
-    for game in session.scalars(select(Game).where(Game.fingerprint.is_(None))):
+    """(Re)compute every game's fingerprint, so games uploaded before fingerprints existed, or
+    before their definition changed, get the current one. Returns the duplicate groups (same
+    player, same fingerprint), oldest upload first, for the owner to review."""
+    for game in session.scalars(select(Game)):
         parsed = parse_pgn(
             game.pgn, max_chars=settings.limits.max_pgn_chars, max_plies=settings.limits.max_plies
         )
