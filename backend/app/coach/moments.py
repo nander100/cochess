@@ -460,6 +460,7 @@ def _call(
     )
     if banned:
         payload_moment = _scrub(payload_moment, banned)
+        player = _scrub_player(player, banned)
     payload = CoachPayload(
         task=task,
         user_prompt=user_prompt,
@@ -511,6 +512,25 @@ def _scrub(moment: MomentPayload, banned: list[str]) -> MomentPayload:
     return moment.model_copy(
         update={"game_move": game_move, "candidate": candidate, "hints_allowed": hints}
     )
+
+
+def _scrub_player(player: PlayerPayload, banned: list[str]) -> PlayerPayload:
+    """A tendency's example from another game can share its SAN with a move the player is meant
+    to find here: leave that example's move out, so quoting it can't look like a leak."""
+    targets = {normalize(m) for m in banned}
+    tendencies = [
+        t.model_copy(
+            update={
+                "recent_example": t.recent_example.model_copy(
+                    update={"move_number": None, "move_san": None}
+                )
+            }
+        )
+        if t.recent_example.move_san and normalize(t.recent_example.move_san) in targets
+        else t
+        for t in player.tendencies
+    ]
+    return player.model_copy(update={"tendencies": tendencies})
 
 
 def _context(data: _Data) -> tuple[str, dict[str, Any]]:

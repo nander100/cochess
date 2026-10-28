@@ -9,8 +9,10 @@ from pydantic import BaseModel
 from app.analysis.evals import Color
 from app.analysis.moments import Hint
 from app.analysis.pgn import Position
+from app.analysis.phase import Phase
 from app.analysis.summary_models import GameSummary, LineSummary, MoveLabel
-from app.config import CoachSettings
+from app.analysis.tendencies import Example, TendencyReport, Trend
+from app.config import CoachSettings, TendencySettings
 
 RatingBand = Literal["beginner", "intermediate", "advanced"]
 Task = Literal["synopsis", "chat", "explain", "moment_intro", "moment_feedback"]
@@ -32,12 +34,27 @@ SYNOPSIS_INSTRUCTION = (
 )
 
 
+class PlayerTendency(BaseModel):
+    """SPEC_V2 §9.3. `recent_example`'s move counts as an allowed move for validation."""
+
+    theme: str
+    label: str
+    rate_per_game: float
+    trend: Trend | None
+    games_seen: int
+    provisional: bool
+    recent_example: Example
+
+
 class PlayerPayload(BaseModel):
     elo: int
     color: Color
     rating_band: RatingBand
     playstyle: str | None
-    tendencies: list[str] = []  # filled in by tendency tracking (SPEC_V2 §9, M5)
+    # Across the player's analyzed games (SPEC_V2 §9.3): the top themes, then accuracy.
+    tendencies: list[PlayerTendency] = []
+    accuracy_by_phase: dict[Phase, float | None] | None = None
+    accuracy_by_color: dict[Color, float | None] | None = None
 
 
 class PositionPayload(BaseModel):
@@ -151,6 +168,26 @@ def player_payload(summary: GameSummary) -> PlayerPayload:
     )
 
 
+def with_tendencies(
+    player: PlayerPayload, report: TendencyReport | None, settings: TendencySettings
+) -> PlayerPayload:
+    """The player with their top tendencies and accuracy (SPEC_V2 §9.3); unchanged before any
+    game has been analyzed."""
+    if report is None or report.games_analyzed == 0:
+        return player
+    tendencies = [
+        PlayerTendency.model_validate(t.model_dump(exclude={"score"}))
+        for t in report.tendencies[: settings.top_n]
+    ]
+    return player.model_copy(
+        update={
+            "tendencies": tendencies,
+            "accuracy_by_phase": report.accuracy.by_phase,
+            "accuracy_by_color": report.accuracy.by_color,
+        }
+    )
+
+
 def movetext(positions: Sequence[Position]) -> str:
     """Plain SAN movetext: "1. d4 d5 2. Bf4 ...". No comments or clocks."""
     parts = []
@@ -189,11 +226,13 @@ def coach_view(summary: GameSummary, settings: CoachSettings) -> GameSummary:
     return summary.model_copy(update={"key_moments": moments})
 
 
-def build_synopsis_payload(summary: GameSummary, settings: CoachSettings) -> CoachPayload:
+def build_synopsis_payload(
+    summary: GameSummary, settings: CoachSettings, player: PlayerPayload | None = None
+) -> CoachPayload:
     """The annotated game and its summary; `fen` and `engine_lines` are omitted (SPEC §7.2)."""
     return CoachPayload(
         task="synopsis",
-        player=player_payload(summary),
+        player=player or player_payload(summary),
         pgn_to_move=annotated_movetext(summary),
         game_summary=coach_view(summary, settings),
     )

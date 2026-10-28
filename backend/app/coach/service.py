@@ -7,12 +7,19 @@ from anthropic.types import MessageParam
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.coach.client import CoachClient, CoachReply, CoachRequest, system_blocks
-from app.coach.payload import SYNOPSIS_INSTRUCTION, build_synopsis_payload, render
+from app.coach.payload import (
+    SYNOPSIS_INSTRUCTION,
+    build_synopsis_payload,
+    player_payload,
+    render,
+    with_tendencies,
+)
 from app.coach.validate import allowed_moves, find_invalid, strip_moves
 from app.config import Settings
 from app.db.coach import load_synopsis, record_usage, save_synopsis
 from app.db.engine_results import load_summary
 from app.db.models import Game
+from app.db.tendencies import latest_tendencies
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +49,9 @@ async def generate_synopsis(
         summary = load_summary(session, game_id)
         if game is None or summary is None:
             raise LookupError(f"game {game_id} has no summary yet")
-    payload = build_synopsis_payload(summary, settings.coach)
+        report = latest_tendencies(session, game.user_id) if game.user_id else None
+    player = with_tendencies(player_payload(summary), report, settings.tendencies)
+    payload = build_synopsis_payload(summary, settings.coach, player)
     allowed = allowed_moves(payload.model_dump(mode="json"))
     messages: list[MessageParam] = [
         {"role": "user", "content": render(payload, SYNOPSIS_INSTRUCTION)}

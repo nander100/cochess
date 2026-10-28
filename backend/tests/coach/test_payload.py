@@ -3,7 +3,15 @@ from typing import Any
 
 import pytest
 
+from app.analysis.detectors.types import ThemeName
 from app.analysis.pgn import parse_pgn
+from app.analysis.tendencies import (
+    THEME_LABELS,
+    AccuracyReport,
+    Example,
+    Tendency,
+    TendencyReport,
+)
 from app.coach.client import history_breakpoint, system_blocks, system_prompt, task_instructions
 from app.coach.payload import (
     SYNOPSIS_INSTRUCTION,
@@ -11,10 +19,13 @@ from app.coach.payload import (
     build_synopsis_payload,
     coach_view,
     movetext,
+    player_payload,
     rating_band,
     render,
+    with_tendencies,
 )
-from app.config import CoachSettings
+from app.coach.validate import allowed_moves, find_invalid
+from app.config import CoachSettings, TendencySettings
 from tests.analysis.test_summary import opera_summary
 from tests.pgn_fixtures import read_pgn
 
@@ -47,6 +58,8 @@ def test_synopsis_payload_has_the_full_game_and_summary_but_no_position() -> Non
         "rating_band": "intermediate",
         "playstyle": "attacking",
         "tendencies": [],
+        "accuracy_by_phase": None,
+        "accuracy_by_color": None,
     }
     assert payload.pgn_to_move is not None
     assert payload.pgn_to_move.startswith("1. e4 e5 2. Nf3 d6")
@@ -153,3 +166,83 @@ def test_coach_view_trims_engine_lines_but_not_the_stored_summary() -> None:
         assert all(len(line.moves_san) <= 2 for line in moment.engine_lines)
         assert len(moment.line_after_san) <= 2
         assert len(original.engine_lines) == 2  # opera_summary asks for 2 lines
+
+
+EXAMPLES = ["Nd4", "Bc4", "Qh5", "Re1", "Kf2", "a4", "g4"]
+
+
+def _report(themes: int) -> TendencyReport:
+    names: list[ThemeName] = ["hung_piece", "allowed_tactic", "missed_tactic", "king_safety",
+                              "pawn_structure", "endgame_technique", "time_trouble"]  # fmt: skip
+    return TendencyReport(
+        games_analyzed=6,
+        provisional=False,
+        tendencies=[
+            Tendency(
+                theme=name,
+                label=THEME_LABELS[name],
+                rate_per_game=1.0,
+                score=7.0 - i,
+                trend=None,
+                games_seen=3,
+                provisional=False,
+                recent_example=Example(game_id="g", move_number=14, move_san=EXAMPLES[i]),
+            )
+            for i, name in enumerate(names[:themes])
+        ],
+        accuracy=AccuracyReport(
+            overall=80.0,
+            by_color={"white": 82.0, "black": 78.0},
+            by_phase={"opening": 90.0, "middlegame": 75.0, "endgame": None},
+        ),
+    )
+
+
+def test_the_coach_gets_the_top_tendencies_without_their_scores() -> None:
+    player = with_tendencies(player_payload(opera_summary()), _report(7), TendencySettings())
+
+    assert [t.theme for t in player.tendencies] == [
+        "hung_piece", "allowed_tactic", "missed_tactic", "king_safety", "pawn_structure",
+    ]  # fmt: skip
+    assert player.model_dump(mode="json")["tendencies"][0] == {
+        "theme": "hung_piece",
+        "label": "Leaving pieces undefended",
+        "rate_per_game": 1.0,
+        "trend": None,
+        "games_seen": 3,
+        "provisional": False,
+        "recent_example": {"game_id": "g", "move_number": 14, "move_san": "Nd4"},
+    }
+    assert player.accuracy_by_phase == {"opening": 90.0, "middlegame": 75.0, "endgame": None}
+    assert player.accuracy_by_color == {"white": 82.0, "black": 78.0}
+
+
+def test_no_tendencies_before_any_game_is_analyzed() -> None:
+    player = player_payload(opera_summary())
+    empty = _report(0).model_copy(update={"games_analyzed": 0})
+
+    assert with_tendencies(player, None, TendencySettings()) == player
+    assert with_tendencies(player, empty, TendencySettings()) == player
+
+
+def test_a_tendencys_example_move_is_allowed() -> None:
+    player = with_tendencies(player_payload(opera_summary()), _report(1), TendencySettings())
+    payload = build_synopsis_payload(opera_summary(), COACH, player)
+
+    allowed = allowed_moves(payload.model_dump(mode="json"))
+    assert "Nd4" in allowed
+    assert find_invalid("Like Nd4 in your last game.", allowed) == []
+
+
+def test_in_a_moment_an_example_that_matches_the_answer_loses_its_move() -> None:
+    from app.coach.moments import _scrub_player
+
+    player = with_tendencies(player_payload(opera_summary()), _report(2), TendencySettings())
+
+    scrubbed = _scrub_player(player, ["Bc4"])
+
+    examples = [t.recent_example.model_dump() for t in scrubbed.tendencies]
+    assert examples == [
+        {"game_id": "g", "move_number": 14, "move_san": "Nd4"},
+        {"game_id": "g", "move_number": None, "move_san": None},
+    ]

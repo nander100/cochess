@@ -3,7 +3,6 @@ called; the answer streams as SSE like the other coach routes. An attempt's firs
 `moment` with the grade and the new state, so the board can react before the text arrives."""
 
 from collections.abc import Callable
-from typing import cast
 
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
@@ -11,7 +10,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.analysis.engine import EngineResult
-from app.analysis.evals import Color
 from app.api import sse
 from app.api.coach import (
     ClientDep,
@@ -23,6 +21,7 @@ from app.api.coach import (
     text_events,
 )
 from app.api.scoping import OwnedGame
+from app.api.turns import current_player
 from app.auth.deps import CurrentUser
 from app.coach.client import CoachClient
 from app.coach.moments import (
@@ -36,9 +35,7 @@ from app.coach.moments import (
     prepare_start,
     prepare_wrap_up,
 )
-from app.coach.payload import PlayerPayload, profile_player
 from app.config import Settings
-from app.db.models import Game, User
 from app.db.moments import load_progress
 
 router = APIRouter(prefix="/api/games", tags=["moments"])
@@ -72,7 +69,7 @@ def start(
     settings: SettingsDep,
     client: ClientDep,
 ) -> StreamingResponse:
-    player = _player(user, game)
+    player = current_player(session, settings, user, game)
     return _respond(
         lambda: prepare_start(session, settings, game, player, index),
         request,
@@ -94,7 +91,7 @@ def attempt(
     settings: SettingsDep,
     client: ClientDep,
 ) -> StreamingResponse:
-    player = _player(user, game)
+    player = current_player(session, settings, user, game)
     return _respond(
         lambda: prepare_attempt(
             session,
@@ -126,7 +123,7 @@ def reveal(
     settings: SettingsDep,
     client: ClientDep,
 ) -> StreamingResponse:
-    player = _player(user, game)
+    player = current_player(session, settings, user, game)
     return _respond(
         lambda: prepare_reveal(session, settings, game, player, index, body.engine_before),
         request,
@@ -152,7 +149,7 @@ def ask(
     if not message:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Ask a question first.")
     _check_question_limit(session, settings, game.id)
-    player = _player(user, game)
+    player = current_player(session, settings, user, game)
     return _respond(
         lambda: prepare_question(session, settings, game, player, index, message),
         request,
@@ -172,7 +169,7 @@ def wrap_up(
     settings: SettingsDep,
     client: ClientDep,
 ) -> StreamingResponse:
-    player = _player(user, game)
+    player = current_player(session, settings, user, game)
     return _respond(
         lambda: prepare_wrap_up(session, settings, game, player),
         request,
@@ -209,12 +206,6 @@ async def _ready(result: MomentAnswer) -> MomentAnswer:
 def _events(result: MomentAnswer) -> list[str]:
     meta = [sse.event("moment", result.meta)] if result.meta else []
     return [*meta, *text_events(result.text, result.invalid_moves_removed)]
-
-
-def _player(user: User, game: Game) -> PlayerPayload:
-    # The profile as it is now (PLAN_V2 §6 Q5); a v1 game's owner may not have filled it in yet.
-    elo = user.elo if user.elo is not None else game.elo
-    return profile_player(elo, user.playstyle, cast(Color, game.user_color))
 
 
 def _check_question_limit(session: Session, settings: Settings, game_id: str) -> None:

@@ -88,7 +88,12 @@ class TestPlainQuestions:
         assert set(payload) == {"task", "user_prompt", "player", "position", "engine_lines"}
         assert (payload["task"], payload["user_prompt"]) == ("chat", "Which move won the game?")
         assert payload["player"] == {"elo": 1350, "color": "white", "rating_band": "intermediate",
-                                     "tendencies": []}  # fmt: skip
+                                     "tendencies": [],
+                                     # One analyzed game with the fake engine's flat evals.
+                                     "accuracy_by_phase": {"opening": 100.0, "middlegame": 100.0,
+                                                           "endgame": None},
+                                     "accuracy_by_color": {"white": 100.0,
+                                                           "black": None}}  # fmt: skip
         # Null fields are left out of what the coach reads: no branch_ply on the game's mainline.
         assert payload["position"] == {"path_san": [], "pgn_to_move": "", "fen": START,
                                        "ply": 0, "on_mainline": True,
@@ -341,6 +346,8 @@ class TestPositions:
             "rating_band": "intermediate",
             "playstyle": "positional",
             "tendencies": [],
+            "accuracy_by_phase": {"opening": 100.0, "middlegame": 100.0, "endgame": None},
+            "accuracy_by_color": {"white": 100.0, "black": None},
         }
 
     def test_the_conversation_so_far_is_cached(self) -> None:

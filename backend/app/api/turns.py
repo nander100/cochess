@@ -12,11 +12,12 @@ from app.analysis.evals import Color, terminal_evaluation
 from app.analysis.paths import PathError, resolve_path
 from app.analysis.pgn import parse_pgn
 from app.coach.chat import Turn
-from app.coach.payload import profile_player
+from app.coach.payload import PlayerPayload, profile_player, with_tendencies
 from app.coach.tools import line_summaries
 from app.config import EngineTier, Settings
 from app.db.engine_results import load_position_result, save_position_result
 from app.db.models import Game, User
+from app.db.tendencies import latest_tendencies
 
 NEEDS_ANALYSIS = "The engine hasn't analyzed this position yet. Analyze it, then ask again."
 
@@ -58,7 +59,13 @@ def prepare_turn(
         raise HTTPException(status.HTTP_409_CONFLICT, detail=NEEDS_ANALYSIS)
     lines = line_summaries(path.fen, stored) if stored is not None else []
 
-    # The profile as it is now (PLAN_V2 §6 Q5); a v1 game's owner may not have filled it in yet.
+    player = current_player(session, settings, user, game)
+    return Turn(message=message, position=path, engine_lines=lines, player=player)
+
+
+def current_player(session: Session, settings: Settings, user: User, game: Game) -> PlayerPayload:
+    """The player as the coach sees them now: the profile as it is today (PLAN_V2 §6 Q5; a v1
+    game's owner may not have filled it in yet) and their latest tendencies (SPEC_V2 §9.3)."""
     elo = user.elo if user.elo is not None else game.elo
     player = profile_player(elo, user.playstyle, cast(Color, game.user_color))
-    return Turn(message=message, position=path, engine_lines=lines, player=player)
+    return with_tendencies(player, latest_tendencies(session, user.id), settings.tendencies)
