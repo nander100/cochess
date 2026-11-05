@@ -1,0 +1,81 @@
+.game-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.game-title {
+  flex: 1 1 auto;
+  margin: 0;
+  font: var(--text-title-analysis);
+  letter-spacing: var(--tracking-title);
+}
+
+.game-facts {
+  margin: 0;
+  color: var(--color-muted);
+  font: var(--text-ui);
+}
+
+.board-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-left: calc(var(--eval-bar-width) + var(--space-3));
+}
+
+.board-flip.ui-button {
+  font: var(--text-ui);
+  font-weight: 500;
+}
+
+.moves-panel {
+  padding: var(--space-1) var(--space-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-panel);
+}
+
+.moves-panel-title {
+  margin: 0;
+  font: var(--text-small-heading);
+  font-family: var(--font-body);
+  letter-spacing: normal;
+}
+
+.moves-panel-title button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.moves-panel-name {
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.moves-panel-summary {
+  color: var(--color-muted);
+  font: var(--text-small);
+  font-weight: 500;
+}
+
+.moves-panel-chevron {
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+.moves-panel-chevron.open {
+  transform: rotate(180deg);
+}
+
+.moves-panel > div {
+  padding-bottom: var(--space-3);
+}

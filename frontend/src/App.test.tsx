@@ -36,6 +36,11 @@ async function submitGame() {
   fireEvent.click(screen.getByRole('button', { name: 'Analyze game' }))
 }
 
+/** The move list is collapsed by default (the owner's choice); open it to use the moves. */
+async function openMoves() {
+  fireEvent.click(await screen.findByRole('button', { name: /^Moves/ }))
+}
+
 const LOGGED_OUT = new ApiError(401, "You're not logged in. Ask the owner for a new login link.")
 
 const LISTED = {
@@ -85,7 +90,7 @@ test('"Analysis" opens the most recent game', async () => {
   const deps = fakeDeps({ listGames: vi.fn(async () => [LISTED]) })
   renderApp(deps, '/analysis')
 
-  expect(await screen.findByRole('heading', { name: /Alex – Rival/ })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'You vs Rival' })).toBeInTheDocument()
   const nav = screen.getByRole('navigation', { name: 'Main' })
   expect(within(nav).getByRole('link', { name: 'Analysis' })).toHaveAttribute('aria-current', 'page')
 })
@@ -116,7 +121,7 @@ test('a new game is analyzed, then opens on the board with engine details and a 
 
   await submitGame()
 
-  expect(await screen.findByRole('heading', { name: /Alex – Rival/ })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'You vs Rival' })).toBeInTheDocument()
   expect(deps.api.getGame).toHaveBeenCalledWith('game-1')
   expect(screen.getByText(/stockfish-19-lite, 3 thread\(s\)/)).toBeInTheDocument()
   expect(await screen.findByText('A tidy game.')).toBeInTheDocument()
@@ -195,6 +200,7 @@ test('a reopened game shows its stored synopsis and chat', async () => {
 
 test('the move list marks my mistake, and moves are explored with clicks, the board and arrow keys', async () => {
   renderApp(fakeDeps(), '/games/game-1')
+  await openMoves()
 
   const moves = await screen.findByLabelText('Moves')
   expect(within(moves).getByRole('button', { name: '2. Nf3, mistake' })).toHaveTextContent('Nf3?')
@@ -217,6 +223,7 @@ test('the eval bar follows the position', async () => {
 
   const bar = await screen.findByRole('meter', { name: 'Evaluation' })
   expect(bar).toHaveAttribute('aria-valuenow', '50')
+  await openMoves()
   fireEvent.click(screen.getByRole('button', { name: '2. Nf3, mistake' }))
 
   expect(bar).toHaveAttribute('aria-valuenow', '30')
@@ -372,18 +379,20 @@ describe('chat and Explain are about the position on the board', () => {
     const deps = fakeDeps()
     renderApp(deps, '/games/game-1')
     // DETAIL stores a verify result for the position after 1... e5.
+    await openMoves()
     fireEvent.click(await screen.findByRole('button', { name: '1... e5' }))
 
     const body = await askHere(deps, 'What now?')
 
     expect(body).toEqual({ message: 'What now?', path_uci: ['e2e4', 'e7e5'] })
     expect(deps.engine.analyze).not.toHaveBeenCalled()
-    expect(screen.getByText('You').parentElement).toHaveTextContent('after 1... e5')
+    expect(screen.getByText('after 1... e5')).toBeInTheDocument()
   })
 
   test('a variation: the browser analyzes it first and sends its result', async () => {
     const deps = fakeDeps()
     renderApp(deps, '/games/game-1')
+    await openMoves()
     fireEvent.click(await screen.findByRole('button', { name: '1... e5' }))
     fireEvent.click(screen.getByRole('button', { name: 'play Bc4' }))
 
@@ -399,12 +408,13 @@ describe('chat and Explain are about the position on the board', () => {
       path_uci: ['e2e4', 'e7e5', 'f1c4'],
       engine_result: expect.objectContaining({ tier: 'verify' }),
     })
-    expect(screen.getByText('You').parentElement).toHaveTextContent('after 2. Bc4, in your line')
+    expect(screen.getByText('after 2. Bc4, in your line')).toBeInTheDocument()
   })
 
   test('Explain sends the board position and the answer appears in the chat', async () => {
     const deps = fakeDeps()
     renderApp(deps, '/games/game-1')
+    await openMoves()
     fireEvent.click(await screen.findByRole('button', { name: '1... e5' }))
 
     fireEvent.click(screen.getByRole('button', { name: 'Explain this position' }))
@@ -433,7 +443,7 @@ describe('critical moments', () => {
     const deps = fakeDeps({ getGame: vi.fn(async () => withMoment({}, { synopsis })) })
     renderApp(deps, '/games/game-1')
 
-    const summary = await screen.findByText(/Show the synopsis \(spoilers/)
+    const summary = await screen.findByText(/Show the summary \(spoilers/)
 
     expect(summary.closest('details')).not.toHaveAttribute('open')
   })
@@ -495,6 +505,8 @@ describe('critical moments', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show me' }))
 
     expect(await screen.findByText(/The engine's move:/)).toHaveTextContent('2. d4')
+    fireEvent.click(screen.getByRole('tab', { name: 'Coach' }))
+    await openMoves()
     expect(screen.getByRole('button', { name: '2. Bc4' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '2. d4' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Live engine' })).toBeInTheDocument()

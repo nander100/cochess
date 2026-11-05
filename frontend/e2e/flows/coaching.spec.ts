@@ -20,11 +20,12 @@ test('a player uploads a game, reads the coach, and steps through a critical mom
   await expect(page).toHaveURL(/\/games\/[0-9a-f-]+$/, { timeout: 60_000 })
   const gameId = page.url().split('/').at(-1) ?? ''
   await expect(page.locator('cg-board')).toBeVisible()
+  await page.getByRole('button', { name: /^Moves/ }).click() // collapsed by default
   await page.getByRole('button', { name: '3. Ng5' }).click()
   await expect(page.locator('.eval-bar')).toBeVisible()
 
   // Synopsis: written on its own after the upload, behind a spoiler while moments are unsolved.
-  const spoiler = page.getByText(/Show the synopsis \(spoilers/)
+  const spoiler = page.getByText(/Show the summary \(spoilers/)
   await expect(spoiler).toBeVisible()
   await spoiler.click()
   await expect(page.getByText('E2E synopsis: a fighting game.')).toBeVisible()

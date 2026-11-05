@@ -1,4 +1,7 @@
+import type { ReactNode } from 'react'
 import Markdown from 'react-markdown'
+import { Button, CoachAvatar, FeatureCard, TypingIndicator } from '../ui'
+import './Synopsis.css'
 
 export interface SynopsisState {
   status: 'writing' | 'done' | 'error'
@@ -9,22 +12,17 @@ export interface SynopsisState {
 interface SynopsisProps {
   state: SynopsisState
   onRetry?: () => void
+  /** Shown under the text, e.g. "Practice 3 critical moments". */
+  action?: ReactNode
 }
 
-/** The coach's synopsis. Markdown is rendered without raw HTML (react-markdown's default). */
-export function Synopsis({ state, onRetry }: SynopsisProps) {
+/** The coach's synopsis as the design's "Coach's summary" feature card. Markdown is rendered
+ * without raw HTML (react-markdown's default). */
+export function Synopsis({ state, onRetry, action }: SynopsisProps) {
   return (
-    <section
-      className="synopsis"
-      aria-label="Coach's synopsis"
-      aria-busy={state.status === 'writing'}
-    >
-      <h2>Your coach</h2>
-      {state.status === 'writing' && state.text === '' && (
-        <p className="coach-writing" role="status">
-          Coach is writing…
-        </p>
-      )}
+    <FeatureCard as="section" className="synopsis" aria-label="Coach's synopsis" aria-busy={state.status === 'writing'}>
+      <CoachSummaryHeading />
+      {state.status === 'writing' && state.text === '' && <TypingIndicator label="Coach is writing…" />}
       {state.text && (
         <div className="synopsis-text">
           <Markdown>{state.text}</Markdown>
@@ -32,16 +30,24 @@ export function Synopsis({ state, onRetry }: SynopsisProps) {
       )}
       {state.status === 'error' && (
         <div className="synopsis-error">
-          <p className="run-error" role="alert">
-            {state.error}
-          </p>
+          <p role="alert">{state.error}</p>
           {onRetry && (
-            <button type="button" onClick={onRetry}>
+            <Button className="synopsis-action" onClick={onRetry}>
               Try again
-            </button>
+            </Button>
           )}
         </div>
       )}
-    </section>
+      {state.status === 'done' && action}
+    </FeatureCard>
+  )
+}
+
+export function CoachSummaryHeading() {
+  return (
+    <div className="synopsis-heading">
+      <CoachAvatar />
+      <h2>Coach's summary</h2>
+    </div>
   )
 }

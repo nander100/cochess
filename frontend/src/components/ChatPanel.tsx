@@ -1,6 +1,8 @@
 import { type FormEvent, useId, useState } from 'react'
 import Markdown from 'react-markdown'
 import type { ChatProgress } from '../analysis/chat'
+import { Button, ChatBubble, TintedPanel, TypingIndicator } from '../ui'
+import './ChatPanel.css'
 
 const MAX_MESSAGE_CHARS = 2000 // mirrors backend CoachSettings.chat_max_message_chars
 const EXPLAIN_TEXT = 'Explain this position'
@@ -59,13 +61,13 @@ export function ChatPanel({ ask, explain, where, initial = [] }: ChatPanelProps)
   }
 
   return (
-    <section className="chat" aria-label="Chat with your coach">
+    <TintedPanel as="section" className="chat" aria-label="Chat with your coach">
       <div className="chat-header">
-        <h2>Ask your coach</h2>
+        <h2 className="chat-title">Ask your coach about this position</h2>
         {explain && (
-          <button type="button" className="explain" disabled={busy} onClick={() => void send(EXPLAIN_TEXT, explain)}>
+          <Button variant="outline" disabled={busy} onClick={() => void send(EXPLAIN_TEXT, explain)}>
             {EXPLAIN_TEXT}
-          </button>
+          </Button>
         )}
       </div>
       {where && <p className="chat-where-now">Your questions are about the board: {where}.</p>}
@@ -76,22 +78,17 @@ export function ChatPanel({ ask, explain, where, initial = [] }: ChatPanelProps)
           </li>
         )}
         {messages.map((message, index) => (
-          <li key={index} className={`chat-message ${message.role}`}>
-            <span className="chat-author">
-              {message.role === 'player' ? 'You' : 'Coach'}
-              {message.where && <span className="chat-where"> · {message.where}</span>}
-            </span>
-            {message.role === 'coach' ? <Markdown>{message.text}</Markdown> : <p>{message.text}</p>}
+          <li key={index}>
+            <ChatBubble from={message.role}>
+              {message.where && <span className="chat-where">{message.where}</span>}
+              {message.role === 'coach' ? <Markdown>{message.text}</Markdown> : <p>{message.text}</p>}
+            </ChatBubble>
           </li>
         ))}
       </ol>
-      {progress && (
-        <p className="coach-writing" role="status">
-          {PROGRESS_LABEL[progress]}
-        </p>
-      )}
+      {progress && <TypingIndicator label={PROGRESS_LABEL[progress]} />}
       {error && (
-        <p className="run-error" role="alert">
+        <p className="form-error" role="alert">
           {error}
         </p>
       )}
@@ -101,7 +98,8 @@ export function ChatPanel({ ask, explain, where, initial = [] }: ChatPanelProps)
         </label>
         <textarea
           id={`${id}-message`}
-          rows={2}
+          className="ui-input ui-textarea chat-input"
+          rows={1}
           maxLength={MAX_MESSAGE_CHARS}
           placeholder="Ask about this position…"
           value={draft}
@@ -114,10 +112,10 @@ export function ChatPanel({ ask, explain, where, initial = [] }: ChatPanelProps)
           }}
           disabled={busy}
         />
-        <button type="submit" disabled={busy || draft.trim() === ''}>
+        <Button type="submit" variant="secondary" disabled={busy || draft.trim() === ''}>
           Send
-        </button>
+        </Button>
       </form>
-    </section>
+    </TintedPanel>
   )
 }

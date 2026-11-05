@@ -1,3 +1,4 @@
+import './EnginePanel.css'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { EngineConfig } from '../api/types'
 import { type LiveLine, isGameOver, toLiveLines } from '../engine/live'
@@ -75,7 +76,7 @@ export function EnginePanel({ fen, enabled, onToggle, load, onBest }: EnginePane
         : { kind: 'loading' }
   const lines = status.kind === 'running' || status.kind === 'stopped' ? status.lines : []
   return (
-    <section className="engine-panel" aria-label="Live engine">
+    <section className="engine-panel ui-card" aria-label="Live engine">
       <label htmlFor={`${id}-toggle`} className="engine-toggle">
         <input
           id={`${id}-toggle`}
@@ -83,6 +84,7 @@ export function EnginePanel({ fen, enabled, onToggle, load, onBest }: EnginePane
           checked={enabled}
           onChange={(event) => onToggle(event.target.checked)}
         />
+        <span className="engine-switch" aria-hidden="true" />
         Engine
       </label>
       <EngineStatus status={status} />
@@ -109,7 +111,7 @@ function EngineStatus({ status }: { status: Status }) {
       return <p className="engine-status">The game is over in this position.</p>
     case 'error':
       return (
-        <p className="run-error" role="alert">
+        <p className="form-error" role="alert">
           {status.message}
         </p>
       )

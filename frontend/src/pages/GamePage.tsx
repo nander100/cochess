@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { type ChatDeps, type ChatProgress, askCoach, explainPosition } from '../analysis/chat'
 import { BeforeSearches, type MomentDeps, fenAfter } from '../analysis/moments'
@@ -28,11 +28,15 @@ import { EngineStats } from '../components/EngineStats'
 import { ProgressBar } from '../components/ProgressBar'
 import { isUnsolved } from '../moments/moment'
 import { MomentStepper } from '../moments/MomentStepper'
-import { Synopsis, type SynopsisState } from '../components/Synopsis'
+import { CoachSummaryHeading, Synopsis, type SynopsisState } from '../components/Synopsis'
 import { type LiveLine, isGameOver } from '../engine/live'
 import { analyzeAll } from '../engine/runner'
+import { BoardNav, GameHeading, MovesPanel } from './AnalysisParts'
 import { GameOptions } from './GameOptions'
-import { errorText, gameDate } from './util'
+import Markdown from 'react-markdown'
+import { Button, FeatureCard, Tabs } from '../ui'
+import './GamePage.css'
+import { errorText } from './util'
 
 interface GamePageProps {
   deps: PipelineDeps
@@ -155,6 +159,8 @@ function AnalysisBoard({
   const node = tree.nodes[current]
   const stored = useMemo(() => storedByPosition(detail), [detail])
 
+  const [flipped, setFlipped] = useState(false)
+  const orientation: 'white' | 'black' = flipped ? (detail.user_color === 'white' ? 'black' : 'white') : detail.user_color
   const [engineOn, setEngineOn] = useState(false)
   const [live, setLive] = useState<{ fen: string; line: LiveLine } | null>(null)
   const engine = useRef<Promise<LiveEngine> | null>(null)
@@ -264,37 +270,26 @@ function AnalysisBoard({
           onDone={onAnalyzed}
         />
       )}
-      <div className="analysis-grid">
-        <div className="board-column">
+      <div className="analysis-layout">
+        <section className="board-column" aria-label="Board">
           <div className="board-row">
-            <EvalBar winPct={evaluation.winPct} evalText={evaluation.evalText} orientation={detail.user_color} />
+            <EvalBar winPct={evaluation.winPct} evalText={evaluation.evalText} orientation={orientation} />
             <Board
               fen={boardFen}
-              orientation={detail.user_color}
+              orientation={orientation}
               lastMove={boardLastMove}
               movable={!locked || (candidate === null && (moment?.state === 'intro' || moment?.state === 'attempt'))}
               onMove={play}
             />
           </div>
-          <div className="board-controls" role="group" aria-label="Move navigation">
-            <button type="button" onClick={() => navigate(ROOT)} disabled={locked} aria-label="Start of the game">
-              ⏮
-            </button>
-            <button type="button" onClick={back} disabled={locked} aria-label="Previous move (←)">
-              ◀
-            </button>
-            <button type="button" onClick={forward} disabled={locked} aria-label="Next move (→)">
-              ▶
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate(endOfLine(tree, current))}
-              disabled={locked}
-              aria-label="End of the line"
-            >
-              ⏭
-            </button>
-          </div>
+          <BoardNav
+            disabled={locked}
+            onFirst={() => navigate(ROOT)}
+            onBack={back}
+            onForward={forward}
+            onLast={() => navigate(endOfLine(tree, current))}
+            onFlip={() => setFlipped((value) => !value)}
+          />
           {points.length > 1 && (
             <EvalGraph
               points={points}
@@ -309,22 +304,31 @@ function AnalysisBoard({
             <EnginePanel fen={node.fen} enabled={engineOn} onToggle={setEngineOn} load={loadEngine} onBest={setLive} />
           )}
           {fresh && <EngineStats run={fresh} />}
-        </div>
-        <div className="side-column">
-          <div className="panel">
-            <h2 className="panel-title">Moves</h2>
-            <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} />
-          </div>
-          {detail.status === 'analyzed' && moments.length > 0 && (
-            <div className="tabs" role="tablist" aria-label="Coaching">
-              <button type="button" role="tab" aria-selected={tab === 'coach'} onClick={() => openTab('coach')}>
-                Coach
-              </button>
-              <button type="button" role="tab" aria-selected={tab === 'moments'} onClick={() => openTab('moments')}>
-                Critical moments ({moments.filter((m) => !isUnsolved(m)).length}/{moments.length})
-              </button>
-            </div>
+        </section>
+        <aside className="side-column" aria-label="Coach">
+          {detail.status === 'analyzed' && moments.length > 0 ? (
+            <Tabs
+              label="Coaching"
+              tabs={[
+                { value: 'coach', label: 'Coach' },
+                { value: 'moments', label: `Critical moments (${moments.filter((m) => !isUnsolved(m)).length}/${moments.length})` },
+              ]}
+              value={tab}
+              onChange={openTab}
+            >
+              {coachView()}
+            </Tabs>
+          ) : (
+            coachView()
           )}
+        </aside>
+      </div>
+    </section>
+  )
+
+  function coachView() {
+    return (
+      <div className="side-stack">
           {detail.status === 'analyzed' && tab === 'moments' && momentFen !== null && (
             <MomentStepper
               gameId={detail.id}
@@ -349,31 +353,24 @@ function AnalysisBoard({
               loadEngine={loadEngine}
               autoSynopsis={fresh !== null}
               spoiler={moments.some(isUnsolved)}
+              practice={moments.some(isUnsolved) ? () => openTab('moments') : null}
+              unsolved={moments.filter(isUnsolved).length}
+              moves={
+                <MovesPanel count={detail.moves.length}>
+                  <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} />
+                </MovesPanel>
+              }
               onLoggedOut={onLoggedOut}
             />
           )}
-        </div>
+          {detail.status !== 'analyzed' && (
+            <MovesPanel count={detail.moves.length}>
+              <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} />
+            </MovesPanel>
+          )}
       </div>
-    </section>
-  )
-}
-
-function GameHeading({ detail }: { detail: GameDetail }) {
-  const { info, accuracy } = detail
-  const date = gameDate(detail.played_at)
-  return (
-    <header className="game-heading">
-      <h2>
-        {info.white} – {info.black} <span className="result">{info.result}</span>
-      </h2>
-      <p>
-        {date}
-        {info.time_control && ` · ${info.time_control}`}
-        {info.opening && ` · ${info.opening}`} · you played {detail.user_color}
-        {accuracy?.user != null && ` · your accuracy ${accuracy.user}%`}
-      </p>
-    </header>
-  )
+    )
+  }
 }
 
 /** An analysis that didn't finish (the tab was closed): pick it up from where the server says. */
@@ -433,7 +430,9 @@ function ResumeAnalysis({ detail, deps, autoStart, onLoggedOut, onDone }: {
 }
 
 /** The synopsis and the chat, for an analyzed game. */
-function Coach({ detail, deps, board, ensureAnalyzed, loadEngine, autoSynopsis, spoiler, onLoggedOut }: {
+function Coach({
+  detail, deps, board, ensureAnalyzed, loadEngine, autoSynopsis, spoiler, practice, unsolved, moves, onLoggedOut,
+}: {
   detail: GameDetail
   deps: PipelineDeps
   /** The position on the board: chat and Explain are about it (SPEC_V2 §6). */
@@ -443,6 +442,11 @@ function Coach({ detail, deps, board, ensureAnalyzed, loadEngine, autoSynopsis, 
   autoSynopsis: boolean
   /** Unsolved critical moments: the synopsis names their answers, so it starts collapsed (Q16). */
   spoiler: boolean
+  /** Open the critical moments ("Practice N critical moments" on the summary card). */
+  practice: (() => void) | null
+  unsolved: number
+  /** The move list, between the summary and the chat (Analysis.dc.html). */
+  moves: ReactNode
   onLoggedOut: () => void
 }) {
   const [synopsis, setSynopsis] = useState<SynopsisState | null>(
@@ -488,23 +492,37 @@ function Coach({ detail, deps, board, ensureAnalyzed, loadEngine, autoSynopsis, 
     },
   }
 
+  const practiceButton = practice ? (
+    <Button className="synopsis-action" onClick={practice}>
+      Practice {unsolved} critical moment{unsolved === 1 ? '' : 's'}
+    </Button>
+  ) : null
+
   return (
     <>
       {synopsis && spoiler && synopsis.status === 'done' ? (
-        <details className="synopsis-spoiler">
-          <summary>Show the synopsis (spoilers: it names better moves for your critical moments)</summary>
-          <Synopsis state={synopsis} onRetry={() => void write()} />
-        </details>
+        <FeatureCard as="section" className="synopsis" aria-label="Coach's synopsis">
+          <CoachSummaryHeading />
+          <details className="synopsis-spoiler">
+            <summary>Show the summary (spoilers: it names better moves for your critical moments)</summary>
+            <div className="synopsis-text">
+              <Markdown>{synopsis.text}</Markdown>
+            </div>
+          </details>
+          {practiceButton}
+        </FeatureCard>
       ) : synopsis ? (
-        <Synopsis state={synopsis} onRetry={() => void write()} />
+        <Synopsis state={synopsis} onRetry={() => void write()} action={practiceButton} />
       ) : (
-        <section className="synopsis" aria-label="Coach's synopsis">
-          <h2>Your coach</h2>
-          <button type="button" onClick={() => void write()}>
+        <FeatureCard as="section" className="synopsis" aria-label="Coach's synopsis">
+          <CoachSummaryHeading />
+          <p>Your coach can sum up the game's story, its turning point, and the habit to work on.</p>
+          <Button className="synopsis-action" onClick={() => void write()}>
             Write a synopsis of this game
-          </button>
-        </section>
+          </Button>
+        </FeatureCard>
       )}
+      {moves}
       <ChatPanel
         initial={detail.chat}
         where={positionLabel(board)}

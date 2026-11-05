@@ -1,0 +1,115 @@
+.engine-panel.ui-card {
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+
+.engine-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-height);
+  font: var(--text-ui-strong);
+  cursor: pointer;
+}
+
+.engine-toggle input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.engine-switch {
+  position: relative;
+  width: var(--switch-width);
+  height: var(--switch-height);
+  border: var(--border-width) solid var(--color-field-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-track);
+  transition: background-color var(--duration-fast) var(--ease);
+}
+
+.engine-switch::after {
+  content: '';
+  position: absolute;
+  top: var(--switch-inset);
+  left: var(--switch-inset);
+  width: calc(var(--switch-height) - 2 * var(--switch-inset) - 2 * var(--border-width));
+  height: calc(var(--switch-height) - 2 * var(--switch-inset) - 2 * var(--border-width));
+  border-radius: var(--radius-pill);
+  background: var(--color-fg);
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+.engine-toggle input:checked + .engine-switch {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.engine-toggle input:checked + .engine-switch::after {
+  background: var(--color-primary-fg);
+  transform: translateX(calc(var(--switch-width) - var(--switch-height)));
+}
+
+.engine-toggle input:focus-visible + .engine-switch {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.engine-status {
+  margin: 0;
+  color: var(--color-muted);
+  font: var(--text-small);
+}
+
+.engine-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: var(--text-ui);
+}
+
+.engine-lines li {
+  overflow: hidden;
+  padding: var(--space-1) 0;
+  border-top: var(--border-width) solid var(--color-row-border);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.engine-eval {
+  display: inline-block;
+  min-width: var(--space-14);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.engine-stats {
+  font: var(--text-small);
+  color: var(--color-muted);
+}
+
+.engine-stats summary {
+  cursor: pointer;
+}
+
+.engine-stats table {
+  display: block;
+  overflow-x: auto;
+  margin-top: var(--space-3);
+  border-collapse: collapse;
+}
+
+.engine-stats th,
+.engine-stats td {
+  padding: var(--space-1) var(--space-3) var(--space-1) 0;
+  border-bottom: var(--border-width) solid var(--color-row-border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.engine-stats .line {
+  font-family: var(--font-mono);
+}

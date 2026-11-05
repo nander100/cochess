@@ -1,0 +1,51 @@
+.synopsis.ui-feature-card {
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border-radius: var(--radius-panel);
+}
+
+.synopsis-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.synopsis-heading h2 {
+  margin: 0;
+  font: var(--text-panel);
+  color: var(--color-feature-fg);
+}
+
+.synopsis-text {
+  color: var(--color-feature-muted);
+  font: var(--text-body);
+}
+
+.synopsis-text > :first-child {
+  margin-top: 0;
+}
+
+.synopsis-text > :last-child {
+  margin-bottom: 0;
+}
+
+.synopsis-text h2,
+.synopsis-text h3 {
+  color: var(--color-feature-fg);
+  font: var(--text-small-heading);
+}
+
+.synopsis .ui-typing {
+  color: var(--color-feature-muted);
+}
+
+.synopsis-error p {
+  margin: 0 0 var(--space-2);
+}
+
+.synopsis-action.ui-button,
+.synopsis .synopsis-action.ui-button {
+  align-self: flex-start;
+  background: var(--header-accent);
+  color: var(--header-accent-fg);
+}

@@ -107,6 +107,7 @@
   --paste-results: 560px;
   --paste-table-min: 640px;
   --slot-cell-height: 10px;
+  --chat-log-max: 420px;
   --table-min: 680px;
   --text-avatar-size: 26px;
   --brand-art: 320px;
@@ -131,6 +132,9 @@
   --control-height-large: 48px;
   --control-height-small: 40px;
   --step-dot: 28px;
+  --switch-width: 40px;
+  --switch-height: 24px;
+  --switch-inset: 3px;
   --icon-size: 20px;
   --icon-size-small: 18px;
   --icon-stroke: 2px;
