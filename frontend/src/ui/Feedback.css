@@ -1,0 +1,131 @@
+.ui-progress {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.ui-progress-label {
+  margin: 0;
+  font: var(--text-ui);
+}
+
+.ui-progress-track {
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-track);
+  overflow: hidden;
+}
+
+.ui-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-primary);
+  transition: inline-size var(--duration-normal) var(--ease);
+}
+
+.ui-skeleton {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.ui-skeleton-line {
+  display: block;
+  height: var(--space-4);
+  border-radius: var(--radius-nav);
+  background: var(--color-track);
+  animation: ui-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.ui-skeleton-line:last-child {
+  inline-size: 60%;
+}
+
+@keyframes ui-skeleton-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.ui-empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-6);
+  border: var(--border-width) dashed var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.ui-empty-title {
+  margin: 0;
+  font: var(--text-panel);
+}
+
+.ui-empty-body {
+  color: var(--color-muted);
+}
+
+.ui-empty-body > p {
+  margin: 0;
+}
+
+.ui-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--color-danger);
+  border-radius: var(--radius-card);
+  color: var(--color-fg);
+}
+
+.ui-error .ui-icon {
+  color: var(--color-danger);
+}
+
+.ui-error p {
+  flex: 1;
+  margin: 0;
+}
+
+.ui-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-muted);
+  font: var(--text-ui);
+}
+
+.ui-typing-dots {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.ui-typing-dots span {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  animation: ui-typing-bounce 1.2s ease-in-out infinite;
+}
+
+.ui-typing-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.ui-typing-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes ui-typing-bounce {
+  0%,
+  80%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  40% {
+    opacity: 1;
+    transform: translateY(calc(-1 * var(--space-1)));
+  }
+}

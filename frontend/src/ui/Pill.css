@@ -1,0 +1,70 @@
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  font: var(--text-pill);
+  white-space: nowrap;
+}
+
+.ui-pill-analyzed {
+  background: var(--brand-baby-blue);
+  color: var(--brand-black);
+}
+
+.ui-pill-busy {
+  background: var(--color-secondary-bg);
+  color: var(--color-secondary-fg);
+}
+
+.ui-pill-neutral {
+  background: var(--color-tint);
+  color: var(--color-fg);
+}
+
+.ui-pill-good,
+.ui-pill-inaccuracy,
+.ui-pill-mistake,
+.ui-pill-blunder,
+.ui-pill-plan {
+  background: var(--color-bg);
+  border: var(--border-width) solid currentColor;
+}
+
+.ui-pill-good {
+  color: var(--chess-good);
+}
+
+.ui-pill-inaccuracy {
+  color: var(--chess-inaccuracy);
+}
+
+.ui-pill-mistake {
+  color: var(--chess-mistake);
+}
+
+.ui-pill-blunder {
+  color: var(--chess-blunder);
+}
+
+.ui-pill-plan {
+  color: var(--chess-plan);
+}
+
+.ui-swatch {
+  display: inline-block;
+  width: var(--swatch-size);
+  height: var(--swatch-size);
+  border-radius: var(--radius-swatch);
+  border: var(--border-width) solid var(--color-fg);
+  vertical-align: middle;
+}
+
+.ui-swatch-white {
+  background: var(--brand-white);
+}
+
+.ui-swatch-black {
+  background: var(--brand-black);
+}

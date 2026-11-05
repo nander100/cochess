@@ -1,0 +1,49 @@
+.ui-field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.ui-field-label {
+  font: var(--text-small-heading);
+}
+
+.ui-field-help,
+.ui-field-error {
+  margin: 0;
+  font: var(--text-ui);
+  color: var(--color-muted);
+}
+
+.ui-field-error {
+  color: var(--color-danger);
+}
+
+.ui-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-field);
+  color: var(--color-fg);
+  font: var(--text-ui);
+}
+
+.ui-textarea {
+  padding: var(--space-3);
+  resize: vertical;
+}
+
+.ui-mono {
+  font: var(--text-pgn);
+}
+
+.ui-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ui-input[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}

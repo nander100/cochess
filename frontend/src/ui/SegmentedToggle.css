@@ -1,0 +1,62 @@
+.ui-toggle {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.ui-toggle-legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font: var(--text-small-heading);
+}
+
+.ui-toggle-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.ui-toggle-option {
+  position: relative;
+  display: inline-flex;
+}
+
+.ui-toggle-option input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.ui-toggle-option span {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height);
+  padding: 0 var(--space-4);
+  border: var(--border-width) solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-field);
+  color: var(--color-fg);
+  font: var(--text-ui-strong);
+}
+
+.ui-toggle-option input:checked + span {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+}
+
+.ui-toggle-option input:focus-visible + span {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.ui-toggle:disabled .ui-toggle-option span {
+  opacity: 0.45;
+}
+
+.ui-toggle:disabled .ui-toggle-option input {
+  cursor: not-allowed;
+}

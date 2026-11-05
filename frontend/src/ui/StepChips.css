@@ -1,0 +1,43 @@
+.ui-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ui-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-pill);
+  font: var(--text-chip);
+}
+
+button.ui-step {
+  cursor: pointer;
+}
+
+.ui-step-done {
+  background: var(--color-done-bg);
+  color: var(--brand-white);
+}
+
+.ui-step-check {
+  color: var(--brand-baby-blue);
+  stroke-width: 3;
+}
+
+.ui-step-current {
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+}
+
+.ui-step-upcoming {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+  color: var(--color-muted);
+}

@@ -1,0 +1,30 @@
+.ui-table-box {
+  overflow-x: auto;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-ui);
+}
+
+.ui-table thead tr {
+  background: var(--color-tint);
+  text-align: left;
+}
+
+.ui-table th {
+  padding: var(--space-3) var(--space-4);
+  font-weight: 600;
+}
+
+.ui-table td {
+  padding: var(--space-3) var(--space-4);
+  border-top: var(--border-width) solid var(--color-row-border);
+}
+
+.ui-table .numeric {
+  font-variant-numeric: tabular-nums;
+}

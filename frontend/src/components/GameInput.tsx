@@ -1,5 +1,6 @@
 import { type FormEvent, useId, useState } from 'react'
 import type { Color, CreateGameRequest } from '../api/types'
+import { SegmentedToggle, type ToggleOption } from '../ui'
 
 interface GameInputProps {
   disabled: boolean
@@ -7,6 +8,10 @@ interface GameInputProps {
 }
 
 const COLOR_HINT = 'Choose the color you played first.'
+const COLORS: readonly ToggleOption<Color>[] = [
+  { value: 'white', label: 'I played White' },
+  { value: 'black', label: 'I played Black' },
+]
 
 /** One game to analyze. Rating and playstyle come from the player's profile (SPEC_V2 §4.3).
  * The color comes first and starts unselected: the PGN box and Analyze wait for it, so a game
@@ -34,29 +39,22 @@ export function GameInput({ disabled, onSubmit }: GameInputProps) {
 
   return (
     <form className="game-input" onSubmit={handleSubmit} noValidate aria-label="Game to analyze">
-      <fieldset disabled={disabled} aria-describedby={needsColor ? `${id}-hint` : undefined}>
-        <legend>Which color did you play?</legend>
-        {(['white', 'black'] as const).map((value) => (
-          <label key={value} className="radio">
-            <input
-              type="radio"
-              name={`${id}-color`}
-              value={value}
-              checked={color === value}
-              onChange={() => {
-                setColor(value)
-                setError(null)
-              }}
-            />
-            {value === 'white' ? 'I played White' : 'I played Black'}
-          </label>
-        ))}
-        {needsColor && (
-          <p id={`${id}-hint`} className="form-hint">
-            {COLOR_HINT}
-          </p>
-        )}
-      </fieldset>
+      <SegmentedToggle
+        legend="Which color did you play?"
+        options={COLORS}
+        value={color}
+        onChange={(value) => {
+          setColor(value)
+          setError(null)
+        }}
+        disabled={disabled}
+        describedBy={needsColor ? `${id}-hint` : undefined}
+      />
+      {needsColor && (
+        <p id={`${id}-hint`} className="form-hint">
+          {COLOR_HINT}
+        </p>
+      )}
 
       <label htmlFor={`${id}-pgn`}>
         Your game (PGN)

@@ -1,0 +1,97 @@
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: 0 var(--space-5);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-control);
+  font: var(--text-button);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+}
+
+.ui-button-primary {
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+}
+
+.ui-button-secondary {
+  background: var(--color-secondary-bg);
+  color: var(--color-secondary-fg);
+}
+
+.ui-button-outline {
+  background: var(--color-field);
+  color: var(--color-fg);
+  border-color: var(--color-field-border);
+}
+
+.ui-button-danger {
+  background: var(--color-danger);
+  color: var(--color-danger-fg);
+}
+
+.ui-button-link {
+  min-height: 0;
+  padding: 0;
+  background: none;
+  color: var(--color-link);
+  text-decoration: underline;
+}
+
+.ui-button:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+.ui-button-outline:hover:not(:disabled) {
+  filter: none;
+  background: var(--color-tint);
+}
+
+.ui-button-link:hover:not(:disabled) {
+  filter: none;
+  color: var(--color-link-hover);
+}
+
+.ui-button:disabled,
+.ui-icon-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+  border-radius: var(--radius-control);
+  border: var(--border-width) solid var(--color-field-border);
+  background: var(--color-field);
+  color: var(--color-fg);
+  cursor: pointer;
+}
+
+.ui-icon-button-outline:hover:not(:disabled) {
+  background: var(--color-tint);
+}
+
+.ui-icon-button-primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+}
+
+.ui-icon-button-header {
+  border-color: var(--header-control-border);
+  background: var(--header-bg);
+  color: var(--header-accent);
+}
+
+.ui-icon-button-header:focus-visible {
+  outline-color: var(--header-accent);
+}

@@ -57,6 +57,9 @@
   --text-lead: 400 17px / 1.55 var(--font-body);
   --text-body: 400 15px / 1.6 var(--font-body);
   --text-ui: 400 14px / 1.5 var(--font-body);
+  --text-ui-strong: 600 14px / 1.5 var(--font-body);
+  --text-button: 600 15px / 1.2 var(--font-body);
+  --text-chip: 600 13px / 1.2 var(--font-body);
   --text-small-heading: 600 15px / 1.4 var(--font-body);
   --text-eyebrow: 600 13px / 1.4 var(--font-body);
   --text-pill: 600 12px / 1.2 var(--font-body);
@@ -85,6 +88,9 @@
   --page-gutter: var(--space-6);
   --board-column: 520px;
   --side-panel: 380px;
+  --modal-width: 560px;
+  --tooltip-width: 240px;
+  --toast-width: 380px;
 
   /* Radii */
   --radius-nav: 8px;

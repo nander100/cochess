@@ -1,0 +1,60 @@
+.ui-card,
+.ui-feature-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border-radius: var(--radius-card);
+}
+
+.ui-card {
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.ui-feature-card {
+  background: var(--color-feature);
+  color: var(--color-feature-fg);
+}
+
+.ui-feature-card .ui-eyebrow,
+.ui-feature-card .ui-card-label {
+  color: var(--header-accent);
+}
+
+.ui-feature-card p,
+.ui-feature-card .ui-card-body {
+  color: var(--color-feature-muted);
+}
+
+.ui-feature-card a {
+  color: var(--header-accent);
+}
+
+.ui-tinted-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border: var(--border-width) solid var(--color-tint-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-tint);
+}
+
+.ui-eyebrow,
+.ui-card-label {
+  margin: 0;
+  font: var(--text-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-label);
+}
+
+.ui-card-label {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.ui-card-value {
+  font: var(--text-card-value);
+}

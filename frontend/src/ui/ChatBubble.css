@@ -1,0 +1,51 @@
+.ui-coach-avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: var(--radius-pill);
+  background: var(--brand-baby-blue);
+  color: var(--brand-black);
+  font: var(--text-small-heading);
+}
+
+.ui-bubble-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.ui-bubble-row-player {
+  justify-content: flex-end;
+}
+
+.ui-bubble {
+  max-width: 90%;
+  padding: var(--space-2) var(--space-3);
+  font: var(--text-ui);
+  overflow-wrap: anywhere;
+}
+
+.ui-bubble > :first-child {
+  margin-top: 0;
+}
+
+.ui-bubble > :last-child {
+  margin-bottom: 0;
+}
+
+.ui-bubble-player {
+  max-width: 85%;
+  border-radius: var(--radius-bubble-user);
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+}
+
+.ui-bubble-coach {
+  border-radius: var(--radius-bubble-coach);
+  border: var(--border-width) solid var(--color-tint-border);
+  background: var(--color-field);
+  color: var(--color-fg);
+}
