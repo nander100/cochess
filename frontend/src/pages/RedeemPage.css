@@ -1,0 +1,180 @@
+.redeem {
+  display: flex;
+  flex-wrap: wrap;
+  min-height: 100vh;
+}
+
+.redeem-brand {
+  display: flex;
+  flex: 1 1 420px;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-8);
+  box-sizing: border-box;
+  min-width: 0;
+  padding: var(--space-10) var(--space-10);
+  background: var(--header-bg);
+  color: var(--header-fg);
+}
+
+.redeem-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.redeem-logo-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-10);
+  height: var(--space-10);
+  border-radius: var(--radius-control);
+  background: var(--header-accent);
+  color: var(--header-accent-fg);
+  font: var(--text-section);
+}
+
+.redeem-wordmark {
+  font: var(--text-section);
+  letter-spacing: var(--tracking-title);
+}
+
+.redeem-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: 100%;
+  max-width: var(--brand-art);
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: var(--board-frame-width) solid var(--header-accent);
+  border-radius: var(--radius-box);
+}
+
+.redeem-tiles .light {
+  background: var(--brand-white);
+}
+
+.redeem-tiles .dark {
+  background: var(--brand-baby-blue);
+}
+
+.redeem-tagline {
+  max-width: var(--brand-tagline-width);
+  margin: 0;
+  font: var(--text-tagline);
+}
+
+.redeem-main {
+  display: flex;
+  flex: 1 1 480px;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: var(--space-10) var(--page-gutter);
+}
+
+.redeem-card,
+.redeem-state {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  width: 100%;
+  max-width: var(--card-narrow);
+}
+
+.redeem-state > .ui-pill,
+.redeem-badge {
+  align-self: flex-start;
+  font: var(--text-chip);
+  padding: var(--space-2) var(--space-3);
+}
+
+.redeem-badge {
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-pill);
+  color: var(--color-muted);
+}
+
+.redeem-title {
+  margin: 0;
+  font: var(--text-display-2);
+  letter-spacing: var(--tracking-display);
+}
+
+.redeem-title-small {
+  margin: 0;
+  font: var(--text-title-2);
+}
+
+.redeem-lead {
+  margin: 0;
+  font: var(--text-body-large);
+  color: var(--color-muted);
+}
+
+.redeem-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  list-style: none;
+  font: var(--text-body);
+  font-weight: 500;
+}
+
+.redeem-steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.redeem-step-number {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--step-dot);
+  height: var(--step-dot);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-pill);
+  color: var(--color-muted);
+  font: var(--text-chip);
+  font-weight: 700;
+}
+
+.redeem-steps .now .redeem-step-number {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+}
+
+.redeem-go {
+  min-height: var(--control-height-large);
+  font: var(--text-button-large);
+}
+
+.redeem-small {
+  margin: 0;
+  font: var(--text-small);
+  color: var(--color-muted);
+}
+
+.redeem-note {
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--color-tint-border);
+  border-radius: var(--radius-card);
+  background: var(--color-tint);
+  font: var(--text-ui);
+}
+
+.redeem-theme {
+  align-self: flex-start;
+  border-color: var(--color-border);
+  background: transparent;
+  font-weight: 500;
+}

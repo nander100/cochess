@@ -31,6 +31,24 @@ test('no raw colors outside the tokens', () => {
   expect(offenders(RAW_COLOR)).toEqual([])
 })
 
+// Sizes: the shared components and page stylesheets use the spacing, type and size tokens. (The
+// legacy src/styles.css is being replaced page by page in M1 and is not checked.)
+const RAW_SIZE = /(?<![\w-])\d*\.?\d+(px|rem|em)\b/
+const SIZED = (path: string) => path.endsWith('.css') && path !== '../styles.css' && !ALLOWED.has(path)
+
+test('no raw sizes in component and page stylesheets', () => {
+  const found = Object.entries(sources)
+    .filter(([path]) => SIZED(path))
+    .flatMap(([path, text]) =>
+      text
+        .split('\n')
+        .map((line, i) => ({ line, at: `${path}:${i + 1}` }))
+        .filter(({ line }) => !line.trim().startsWith('/*') && !line.trim().startsWith('*') && RAW_SIZE.test(line))
+        .map(({ at, line }) => `${at}  ${line.trim()}`),
+    )
+  expect(found).toEqual([])
+})
+
 test('no raw font stacks outside the tokens', () => {
   expect(offenders(RAW_FONT)).toEqual([])
 })

@@ -39,6 +39,7 @@ export async function logInWithProfile(page: Page, link: string, elo: number): P
 export async function logIn(page: Page, link: string, elo: number): Promise<void> {
   const url = new URL(link)
   await page.goto(`${url.pathname}${url.hash}`)
+  await page.getByRole('link', { name: 'Set up my profile' }).click()
   await page.getByLabel(/rating/i).fill(String(elo))
   await page.getByLabel(/time control/i).selectOption('rapid')
   await page.getByRole('button', { name: /^Save/ }).click()

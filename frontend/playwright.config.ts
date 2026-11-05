@@ -15,6 +15,8 @@ const FRONTEND_PORT = 5174
 // production `docker compose up`, instead of starting dev servers.
 const EXTERNAL_URL = process.env.E2E_BASE_URL
 const REAL_ENGINE = process.env.E2E_REAL_ENGINE === '1'
+// SCREENS=1 saves screenshots of every page (light and dark, 1280 and 1920 px) for the M1 review.
+const SCREENS = process.env.SCREENS === '1'
 
 function env(extra: Record<string, string>): Record<string, string> {
   const base = Object.entries(process.env).filter(
@@ -25,8 +27,8 @@ function env(extra: Record<string, string>): Record<string, string> {
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: REAL_ENGINE ? 'analysis.spec.ts' : 'flows/*.spec.ts',
-  timeout: REAL_ENGINE ? 10 * 60_000 : 90_000,
+  testMatch: REAL_ENGINE ? 'analysis.spec.ts' : SCREENS ? 'screens.spec.ts' : 'flows/*.spec.ts',
+  timeout: REAL_ENGINE ? 10 * 60_000 : SCREENS ? 5 * 60_000 : 90_000,
   workers: 1, // one backend and database for every test
   reporter: [['list']],
   use: {

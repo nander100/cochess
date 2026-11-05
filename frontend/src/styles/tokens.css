@@ -29,7 +29,8 @@
   --board-last-move: rgb(111 174 224 / 45%); /* one overlay for #CFE3FA / #6FAEE0 (see M1 notes) */
   --board-coord-on-light: var(--brand-navy);
   --board-coord-on-dark: var(--brand-black);
-  --board-frame: 2px solid var(--brand-black);
+  --board-frame-width: 2px;
+  --board-frame: var(--board-frame-width) solid var(--brand-black);
   --board-max: 600px;
 
   /* Eval bar and graph */
@@ -48,6 +49,9 @@
   --font-mono: ui-monospace, Menlo, monospace;
 
   --text-display: 700 44px / 1.05 var(--font-heading);
+  --text-display-2: 700 40px / 1.08 var(--font-heading);
+  --text-tagline: 700 28px / 1.2 var(--font-heading);
+  --text-title-2: 700 32px / 1.1 var(--font-heading);
   --text-title: 700 34px / 1.1 var(--font-heading);
   --text-title-analysis: 700 30px / 1.1 var(--font-heading);
   --text-section: 700 22px / 1.25 var(--font-heading);
@@ -56,6 +60,9 @@
   --text-logo: 700 20px / 1 var(--font-heading);
   --text-lead: 400 17px / 1.55 var(--font-body);
   --text-body: 400 15px / 1.6 var(--font-body);
+  --text-body-large: 400 16px / 1.6 var(--font-body);
+  --text-button-large: 600 16px / 1.2 var(--font-body);
+  --text-small: 400 13px / 1.5 var(--font-body);
   --text-ui: 400 14px / 1.5 var(--font-body);
   --text-ui-strong: 600 14px / 1.5 var(--font-body);
   --text-button: 600 15px / 1.2 var(--font-body);
@@ -89,6 +96,9 @@
   --board-column: 520px;
   --side-panel: 380px;
   --modal-width: 560px;
+  --card-narrow: 440px;
+  --brand-art: 320px;
+  --brand-tagline-width: 380px;
   --tooltip-width: 240px;
   --toast-width: 380px;
 
@@ -106,6 +116,8 @@
 
   /* Controls */
   --control-height: 44px;
+  --control-height-large: 48px;
+  --step-dot: 28px;
   --icon-size: 20px;
   --icon-size-small: 18px;
   --icon-stroke: 2px;

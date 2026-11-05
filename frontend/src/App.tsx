@@ -95,16 +95,8 @@ function Shell({ deps }: AppProps) {
     setSession({ kind: 'logged-out' })
   }
 
-  if (onRedeemPage) {
-    return (
-      <>
-        <AppHeader />
-        <main className="page">
-          <RedeemPage api={pipeline.api} token={redeemToken} onRedeemed={redeemed} />
-        </main>
-      </>
-    )
-  }
+  // The invite page has its own layout (Redeem.dc.html): a brand panel instead of the header.
+  if (onRedeemPage) return <RedeemPage api={pipeline.api} token={redeemToken} onRedeemed={redeemed} />
 
   return (
     <>

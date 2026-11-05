@@ -303,13 +303,32 @@ test('the header shows who is logged in, and logging out ends the session', asyn
   expect(deps.api.logout).toHaveBeenCalled()
 })
 
-test('a login link redeems the token, then opens my games', async () => {
+test('a login link redeems the token, welcomes the player, then opens my games', async () => {
   const deps = fakeDeps()
   renderApp(deps, '/redeem#token=abc123')
 
-  expect(await screen.findByText(/No games yet/)).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: `Welcome, ${PROFILE.name}.` })).toBeInTheDocument()
+  expect(screen.getByText('Invite accepted')).toBeInTheDocument()
   expect(deps.api.redeem).toHaveBeenCalledTimes(1)
   expect(deps.api.redeem).toHaveBeenCalledWith('abc123')
+  fireEvent.click(screen.getByRole('link', { name: 'Open my games' }))
+
+  expect(await screen.findByText(/No games yet/)).toBeInTheDocument()
+})
+
+test('a new player is sent from the invite to set up their profile', async () => {
+  const blank = { ...PROFILE, elo: null, time_control: null, complete: false }
+  renderApp(fakeDeps({ me: vi.fn(async () => blank) }), '/redeem#token=abc123')
+
+  expect(await screen.findByRole('link', { name: 'Set up my profile' })).toHaveAttribute('href', '/profile')
+  expect(screen.getByText('Your profile: name, Elo, time control')).toBeInTheDocument()
+})
+
+test('the invite shows that it is being checked', () => {
+  renderApp(fakeDeps({ redeem: vi.fn(() => new Promise<void>(() => {})) }), '/redeem#token=abc123')
+
+  expect(screen.getByRole('heading', { name: 'Checking your invite…' })).toBeInTheDocument()
+  expect(screen.getByRole('progressbar', { name: 'Checking invite' })).toBeInTheDocument()
 })
 
 test('a used login link shows why it failed', async () => {
@@ -317,7 +336,9 @@ test('a used login link shows why it failed', async () => {
   const deps = fakeDeps({ redeem: vi.fn().mockRejectedValue(used), me: vi.fn().mockRejectedValue(LOGGED_OUT) })
   renderApp(deps, '/redeem#token=abc123')
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('expired or was already used')
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveTextContent("This invite link can't be used.")
+  expect(alert).toHaveTextContent('expired or was already used')
 })
 
 test('reopening a used login link while logged in just opens my games', async () => {
