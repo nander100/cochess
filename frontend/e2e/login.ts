@@ -31,7 +31,7 @@ export async function logInWithProfile(page: Page, link: string, elo: number): P
   await logIn(page, link, elo)
   await page.getByRole('link', { name: 'Skip for now' }).click()
   await page.getByRole('heading', { name: 'My games' }).waitFor()
-  await page.getByRole('link', { name: 'Analyze a game' }).first().click()
+  await page.getByRole('link', { name: /^Analyze (a|your first) game$/ }).first().click()
   await page.getByLabel(/your game/i).waitFor()
 }
 

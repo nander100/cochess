@@ -38,10 +38,73 @@ async function submitGame() {
 
 const LOGGED_OUT = new ApiError(401, "You're not logged in. Ask the owner for a new login link.")
 
-test('renders the app title', async () => {
-  renderApp(fakeDeps())
+const LISTED = {
+  id: 'game-1',
+  played_at: '2026-10-01T18:04:05Z',
+  opponent: 'Rival',
+  user_color: 'white' as const,
+  user_result: 'win' as const,
+  time_control: '600+5',
+  opening: 'Ruy Lopez',
+  accuracy: 81.2,
+  status: 'analyzed' as const,
+}
 
-  expect(await screen.findByRole('heading', { name: 'CoChess' })).toBeInTheDocument()
+test('the header has the logo, the main nav, the player and a theme toggle', async () => {
+  renderApp(fakeDeps(), '/games')
+
+  const banner = screen.getByRole('banner')
+  expect(within(banner).getByRole('link', { name: 'CoChess' })).toBeInTheDocument()
+  const nav = await within(banner).findByRole('navigation', { name: 'Main' })
+  expect(within(nav).getAllByRole('link').map((link) => link.textContent)).toEqual([
+    'Games',
+    'Analysis',
+    'Critical moments',
+    'Assessment',
+    'Profile',
+  ])
+  expect(within(nav).getByRole('link', { name: 'Games' })).toHaveAttribute('aria-current', 'page')
+  expect(within(banner).getByText(PROFILE.name)).toBeInTheDocument()
+})
+
+test('the theme toggle switches between light and dark', async () => {
+  renderApp(fakeDeps(), '/games')
+  expect(document.documentElement.dataset.theme).toBe('light')
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Switch to dark mode' }))
+
+  expect(document.documentElement.dataset.theme).toBe('dark')
+  fireEvent.click(screen.getByRole('button', { name: 'Switch to light mode' }))
+  expect(document.documentElement.dataset.theme).toBe('light')
+})
+
+test('"Analysis" opens the most recent game', async () => {
+  const deps = fakeDeps({ listGames: vi.fn(async () => [LISTED]) })
+  renderApp(deps, '/analysis')
+
+  expect(await screen.findByRole('heading', { name: /Alex – Rival/ })).toBeInTheDocument()
+  const nav = screen.getByRole('navigation', { name: 'Main' })
+  expect(within(nav).getByRole('link', { name: 'Analysis' })).toHaveAttribute('aria-current', 'page')
+})
+
+test('"Critical moments" opens the latest game on its first unfinished moment', async () => {
+  const solved = { ...MOMENT, index: 1, state: 'solved' as const }
+  const open = { ...MOMENT, index: 2, ply: 3, state: 'intro' as const }
+  const deps = fakeDeps({
+    listGames: vi.fn(async () => [LISTED]),
+    getGame: vi.fn(async () => ({ ...DETAIL, moments: [solved, open] })),
+  })
+  renderApp(deps, '/moments')
+
+  expect(await screen.findByRole('tab', { name: /Critical moments/, selected: true })).toBeInTheDocument()
+  const nav = screen.getByRole('navigation', { name: 'Main' })
+  expect(within(nav).getByRole('link', { name: 'Critical moments' })).toHaveAttribute('aria-current', 'page')
+})
+
+test.each(['/analysis', '/moments'])('%s with no games says how to start', async (path) => {
+  renderApp(fakeDeps(), path)
+
+  expect(await screen.findByRole('link', { name: 'Analyze your first game' })).toHaveAttribute('href', '/games')
 })
 
 test('a new game is analyzed, then opens on the board with engine details and a synopsis', async () => {

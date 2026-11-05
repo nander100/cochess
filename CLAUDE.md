@@ -92,8 +92,9 @@ cochess/
     │   ├── dashboard/           # + cards and charts
     │   ├── onboarding/          # paste-and-check table, slots, baseline report
     │   ├── components/          # ChatPanel, GameInput, Synopsis, ProgressBar, ...
-    │   ├── pages/               # Games, Analysis, Onboarding, Profile, Redeem (+ Dashboard, Settings)
+    │   ├── pages/               # Games, Analysis, Onboarding, Profile, Redeem, LatestGamePage (+ the nav's /analysis and /moments), GameOptions
     │   ├── shortcuts/           # + keyboard shortcuts and help overlay
+    │   ├── theme/               # + light/dark/system theme state (ThemeProvider, useTheme)
     │   ├── api/                 # typed client, SSE reader, TS mirrors of backend schemas
     │   └── test/                # fake engine transport, scripted E2E engine, fakes
     └── e2e/                     # Playwright: flows/ (scripted engine + coach), analysis.spec.ts (real Stockfish)

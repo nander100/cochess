@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import type { PipelineDeps } from './analysis/pipeline'
 import { createApiClient, isLoggedOut } from './api/client'
 import type { EngineConfig, Profile } from './api/types'
 import { type EngineHandle, StockfishEngine } from './engine/StockfishEngine'
 import { GamePage } from './pages/GamePage'
 import { GamesPage } from './pages/GamesPage'
+import { LatestGamePage } from './pages/LatestGamePage'
 import { NewGamePage } from './pages/NewGamePage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { BaselineReportPanel } from './onboarding/BaselineReportPanel'
 import { ProfilePage } from './pages/ProfilePage'
 import { RedeemPage } from './pages/RedeemPage'
 import { errorText, tokenFromHash } from './pages/util'
+import { ThemeProvider } from './theme/ThemeProvider'
+import { useTheme } from './theme/themeContext'
+import { ErrorState, Header, type NavItem, Skeleton, ToastProvider } from './ui'
 
 type Session =
   | { kind: 'loading' }
@@ -38,7 +42,31 @@ interface AppProps {
   deps?: PipelineDeps
 }
 
+/** The main nav (docs/design/screens.md). "Analysis" and "Critical moments" open the latest game;
+ * on a game's page, the moments view (?view=moments) highlights "Critical moments". */
+function mainNav(search: string): NavItem[] {
+  const moments = new URLSearchParams(search).get('view') === 'moments'
+  const onGame = (path: string) => path.startsWith('/games/')
+  return [
+    { to: '/games', label: 'Games', activeFor: (path) => path === '/games' || path === '/new' },
+    { to: '/analysis', label: 'Analysis', activeFor: (path) => path === '/analysis' || (onGame(path) && !moments) },
+    { to: '/moments', label: 'Critical moments', activeFor: (path) => path === '/moments' || (onGame(path) && moments) },
+    { to: '/onboarding', label: 'Assessment', activeFor: (path) => path === '/onboarding' },
+    { to: '/profile', label: 'Profile', activeFor: (path) => path === '/profile' },
+  ]
+}
+
 export default function App({ deps }: AppProps) {
+  return (
+    <ThemeProvider>
+      <ToastProvider>
+        <Shell deps={deps} />
+      </ToastProvider>
+    </ThemeProvider>
+  )
+}
+
+function Shell({ deps }: AppProps) {
   const [pipeline] = useState(() => deps ?? defaultDeps())
   const [session, setSession] = useState<Session>({ kind: 'loading' })
   const location = useLocation()
@@ -69,22 +97,21 @@ export default function App({ deps }: AppProps) {
 
   if (onRedeemPage) {
     return (
-      <main>
-        <Header />
-        <RedeemPage api={pipeline.api} token={redeemToken} onRedeemed={redeemed} />
-      </main>
+      <>
+        <AppHeader />
+        <main className="page">
+          <RedeemPage api={pipeline.api} token={redeemToken} onRedeemed={redeemed} />
+        </main>
+      </>
     )
   }
 
   return (
-    <main>
-      <Header session={session} onLogOut={() => void logOut()} />
-      {session.kind === 'loading' && <p className="coach-writing">Connecting…</p>}
-      {session.kind === 'error' && (
-        <p className="run-error" role="alert">
-          {session.message}
-        </p>
-      )}
+    <>
+      <AppHeader session={session} onLogOut={() => void logOut()} />
+      <main className="page">
+      {session.kind === 'loading' && <Skeleton label="Connecting…" />}
+      {session.kind === 'error' && <ErrorState message={session.message} onRetry={loadProfile} />}
       {session.kind === 'logged-out' && (
         <p className="logged-out" role="alert">
           You're not logged in. Ask the owner for a login link, then open it in this browser.
@@ -116,6 +143,14 @@ export default function App({ deps }: AppProps) {
               <Route path="/" element={<Navigate to="/games" replace />} />
               <Route path="/games" element={<GamesPage api={pipeline.api} onLoggedOut={loggedOut} />} />
               <Route path="/games/:gameId" element={<GamePage deps={pipeline} onLoggedOut={loggedOut} />} />
+              <Route
+                path="/analysis"
+                element={<LatestGamePage api={pipeline.api} target="analysis" onLoggedOut={loggedOut} />}
+              />
+              <Route
+                path="/moments"
+                element={<LatestGamePage api={pipeline.api} target="moments" onLoggedOut={loggedOut} />}
+              />
               <Route path="/new" element={<NewGamePage deps={pipeline} onLoggedOut={loggedOut} />} />
               <Route path="/onboarding" element={<OnboardingPage deps={pipeline} onLoggedOut={loggedOut} />} />
             </>
@@ -125,32 +160,30 @@ export default function App({ deps }: AppProps) {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       )}
-    </main>
+      </main>
+    </>
   )
 }
 
-interface HeaderProps {
+interface AppHeaderProps {
   session?: Session
   onLogOut?: () => void
 }
 
-function Header({ session, onLogOut }: HeaderProps) {
+/** The design's black header. The nav and the player's name appear once logged in; "Log out"
+ * sits with the name (the design has no place for it). */
+function AppHeader({ session, onLogOut }: AppHeaderProps) {
+  const { pathname, search } = useLocation()
+  const { theme, toggle } = useTheme()
+  const signedIn = session?.kind === 'in'
   return (
-    <header>
-      <h1>CoChess</h1>
-      <p className="tagline">Paste a game. The engine finds what happened; your coach explains it.</p>
-      {session?.kind === 'in' && (
-        <nav aria-label="Main">
-          <span className="signed-in">{session.profile.name}</span>
-          <Link to="/games">My games</Link>
-          <Link to="/new">Analyze a game</Link>
-          <Link to="/onboarding">Assessment</Link>
-          <Link to="/profile">Profile</Link>
-          <button type="button" className="link-button" onClick={onLogOut}>
-            Log out
-          </button>
-        </nav>
-      )}
-    </header>
+    <Header
+      nav={signedIn ? mainNav(search) : []}
+      pathname={pathname}
+      playerName={signedIn ? session.profile.name : null}
+      theme={theme}
+      onToggleTheme={toggle}
+      onLogOut={signedIn ? onLogOut : undefined}
+    />
   )
 }

@@ -11,21 +11,14 @@
   --space: var(--space-4);
 }
 
-main {
-  max-width: 76rem;
+/* Page content under the header (tokens.md "Spacing"). */
+.page {
+  box-sizing: border-box;
+  max-width: var(--page-max);
   margin: 0 auto;
-  padding: 2rem var(--space) 4rem;
+  padding: var(--space-8) var(--page-gutter) var(--space-16);
 }
 
-h1 {
-  font-size: 2.25rem;
-  margin: 0 0 0.25rem;
-}
-
-.tagline {
-  color: var(--color-muted);
-  margin: 0 0 2rem;
-}
 
 .game-input {
   max-width: 52rem;
@@ -324,22 +317,9 @@ progress {
   padding: 0.45rem 0.5rem;
 }
 
-nav[aria-label='Main'] {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 1.2rem;
-  margin-top: 0.4rem;
-}
-
-nav[aria-label='Main'] a,
 .link-button {
   color: var(--color-accent);
   font-weight: 600;
-}
-
-.signed-in {
-  color: var(--color-muted);
 }
 
 button.link-button {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { type ChatDeps, type ChatProgress, askCoach, explainPosition } from '../analysis/chat'
 import { BeforeSearches, type MomentDeps, fenAfter } from '../analysis/moments'
 import { type AnalysisRun, type AnalysisStatus, type PipelineDeps, resumeGame, statusLabel } from '../analysis/pipeline'
@@ -49,7 +49,16 @@ type Load = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: '
 /** One game on the analysis board, loaded from the database (SPEC_V2 §5.1). */
 export function GamePage({ deps, onLoggedOut }: GamePageProps) {
   const { gameId = '' } = useParams()
-  const fresh = (useLocation().state as FreshAnalysis | null)?.run ?? null
+  const location = useLocation()
+  const fresh = (location.state as FreshAnalysis | null)?.run ?? null
+  // ?view=moments&moment=N opens the critical-moments view (the nav's "Critical moments").
+  const [params, setParams] = useSearchParams()
+  const initialTab: Tab = params.get('view') === 'moments' ? 'moments' : 'coach'
+  const initialMoment = Number(params.get('moment')) || null
+  const showTab = useCallback(
+    (tab: Tab) => setParams(tab === 'moments' ? { view: 'moments' } : {}, { replace: true, state: location.state }),
+    [setParams, location.state],
+  )
   const [load, setLoad] = useState<Load>({ kind: 'loading' })
   // After a color change that needs a few positions verified, the analysis resumes on its own.
   const [autoResume, setAutoResume] = useState(false)
@@ -83,6 +92,9 @@ export function GamePage({ deps, onLoggedOut }: GamePageProps) {
       detail={load.detail}
       deps={deps}
       fresh={fresh}
+      initialTab={initialTab}
+      initialMoment={initialMoment}
+      onTabChange={showTab}
       onLoggedOut={onLoggedOut}
       onAnalyzed={reload}
       autoResume={autoResume}
@@ -102,6 +114,9 @@ interface AnalysisBoardProps {
   onLoggedOut: () => void
   onAnalyzed: () => void
   autoResume: boolean
+  initialTab: Tab
+  initialMoment: number | null
+  onTabChange: (tab: Tab) => void
   onColorChanged: (detail: GameDetail) => void
   onDeleted: () => void
 }
@@ -110,18 +125,27 @@ type Tab = 'coach' | 'moments'
 
 function AnalysisBoard({
   detail, deps, fresh, onLoggedOut, onAnalyzed, autoResume, onColorChanged, onDeleted,
+  initialTab, initialMoment, onTabChange,
 }: AnalysisBoardProps) {
   const [tree, setTree] = useState<GameTree>(() =>
     detail.moments.filter((m) => !isUnsolved(m)).reduce(withMomentLines, fromMoves(detail.moves, detail.final_fen)),
   )
-  const [current, setCurrent] = useState(ROOT)
+  // Opening on a finished moment shows its position, as choosing it in the moments list does.
+  const [current, setCurrent] = useState(() => {
+    const opened = initialTab === 'moments' ? detail.moments.find((m) => m.index === initialMoment) : undefined
+    return opened && !isUnsolved(opened) ? mainlineNode(tree, opened.ply - 1) : ROOT
+  })
 
   // Critical moments (SPEC_V2 §8.2). While the one on screen is unsolved, the board shows its
   // position, a move played there is the attempt (not added to the tree), and navigation, the
   // engine and the chat are locked (PLAN_V2 §6 Q3). Leaving the tab pauses the exercise.
-  const [tab, setTab] = useState<Tab>('coach')
+  const [tab, setTab] = useState<Tab>(initialTab)
   const [moments, setMoments] = useState<MomentInfo[]>(detail.moments)
-  const [momentIndex, setMomentIndex] = useState(() => (detail.moments.find(isUnsolved) ?? detail.moments[0])?.index ?? 0)
+  const [momentIndex, setMomentIndex] = useState(
+    () =>
+      (detail.moments.find((m) => m.index === initialMoment) ?? detail.moments.find(isUnsolved) ?? detail.moments[0])
+        ?.index ?? 0,
+  )
   const [candidate, setCandidate] = useState<string | null>(null)
   const [searches] = useState(() => new BeforeSearches())
   const moment = tab === 'moments' ? (moments.find((m) => m.index === momentIndex) ?? null) : null
@@ -183,6 +207,7 @@ function AnalysisBoard({
 
   function openTab(next: Tab) {
     setTab(next)
+    onTabChange(next)
     setCandidate(null)
     const shown = moments.find((m) => m.index === momentIndex)
     if (next === 'moments' && shown && !isUnsolved(shown)) setCurrent(mainlineNode(tree, shown.ply - 1))

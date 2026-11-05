@@ -86,3 +86,18 @@
   color: var(--header-fg-2);
   font: var(--text-ui);
 }
+
+.ui-header-logout {
+  min-height: var(--control-height);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--header-fg-2);
+  font: var(--text-ui);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ui-header-logout:hover {
+  color: var(--header-fg);
+}
