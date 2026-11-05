@@ -57,6 +57,7 @@
   --text-section: 700 22px / 1.25 var(--font-heading);
   --text-card-value: 700 22px / 1.2 var(--font-heading);
   --text-panel: 700 18px / 1.3 var(--font-heading);
+  --text-panel-size-large: 20px;
   --text-logo: 700 20px / 1 var(--font-heading);
   --text-lead: 400 17px / 1.55 var(--font-body);
   --text-body: 400 15px / 1.6 var(--font-body);
@@ -101,6 +102,11 @@
   --field-min: 220px;
   --hero-column: 420px;
   --lead-width: 520px;
+  --lead-width-wide: 620px;
+  --paste-form: 360px;
+  --paste-results: 560px;
+  --paste-table-min: 640px;
+  --slot-cell-height: 10px;
   --table-min: 680px;
   --text-avatar-size: 26px;
   --brand-art: 320px;
@@ -123,6 +129,7 @@
   /* Controls */
   --control-height: 44px;
   --control-height-large: 48px;
+  --control-height-small: 40px;
   --step-dot: 28px;
   --icon-size: 20px;
   --icon-size-small: 18px;

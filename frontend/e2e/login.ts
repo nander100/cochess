@@ -43,5 +43,5 @@ export async function logIn(page: Page, link: string, elo: number): Promise<void
   await page.getByLabel(/rating/i).fill(String(elo))
   await page.getByLabel('Rapid', { exact: true }).check()
   await page.getByRole('button', { name: /^Save/ }).click()
-  await page.getByRole('heading', { name: 'Your baseline assessment' }).waitFor()
+  await page.getByRole('heading', { name: 'Twelve games, one honest picture of your play.' }).waitFor()
 }

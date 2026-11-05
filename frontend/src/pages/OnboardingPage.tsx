@@ -6,10 +6,11 @@ import type { PipelineDeps } from '../analysis/pipeline'
 import { type QueueProgress, queueLabel, runOnboardingQueue } from '../analysis/queue'
 import { isLoggedOut } from '../api/client'
 import type { OnboardingStatus } from '../api/types'
-import { ProgressBar } from '../components/ProgressBar'
 import { CATEGORY_LABEL, SLOT_LABEL } from '../onboarding/labels'
 import { PasteGames } from '../onboarding/PasteGames'
 import { SlotChecklist } from '../onboarding/SlotChecklist'
+import { Button, Card, ErrorState, Eyebrow, FeatureCard, Pill, ProgressBar, Skeleton, TypingIndicator } from '../ui'
+import './OnboardingPage.css'
 import { errorText, gameDate } from './util'
 
 interface OnboardingPageProps {
@@ -96,28 +97,46 @@ export function OnboardingPage({ deps, onLoggedOut }: OnboardingPageProps) {
 
   if (status === null) {
     return error ? (
-      <p className="run-error" role="alert">
-        {error}
-      </p>
+      <ErrorState message={error} onRetry={() => void refresh()} />
     ) : (
-      <p className="coach-writing">Loading…</p>
+      <Skeleton lines={4} label="Loading your assessment…" />
     )
   }
 
   const shownReport = report ?? status.report?.text ?? null
   const primary = status.primary_time_control
   const pending = status.games.length - status.analyzed
+  const filled = status.slots.reduce((sum, slot) => sum + Math.min(slot.filled, slot.of), 0)
+  const needed = status.slots.reduce((sum, slot) => sum + slot.of, 0)
 
   return (
     <div className="onboarding">
-      <section className="panel" aria-labelledby="onboarding-title">
-        <h2 id="onboarding-title">Your baseline assessment</h2>
-        <p>
-          Add 12 of your {primary ? CATEGORY_LABEL[primary].toLowerCase() : ''} games: 3 wins and 3 losses with White,
-          and the same with Black. The engine analyzes each one here in your browser (about 10 minutes in all), then
-          your coach writes a report on where you stand. <Link to="/games">Skip for now</Link>: you can analyze single
-          games any time.
-        </p>
+      <section className="onboarding-hero" aria-labelledby="onboarding-title">
+        <div className="onboarding-hero-text">
+          <Eyebrow>Assessment</Eyebrow>
+          <h1 id="onboarding-title" className="onboarding-title">
+            Twelve games, one honest picture of your play.
+          </h1>
+          <p className="onboarding-lead">
+            Add 3 wins and 3 losses with each color, all in your main time control
+            {primary ? ` (${CATEGORY_LABEL[primary]})` : ''}. The engine analyzes each one here in your browser (about 10
+            minutes in all); then your coach writes a baseline report on where you stand.
+          </p>
+        </div>
+        <Link to="/games" className="onboarding-skip">
+          Skip for now
+        </Link>
+      </section>
+
+      <section className="onboarding-slots" aria-labelledby="onboarding-slots">
+        <div className="onboarding-section-head">
+          <h2 id="onboarding-slots" className="onboarding-section-title">
+            Your 12 slots
+          </h2>
+          <span className="onboarding-muted">
+            {filled} of {needed} filled
+          </span>
+        </div>
         <SlotChecklist slots={status.slots} />
       </section>
 
@@ -131,79 +150,106 @@ export function OnboardingPage({ deps, onLoggedOut }: OnboardingPageProps) {
           onLoggedOut={onLoggedOut}
         />
       )}
-      {notice && <p role="status">{notice}</p>}
+      {notice && (
+        <p className="onboarding-notice" role="status">
+          {notice}
+        </p>
+      )}
 
       {status.games.length > 0 && (
-        <section className="panel" aria-label="Your onboarding games">
-          <h2>
-            Games ({status.analyzed} of {status.games.length} analyzed)
-          </h2>
+        <Card as="section" className="onboarding-progress" aria-label="Your onboarding games">
+          <div className="onboarding-section-head">
+            <h2 className="onboarding-card-title">
+              Games ({status.analyzed} of {status.games.length} analyzed)
+            </h2>
+            {pending > 0 && <span className="onboarding-muted">Analyzing in your browser</span>}
+          </div>
           {progress && (
             <ProgressBar
               label={queueLabel(progress)}
               {...(progress.status.phase === 'starting' ? { done: 0, total: 1 } : progress.status)}
             />
           )}
+          {pending > 0 && (
+            <p className="onboarding-muted">You can close this tab: the analysis picks up where it stopped.</p>
+          )}
           {!progress && pending > 0 && (
-            <button type="button" onClick={() => void analyze()}>
+            <Button className="onboarding-continue" onClick={() => void analyze()}>
               Continue analysis ({pending} left)
-            </button>
+            </Button>
           )}
           <ol className="onboarding-games">
             {status.games.map((game) => (
               <li key={game.id}>
-                <span className="slot-tag">{SLOT_LABEL[game.slot]}</span> vs {game.opponent},{' '}
-                {gameDate(game.played_at)}
-                {game.opening ? ` · ${game.opening}` : ''} ·{' '}
-                {game.status === 'analyzed' ? <Link to={`/games/${game.id}`}>Open</Link> : 'waiting for analysis'}{' '}
+                <Pill tone="neutral">{SLOT_LABEL[game.slot]}</Pill>
+                <span className="onboarding-game-text">
+                  vs {game.opponent}, {gameDate(game.played_at)}
+                  {game.opening ? ` · ${game.opening}` : ''}
+                </span>
+                {game.status === 'analyzed' ? (
+                  <Link to={`/games/${game.id}`}>Open</Link>
+                ) : (
+                  <span className="onboarding-muted">waiting for analysis</span>
+                )}
                 {removing === game.id ? (
-                  <span role="group" aria-label={`Remove the game vs ${game.opponent}?`}>
-                    Remove this game?{' '}
-                    <button type="button" className="danger" onClick={() => void remove(game.id)}>
+                  <span role="group" aria-label={`Remove the game vs ${game.opponent}?`} className="onboarding-confirm">
+                    Remove this game?
+                    <Button variant="danger" onClick={() => void remove(game.id)}>
                       Remove
-                    </button>{' '}
-                    <button type="button" className="secondary" onClick={() => setRemoving(null)}>
+                    </Button>
+                    <Button variant="outline" onClick={() => setRemoving(null)}>
                       Keep
-                    </button>
+                    </Button>
                   </span>
                 ) : (
-                  <button
-                    type="button"
-                    className="link-button"
+                  <Button
+                    variant="link"
                     disabled={progress !== null}
                     aria-label={`Remove the game vs ${game.opponent}`}
                     onClick={() => setRemoving(game.id)}
                   >
                     Remove
-                  </button>
+                  </Button>
                 )}
               </li>
             ))}
           </ol>
-        </section>
+        </Card>
       )}
 
-      {error && (
-        <p className="run-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <ErrorState message={error} />}
 
-      {(status.report_ready || shownReport) && (
-        <section className="panel synopsis" aria-label="Baseline report">
-          <h2>Baseline report</h2>
+      <FeatureCard as="section" className="onboarding-report" aria-label="Baseline report">
+        <div className="onboarding-report-text">
+          <span className="ui-eyebrow">Baseline report</span>
           {shownReport ? (
-            <div className="synopsis-text">
+            <div className="onboarding-report-body">
               <Markdown>{shownReport}</Markdown>
             </div>
           ) : (
-            <button type="button" onClick={() => void writeReport()} disabled={writing}>
-              Write my baseline report
-            </button>
+            <>
+              <h2 className="onboarding-report-title">
+                {status.report_ready ? 'Ready to write' : 'Unlocks when all 12 games are analyzed'}
+              </h2>
+              <p>
+                Your strengths, the top three things to work on with examples from your games, how your openings are
+                going, and a 2–4 week focus plan.
+              </p>
+            </>
           )}
-          {writing && <p className="coach-writing">Your coach is reading all 12 games…</p>}
-        </section>
-      )}
+          {writing && <TypingIndicator label="Your coach is reading all 12 games…" />}
+        </div>
+        {!shownReport &&
+          (status.report_ready ? (
+            <Button className="onboarding-write" onClick={() => void writeReport()} disabled={writing}>
+              Write my baseline report
+            </Button>
+          ) : (
+            <Button variant="outline" className="onboarding-locked" disabled>
+              Generate report · {status.analyzed}/{needed}
+            </Button>
+          ))}
+      </FeatureCard>
     </div>
   )
 }

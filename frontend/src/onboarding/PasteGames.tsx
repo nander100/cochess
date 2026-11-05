@@ -2,7 +2,9 @@ import { type FormEvent, useId, useState } from 'react'
 import { type ApiClient, isLoggedOut } from '../api/client'
 import type { Color, GameChoice, ParseResponse, ParsedRow, SubmitGame, TimeControl } from '../api/types'
 import { errorText } from '../pages/util'
+import { Button, Pill, Table } from '../ui'
 import { CATEGORY_LABEL, PICKABLE, SLOT_LABEL, reasonText } from './labels'
+import './Onboarding.css'
 
 interface PasteGamesProps {
   api: ApiClient
@@ -93,42 +95,47 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
     onAdded(`Added ${count} game${count === 1 ? '' : 's'}.`)
   }
 
+  const unusable = rows.filter((row) => row.slot === null && !needsColor(row)).length
+
   return (
-    <section className="panel paste-games" aria-label="Add games">
-      <form onSubmit={(event) => void check(event)}>
-        <label htmlFor={`${id}-pgn`}>Paste one or more games (PGN)</label>
+    <section className="paste-games" aria-label="Add games">
+      <form className="ui-tinted-panel paste-form" onSubmit={(event) => void check(event)}>
+        <h2 className="paste-title">Add games</h2>
+        <label className="paste-label" htmlFor={`${id}-pgn`}>
+          Paste one or more games (PGN). We split them and check each one.
+        </label>
         <textarea
           id={`${id}-pgn`}
-          className="pgn"
-          rows={6}
+          className="ui-input ui-textarea ui-mono"
+          rows={8}
           value={text}
           onChange={(event) => {
             setText(event.target.value)
             setParsed(null)
           }}
           disabled={busy}
-          placeholder={'[Event "Rated rapid game"]\n...\n\n[Event "Rated rapid game"]\n...'}
+          placeholder={'[Event "Rated rapid game"]\n1. e4 c5 ...\n\n[Event "Rated rapid game"]\n1. d4 Nf6 ...'}
         />
-        <button type="submit" disabled={busy || !text.trim()}>
+        <Button type="submit" className="paste-check" disabled={busy || !text.trim()}>
           Check games
-        </button>
+        </Button>
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
       </form>
-      {error && (
-        <p className="run-error" role="alert">
-          {error}
-        </p>
-      )}
       {parsed && (
-        <>
-          <table className="paste-table">
+        <div className="paste-results">
+          <h2 className="paste-subtitle">Checked games</h2>
+          <Table className="paste-table" aria-label="Checked games">
             <thead>
               <tr>
-                <th scope="col">White</th>
-                <th scope="col">Black</th>
+                <th scope="col">Players</th>
                 <th scope="col">Result</th>
                 <th scope="col">Date</th>
                 <th scope="col">Time control</th>
-                <th scope="col">You played</th>
+                <th scope="col">I played</th>
                 <th scope="col">Slot</th>
               </tr>
             </thead>
@@ -143,22 +150,27 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
                 />
               ))}
             </tbody>
-          </table>
+          </Table>
           <div className="paste-actions">
-            <button
-              type="button"
+            <span className="paste-summary">
+              {plural(usable.length)} can be added
+              {unusable > 0 && ` · ${unusable} can't be used`}
+              {missingColor.length > 0 && ` · ${plural(missingColor.length)} need${missingColor.length === 1 ? 's' : ''} a color`}
+            </span>
+            {detectable && (
+              <Button variant="outline" onClick={applyDetected} disabled={busy}>
+                Use detected colors
+              </Button>
+            )}
+            <Button
+              variant="secondary"
               onClick={() => void add()}
               disabled={busy || missingColor.length > 0 || usable.length === 0}
             >
               {addLabel(missingColor.length, usable.length)}
-            </button>
-            {detectable && (
-              <button type="button" className="secondary" onClick={applyDetected} disabled={busy}>
-                Use detected colors
-              </button>
-            )}
+            </Button>
           </div>
-        </>
+        </div>
       )}
     </section>
   )
@@ -190,15 +202,17 @@ function Row({ row, primary, disabled, onChoose }: RowProps) {
   const label = `game ${row.index + 1}`
   return (
     <tr className={needsColor(row) ? 'needs-color' : row.slot ? 'fills' : 'unused'}>
-      <td>{row.white ?? '?'}</td>
-      <td>{row.black ?? '?'}</td>
-      <td>{row.result ?? '?'}</td>
-      <td>{row.date ?? '—'}</td>
-      <td>
+      <td className="paste-players">
+        {row.white ?? '?'} vs {row.black ?? '?'}
+      </td>
+      <td className="numeric">{row.result ?? '?'}</td>
+      <td className="paste-muted">{row.date ?? '—'}</td>
+      <td className="paste-muted">
         {row.category || row.error ? (
           row.category ? CATEGORY_LABEL[row.category] : '—'
         ) : (
           <select
+            className="ui-input ui-select paste-select"
             aria-label={`Time control for ${label}`}
             defaultValue=""
             disabled={disabled}
@@ -220,6 +234,7 @@ function Row({ row, primary, disabled, onChoose }: RowProps) {
           '—'
         ) : (
           <select
+            className="ui-input ui-select paste-select"
             aria-label={`Your color in ${label}`}
             value={row.user_color ?? ''}
             disabled={disabled}
@@ -238,7 +253,13 @@ function Row({ row, primary, disabled, onChoose }: RowProps) {
           </span>
         )}
       </td>
-      <td>{row.slot ? SLOT_LABEL[row.slot] : <span className="slot-reason">{reason}</span>}</td>
+      <td>
+        {row.slot ? (
+          <Pill tone="analyzed">{SLOT_LABEL[row.slot]}</Pill>
+        ) : (
+          <span className="slot-reason">{reason}</span>
+        )}
+      </td>
     </tr>
   )
 }

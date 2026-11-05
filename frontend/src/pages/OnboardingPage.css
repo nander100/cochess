@@ -1,0 +1,168 @@
+.onboarding {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  max-width: var(--page-max-games);
+  margin: 0 auto;
+}
+
+.onboarding-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+
+.onboarding-hero-text {
+  display: flex;
+  flex: 1 1 var(--lead-width);
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.onboarding-title {
+  margin: 0;
+  font: var(--text-display-2);
+  letter-spacing: var(--tracking-display);
+}
+
+.onboarding-lead {
+  max-width: var(--lead-width-wide);
+  margin: 0;
+  font: var(--text-body-large);
+  color: var(--color-muted);
+}
+
+.onboarding-skip {
+  font: var(--text-ui-strong);
+}
+
+.onboarding-slots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.onboarding-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.onboarding-section-title {
+  flex: 1 1 auto;
+  margin: 0;
+  font: var(--text-section);
+}
+
+.onboarding-card-title {
+  flex: 1 1 auto;
+  margin: 0;
+  font: var(--text-body-large);
+  font-weight: 600;
+  font-family: var(--font-body);
+  letter-spacing: normal;
+}
+
+.onboarding-muted {
+  margin: 0;
+  color: var(--color-muted);
+  font: var(--text-ui);
+}
+
+.onboarding-notice {
+  margin: 0;
+  font-weight: 600;
+  color: var(--chess-good);
+}
+
+.onboarding-progress.ui-card {
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border-radius: var(--radius-panel);
+}
+
+.onboarding-continue {
+  align-self: flex-start;
+}
+
+.onboarding-games {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.onboarding-games li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: var(--border-width) solid var(--color-row-border);
+}
+
+.onboarding-game-text {
+  flex: 1 1 auto;
+}
+
+.onboarding-confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.onboarding-report.ui-feature-card {
+  flex-flow: row wrap;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-8);
+  border-radius: var(--radius-panel);
+}
+
+.onboarding-report-text {
+  display: flex;
+  flex: 1 1 var(--hero-column);
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.onboarding-report-title {
+  margin: 0;
+  font: var(--text-section);
+  color: var(--color-feature-fg);
+}
+
+.onboarding-report-text p {
+  margin: 0;
+}
+
+.onboarding-report-body {
+  color: var(--color-feature-muted);
+  font: var(--text-body);
+}
+
+.onboarding-report-body h2,
+.onboarding-report-body h3 {
+  color: var(--color-feature-fg);
+}
+
+.onboarding-write.ui-button {
+  min-height: var(--control-height-large);
+  background: var(--header-accent);
+  color: var(--header-accent-fg);
+}
+
+.onboarding-locked.ui-button {
+  min-height: var(--control-height-large);
+  border-color: var(--color-eval-border);
+  background: transparent;
+  color: var(--color-feature-muted);
+  opacity: 1;
+}

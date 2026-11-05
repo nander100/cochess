@@ -1,0 +1,167 @@
+/* Slot cards and the paste-and-check panel (Onboarding.dc.html). */
+
+.slot-checklist {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--field-min), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slot-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.slot-card.full {
+  border-color: var(--color-tint-border);
+  background: var(--color-tint);
+}
+
+.slot-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.slot-swatch {
+  width: var(--swatch-size);
+  height: var(--swatch-size);
+  border: var(--board-frame-width) solid var(--color-fg);
+  border-radius: var(--radius-swatch);
+}
+
+.slot-swatch.white {
+  background: var(--brand-white);
+}
+
+.slot-swatch.black {
+  background: var(--brand-black);
+}
+
+.slot-name {
+  flex: 1 1 auto;
+  font: var(--text-small-heading);
+}
+
+.slot-count {
+  font: var(--text-ui-strong);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.slot-cells {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.slot-cells span {
+  height: var(--slot-cell-height);
+  border: var(--border-width) solid var(--color-field-border);
+  border-radius: var(--radius-pill);
+}
+
+.slot-cells span.filled {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.paste-games {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-6);
+}
+
+.paste-form.ui-tinted-panel {
+  flex: 1 1 var(--paste-form);
+  min-width: 0;
+}
+
+.paste-title {
+  margin: 0;
+  font: var(--text-panel);
+  font-size: var(--text-panel-size-large);
+}
+
+.paste-label {
+  font: var(--text-ui);
+  color: var(--color-muted);
+}
+
+.paste-check {
+  align-self: flex-start;
+}
+
+.paste-results {
+  display: flex;
+  flex: 2 1 var(--paste-results);
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.paste-subtitle {
+  margin: 0;
+  font: var(--text-body-large);
+  font-weight: 600;
+  font-family: var(--font-body);
+  letter-spacing: normal;
+}
+
+.paste-results .ui-table {
+  min-width: var(--paste-table-min);
+}
+
+.paste-players {
+  font-weight: 600;
+}
+
+.paste-muted {
+  color: var(--color-muted);
+}
+
+.paste-select.ui-input {
+  width: auto;
+  min-height: var(--control-height-small);
+  border-radius: var(--radius-nav);
+}
+
+.paste-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.paste-summary {
+  flex: 1 1 auto;
+  color: var(--color-muted);
+}
+
+.slot-reason {
+  color: var(--color-muted);
+}
+
+.ui-table tr.unused td {
+  color: var(--color-muted);
+}
+
+/* A row still waiting for the player's color (SPEC_V3 §4.6): a bar and a label, not color alone. */
+.ui-table tr.needs-color td:first-child {
+  box-shadow: inset var(--space-1) 0 0 var(--color-danger);
+}
+
+.color-hint {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-muted);
+  font: var(--text-pill);
+  font-weight: 400;
+}

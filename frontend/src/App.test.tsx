@@ -349,7 +349,7 @@ test('a new player fills in the profile first, then sees the assessment (which t
   fireEvent.click(screen.getByLabelText('Blitz'))
   fireEvent.click(screen.getByRole('button', { name: 'Save and continue' }))
 
-  expect(await screen.findByRole('heading', { name: 'Your baseline assessment' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'Twelve games, one honest picture of your play.' })).toBeInTheDocument()
   fireEvent.click(screen.getByRole('link', { name: 'Skip for now' }))
   expect(await screen.findByText(/No games yet/)).toBeInTheDocument()
   expect(deps.api.updateMe).toHaveBeenCalledWith({

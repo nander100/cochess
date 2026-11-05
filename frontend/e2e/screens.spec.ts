@@ -4,10 +4,11 @@ import { HUNG_KNIGHT, rapidGame } from './flows/games.ts'
 import { TEST_RESULTS } from './paths.ts'
 
 // The M1 checkpoint evidence (SPEC_V3 §12): every page in light and dark at 1280 and 1920 px.
-// Run with `SCREENS=1 npx playwright test`; files land in test-results/screens/.
+// Run with `SCREENS=1 npx playwright test`; files land in frontend/screenshots/ (git-ignored).
 const WIDTHS = [1280, 1920] as const
 const THEMES = ['light', 'dark'] as const
-const OUT = `${TEST_RESULTS}/screens`
+// Outside test-results/, which Playwright clears on every run.
+const OUT = `${TEST_RESULTS}/../screenshots`
 
 /** Switch theme the way a player does (header toggle, or the invite page's button), so the app's
  * theme state and its settings controls agree with what's shown. */
@@ -67,7 +68,7 @@ test('every page, light and dark, 1280 and 1920', async ({ page, browser }) => {
   await page.getByLabel(/rating/i).fill('1200')
   await page.getByLabel('Rapid', { exact: true }).check()
   await page.getByRole('button', { name: /^Save/ }).click()
-  await page.getByRole('heading', { name: 'Your baseline assessment' }).waitFor()
+  await page.getByRole('heading', { name: 'Twelve games, one honest picture of your play.' }).waitFor()
   const games = [rapidGame(0, 'white', '1-0'), rapidGame(1, 'black', '0-1'), rapidGame(2, 'white', '0-1')]
   await page.getByLabel(/Paste one or more games/).fill(games.join('\n\n'))
   await page.getByRole('button', { name: 'Check games' }).click()
