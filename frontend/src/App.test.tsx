@@ -29,7 +29,8 @@ function renderApp(deps: PipelineDeps, path = '/new') {
 }
 
 async function submitGame() {
-  fireEvent.change(await screen.findByLabelText(/your game/i), {
+  fireEvent.click(await screen.findByLabelText('I played White'))
+  fireEvent.change(screen.getByLabelText(/your game/i), {
     target: { value: '1. e4 e5 2. Nf3 *' },
   })
   fireEvent.click(screen.getByRole('button', { name: 'Analyze' }))

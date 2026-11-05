@@ -79,10 +79,22 @@ def report_text(events: list[tuple[str, dict[str, Any]]]) -> str:
 
 
 class TestParse:
-    def test_the_paste_becomes_a_table_with_suggested_colors_and_slots(self) -> None:
+    def test_suggested_colors_are_hints_and_no_color_is_preselected(self) -> None:
         client, _, _ = make()
 
-        data = parse(client, [pgn(0, "white", "1-0"), pgn(1, "black", "1-0")])
+        rows = parse(client, [pgn(0, "white", "1-0"), pgn(1, "black", "1-0")])["games"]
+
+        assert [r["suggested_color"] for r in rows] == ["white", "black"]
+        assert [(r["user_color"], r["user_result"], r["slot"], r["reason"]) for r in rows] == [
+            (None, None, None, "needs_color"),
+            (None, None, None, "needs_color"),
+        ]
+
+    def test_the_paste_becomes_a_table_with_slots_once_colors_are_chosen(self) -> None:
+        client, _, _ = make()
+        choices = [{"user_color": "white"}, {"user_color": "black"}]
+
+        data = parse(client, [pgn(0, "white", "1-0"), pgn(1, "black", "1-0")], choices)
 
         assert data["primary_time_control"] == "rapid"
         rows = data["games"]
@@ -113,7 +125,7 @@ class TestParse:
             pgn(5, "white", "1-0"),
         ]
 
-        rows = parse(client, games)["games"]
+        rows = parse(client, games, [{"user_color": "white"}] * len(games))["games"]
 
         assert [r["reason"] for r in rows] == [
             "draw",
@@ -130,7 +142,10 @@ class TestParse:
     def test_the_players_choices_settle_color_and_a_missing_time_control(self) -> None:
         client, _, _ = make()
         games = [pgn(0, "white", "1-0", tc=None), pgn(1, "white", "1-0", tc="-")]
-        choices = [{"time_control_category": "rapid"}, {"user_color": "black"}]
+        choices = [
+            {"user_color": "white", "time_control_category": "rapid"},
+            {"user_color": "black"},
+        ]
 
         rows = parse(client, games, choices)["games"]
 
@@ -186,6 +201,21 @@ class TestSubmit:
             ("onboarding", "rapid", "uploaded")
         }
         assert {g.id for g in stored} == {results[0]["game_id"], results[2]["game_id"]}
+
+    @pytest.mark.parametrize("color", [None, "missing"], ids=["null", "missing"])
+    def test_every_game_needs_a_color(self, color: str | None) -> None:
+        client, _, _ = make()
+        game: dict[str, Any] = {"pgn": pgn(0, "white", "1-0")}
+        if color is None:
+            game["user_color"] = None
+
+        response = client.post("/api/onboarding/submit", json={"games": [game]})
+
+        assert response.status_code == 422
+        assert response.json()["detail"][0]["msg"] == (
+            "Choose the color you played: White or Black."
+        )
+        assert client.get("/api/onboarding/status").json()["games"] == []
 
     def test_a_full_slot_takes_no_more_games(self) -> None:
         client, _, _ = make()

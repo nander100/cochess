@@ -16,6 +16,7 @@ test('a used login link and logging out say what to do next', async ({ page }) =
 
 test('upload errors are explained', async ({ page }) => {
   await logInWithProfile(page, newLoginLink(`Upload errors ${Date.now()}`), 1200)
+  await page.getByLabel('I played White').check()
   const input = page.getByLabel(/your game/i)
   const analyze = page.getByRole('button', { name: 'Analyze' })
 
@@ -34,6 +35,7 @@ test('upload errors are explained', async ({ page }) => {
   await analyze.click()
   await expect(page).toHaveURL(/\/games\//, { timeout: 60_000 })
   await page.getByRole('link', { name: 'Analyze a game' }).first().click()
+  await page.getByLabel('I played White').check()
   await page.getByLabel(/your game/i).fill(HUNG_KNIGHT)
   await page.getByRole('button', { name: 'Analyze' }).click()
   await expect(page.getByRole('alert')).toContainText("You've already uploaded this game")
@@ -41,6 +43,7 @@ test('upload errors are explained', async ({ page }) => {
 
 test('a game that is not yours is not found', async ({ page, browser }) => {
   await logInWithProfile(page, newLoginLink(`Owner ${Date.now()}`), 1200)
+  await page.getByLabel('I played White').check()
   await page.getByLabel(/your game/i).fill(HUNG_KNIGHT)
   await page.getByRole('button', { name: 'Analyze' }).click()
   await expect(page).toHaveURL(/\/games\/[0-9a-f-]+$/, { timeout: 60_000 })

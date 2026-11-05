@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.api import coach as coach_routes
 from app.api import engine as engine_routes
-from app.api import games, profile
+from app.api import games, profile, validation
 from app.api import moments as moment_routes
 from app.api import onboarding as onboarding_routes
 from app.api import tendencies as tendency_routes
@@ -34,6 +34,7 @@ def create_app(
     upgrade(engine)
 
     app = FastAPI(title="CoChess")
+    validation.install(app)
     app.state.settings = settings
     app.state.session_factory = sessionmaker(engine, expire_on_commit=False)
     if coach_client is None and settings.anthropic_api_key:

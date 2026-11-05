@@ -74,7 +74,8 @@ def parse(
     games = [piece.game for piece in split]
     suggestions = suggest_colors(games)
     choices = [_choice(body.choices, i) for i in range(len(split))]
-    colors = [c.user_color or s for c, s in zip(choices, suggestions, strict=True)]
+    # Only the player's own choice counts: the suggestion is a hint, never a default (SPEC_V3 §4.6).
+    colors = [c.user_color for c in choices]
     filled = onboarding_games(session, user.id)
     decisions = _decide(session, user, settings, games, colors, choices, filled, primary)
     rows = [

@@ -17,6 +17,9 @@ test('a player completes the onboarding assessment and gets a baseline report', 
 
   const table = page.locator('table.paste-table')
   await expect(table.locator('tbody tr')).toHaveCount(13)
+  // Colors start unselected (SPEC_V3 §4.6); the player applies the detected ones.
+  await expect(page.getByRole('button', { name: 'Choose your color for 13 games' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Use detected colors' }).click()
   await expect(table.getByText("Draws don't fill a slot.")).toBeVisible()
   await page.getByRole('button', { name: 'Add 12 games' }).click()
   await expect(page.getByText('Added 12 games.')).toBeVisible()

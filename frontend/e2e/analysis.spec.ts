@@ -44,7 +44,7 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
   await expect(page.getByRole('alert')).toContainText("You're not logged in")
 
   await logInWithProfile(page, link, 950)
-  await page.getByLabel(COLOR, { exact: true }).check()
+  await page.getByLabel(`I played ${COLOR}`).check()
   await page.getByLabel(/your game/i).fill(PGN)
   const started = Date.now()
   await page.getByRole('button', { name: 'Analyze' }).click()

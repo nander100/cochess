@@ -18,7 +18,7 @@ from tests.pgn_fixtures import read_pgn
 OPERA_PLIES = 33
 
 
-def _upload(client: TestClient, pgn: str, color: str = "white") -> dict[str, Any]:
+def _upload(client: TestClient, pgn: str, color: str) -> dict[str, Any]:
     response = client.post("/api/games", json={"pgn": pgn, "user_color": color})
     assert response.status_code == 201, response.text
     game: dict[str, Any] = response.json()
@@ -42,9 +42,9 @@ def _scan(client: TestClient, game: dict[str, Any]) -> list[str]:
 class TestMyGames:
     def test_lists_only_my_games_most_recently_played_first(self, app: FastAPI) -> None:
         me, other = log_in(app, "Me"), log_in(app, "Other")
-        _upload(me, _pgn("2026.03.01", "Me", "Old Rival"))
+        _upload(me, _pgn("2026.03.01", "Me", "Old Rival"), "white")
         _upload(me, _pgn("2026.05.01", "Newer", "Me"), "black")
-        _upload(other, "1. d4 *")
+        _upload(other, "1. d4 *", "white")
 
         games = me.get("/api/games").json()
 
@@ -119,7 +119,7 @@ class TestGameDetail:
         assert labels[2] == "blunder" and labels.count(None) == OPERA_PLIES - 1
 
     def test_an_uploaded_game_has_moves_but_no_evals_yet(self, client: TestClient) -> None:
-        game = _upload(client, read_pgn("opera_game.pgn"))
+        game = _upload(client, read_pgn("opera_game.pgn"), "white")
 
         detail = client.get(f"/api/games/{game['game_id']}").json()
 
@@ -130,7 +130,7 @@ class TestGameDetail:
         assert detail["engine_results"] == [] and detail["verify_fens"] == []
 
     def test_a_scanned_game_lists_the_positions_still_to_verify(self, client: TestClient) -> None:
-        game = _upload(client, read_pgn("opera_game.pgn"))
+        game = _upload(client, read_pgn("opera_game.pgn"), "white")
         expected = _scan(client, game)
 
         detail = client.get(f"/api/games/{game['game_id']}").json()

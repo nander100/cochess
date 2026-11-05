@@ -94,21 +94,61 @@ describe('adding games', () => {
     ])
   })
 
-  test('the player can change the suggested color', async () => {
+  test('colors start unselected: Add waits for every row, which is marked until chosen', async () => {
+    const unchosen = { user_color: null, user_result: null, slot: null, reason: 'needs_color' as const }
+    const chosen = (i: number, color: 'white' | 'black') =>
+      color === 'white' ? row(i) : row(i, { user_color: 'black', user_result: 'loss', slot: 'black_loss' })
     const deps = fakeDeps({
       onboardingParse: vi.fn(async (_text: string, choices: (GameChoice | null)[]) => ({
         primary_time_control: 'rapid' as const,
         slots: EMPTY_SLOTS,
-        games: [choices[0]?.user_color === 'black' ? row(0, { user_color: 'black', user_result: 'loss', slot: 'black_loss' }) : row(0)],
+        games: [0, 1].map((i) => {
+          const color = choices[i]?.user_color
+          return color ? chosen(i, color) : row(i, { ...unchosen, suggested_color: i === 0 ? 'white' : null })
+        }),
+      })),
+    })
+    renderAt(deps, '/onboarding')
+    fireEvent.change(await screen.findByLabelText(/Paste one or more games/), { target: { value: 'two games' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Check games' }))
+
+    const table = await screen.findByRole('table')
+    expect(screen.getByLabelText('Your color in game 1')).toHaveValue('')
+    expect(screen.getByLabelText('Your color in game 2')).toHaveValue('')
+    expect(table.querySelectorAll('tr.needs-color')).toHaveLength(2)
+    expect(within(table).getByText('Detected: you played White')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose your color for 2 games' })).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('Your color in game 1'), { target: { value: 'black' } })
+    expect(await screen.findByText('Black loss')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose your color for 1 game' })).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('Your color in game 2'), { target: { value: 'white' } })
+    expect(await screen.findByRole('button', { name: 'Add 2 games' })).toBeEnabled()
+    expect(table.querySelectorAll('tr.needs-color')).toHaveLength(0)
+  })
+
+  test('detected colors are only applied when the player asks', async () => {
+    const deps = fakeDeps({
+      onboardingParse: vi.fn(async (_text: string, choices: (GameChoice | null)[]) => ({
+        primary_time_control: 'rapid' as const,
+        slots: EMPTY_SLOTS,
+        games: [
+          choices[0]?.user_color
+            ? row(0)
+            : row(0, { user_color: null, user_result: null, slot: null, reason: 'needs_color' }),
+        ],
       })),
     })
     renderAt(deps, '/onboarding')
     fireEvent.change(await screen.findByLabelText(/Paste one or more games/), { target: { value: 'a game' } })
     fireEvent.click(screen.getByRole('button', { name: 'Check games' }))
 
-    fireEvent.change(await screen.findByLabelText('Your color in game 1'), { target: { value: 'black' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Use detected colors' }))
 
-    expect(await screen.findByText('Black loss')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Add 1 game' })).toBeEnabled()
+    expect(vi.mocked(deps.api.onboardingParse).mock.calls.at(-1)![1]).toEqual([{ user_color: 'white' }])
+    expect(screen.queryByRole('button', { name: 'Use detected colors' })).not.toBeInTheDocument()
   })
 })
 

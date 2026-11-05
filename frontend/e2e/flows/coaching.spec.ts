@@ -12,7 +12,7 @@ test('a player uploads a game, reads the coach, and steps through a critical mom
   await expect(page.getByRole('alert')).toContainText("You're not logged in")
 
   await logInWithProfile(page, newLoginLink(`Coaching ${Date.now()}`), 1200)
-  await page.getByLabel('White', { exact: true }).check()
+  await page.getByLabel('I played White').check()
   await page.getByLabel(/your game/i).fill(HUNG_KNIGHT)
   await page.getByRole('button', { name: 'Analyze' }).click()
 

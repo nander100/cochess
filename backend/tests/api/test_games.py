@@ -126,6 +126,27 @@ def test_invalid_fields_are_rejected(client: TestClient, overrides: dict[str, An
     assert response.status_code == 422
 
 
+@pytest.mark.parametrize(
+    "body",
+    [{"pgn": "1. e4 e5 *"}, {"pgn": "1. e4 e5 *", "user_color": "red"}],
+    ids=["missing", "invalid"],
+)
+def test_a_missing_or_invalid_color_is_rejected_with_a_clear_message(
+    client: TestClient, body: dict[str, Any]
+) -> None:
+    response = client.post("/api/games", json=body)
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["msg"] == "Choose the color you played: White or Black."
+
+
+def test_other_validation_errors_keep_their_message(client: TestClient) -> None:
+    response = client.post("/api/games", json={"user_color": "white"})
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "pgn"]
+
+
 @pytest.mark.parametrize("path", USER_FIXTURES, ids=lambda p: p.name)
 def test_owner_games_are_accepted(client: TestClient, path: Path) -> None:
     body = game_body(pgn=path.read_text(), user_color=owner_color(path))

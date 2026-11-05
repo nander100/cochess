@@ -6,15 +6,24 @@ interface GameInputProps {
   onSubmit: (request: CreateGameRequest) => void
 }
 
-/** One game to analyze. Rating and playstyle come from the player's profile (SPEC_V2 §4.3). */
+const COLOR_HINT = 'Choose the color you played first.'
+
+/** One game to analyze. Rating and playstyle come from the player's profile (SPEC_V2 §4.3).
+ * The color comes first and starts unselected: the PGN box and Analyze wait for it, so a game
+ * is never analyzed from the wrong side (SPEC_V3 §4.6). */
 export function GameInput({ disabled, onSubmit }: GameInputProps) {
   const id = useId()
-  const [color, setColor] = useState<Color>('white')
+  const [color, setColor] = useState<Color | null>(null)
   const [pgn, setPgn] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const needsColor = color === null
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (color === null) {
+      setError(COLOR_HINT)
+      return
+    }
     if (pgn.trim() === '') {
       setError('Paste the game you want to analyze (PGN).')
       return
@@ -25,8 +34,8 @@ export function GameInput({ disabled, onSubmit }: GameInputProps) {
 
   return (
     <form className="game-input" onSubmit={handleSubmit} noValidate aria-label="Game to analyze">
-      <fieldset disabled={disabled}>
-        <legend>You played</legend>
+      <fieldset disabled={disabled} aria-describedby={needsColor ? `${id}-hint` : undefined}>
+        <legend>Which color did you play?</legend>
         {(['white', 'black'] as const).map((value) => (
           <label key={value} className="radio">
             <input
@@ -34,11 +43,19 @@ export function GameInput({ disabled, onSubmit }: GameInputProps) {
               name={`${id}-color`}
               value={value}
               checked={color === value}
-              onChange={() => setColor(value)}
+              onChange={() => {
+                setColor(value)
+                setError(null)
+              }}
             />
-            {value === 'white' ? 'White' : 'Black'}
+            {value === 'white' ? 'I played White' : 'I played Black'}
           </label>
         ))}
+        {needsColor && (
+          <p id={`${id}-hint`} className="form-hint">
+            {COLOR_HINT}
+          </p>
+        )}
       </fieldset>
 
       <label htmlFor={`${id}-pgn`}>
@@ -51,7 +68,7 @@ export function GameInput({ disabled, onSubmit }: GameInputProps) {
           placeholder={'[Event "Live Chess"]\n…\n1. d4 d5 2. Bf4 …'}
           value={pgn}
           onChange={(e) => setPgn(e.target.value)}
-          disabled={disabled}
+          disabled={disabled || needsColor}
           required
         />
       </label>
@@ -62,7 +79,7 @@ export function GameInput({ disabled, onSubmit }: GameInputProps) {
         </p>
       )}
 
-      <button type="submit" disabled={disabled}>
+      <button type="submit" disabled={disabled || needsColor}>
         Analyze
       </button>
     </form>

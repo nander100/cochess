@@ -36,8 +36,8 @@ class ParsedRow(BaseModel):
     time_control: str | None  # the header
     category: Category | None  # from the header; None means the player picks
     error: PgnErrorDetail | None
-    suggested_color: Color | None
-    user_color: Color | None  # the player's choice, else the suggestion
+    suggested_color: Color | None  # a hint from the player names; never pre-selected
+    user_color: Color | None  # the player's choice only; None until they pick
     user_result: UserResult | None
     slot: Slot | None
     reason: Reason | None

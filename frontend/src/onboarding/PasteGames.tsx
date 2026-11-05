@@ -46,19 +46,42 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
     }
   }
 
-  async function choose(index: number, change: GameChoice) {
-    const next = choices.map((choice, i) => (i === index ? { ...choice, ...change } : choice))
+  async function apply(next: (GameChoice | null)[]) {
     setChoices(next)
     const response = await run(() => api.onboardingParse(text, next))
     if (response) setParsed(response)
   }
 
-  const usable = parsed?.games.filter((row) => row.slot !== null && row.pgn !== null) ?? []
+  function choose(index: number, change: GameChoice) {
+    void apply(choices.map((choice, i) => (i === index ? { ...choice, ...change } : choice)))
+  }
+
+  /** Copy each detected color into the player's choice. The player asks for this; nothing is
+   * pre-selected (SPEC_V3 §4.6). */
+  function applyDetected() {
+    const rows = parsed?.games ?? []
+    void apply(
+      choices.map((choice, i) => {
+        const suggested = rows[i]?.suggested_color
+        return suggested && !choice?.user_color ? { ...choice, user_color: suggested } : choice
+      }),
+    )
+  }
+
+  const rows = parsed?.games ?? []
+  const missingColor = rows.filter(needsColor)
+  const detectable = missingColor.some((row) => row.suggested_color !== null)
+  const usable = rows.flatMap((row) =>
+    row.slot !== null && row.pgn !== null && row.user_color !== null
+      ? [{ pgn: row.pgn, user_color: row.user_color, index: row.index }]
+      : [],
+  )
 
   async function add() {
+    if (missingColor.length > 0) return
     const games: SubmitGame[] = usable.map((row) => ({
-      pgn: row.pgn ?? '',
-      user_color: row.user_color ?? 'white',
+      pgn: row.pgn,
+      user_color: row.user_color,
       time_control_category: choices[row.index]?.time_control_category ?? null,
     }))
     const response = await run(() => api.onboardingSubmit(games))
@@ -116,18 +139,43 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
                   row={row}
                   primary={parsed.primary_time_control}
                   disabled={busy}
-                  onChoose={(change) => void choose(row.index, change)}
+                  onChoose={(change) => choose(row.index, change)}
                 />
               ))}
             </tbody>
           </table>
-          <button type="button" onClick={() => void add()} disabled={busy || usable.length === 0}>
-            {usable.length === 0 ? 'No games to add' : `Add ${usable.length} game${usable.length === 1 ? '' : 's'}`}
-          </button>
+          <div className="paste-actions">
+            <button
+              type="button"
+              onClick={() => void add()}
+              disabled={busy || missingColor.length > 0 || usable.length === 0}
+            >
+              {addLabel(missingColor.length, usable.length)}
+            </button>
+            {detectable && (
+              <button type="button" className="secondary" onClick={applyDetected} disabled={busy}>
+                Use detected colors
+              </button>
+            )}
+          </div>
         </>
       )}
     </section>
   )
+}
+
+/** A game the player can still use, but hasn't said which side they played. */
+function needsColor(row: ParsedRow): boolean {
+  return row.error === null && row.user_color === null
+}
+
+function plural(n: number): string {
+  return `${n} game${n === 1 ? '' : 's'}`
+}
+
+function addLabel(missing: number, usable: number): string {
+  if (missing > 0) return `Choose your color for ${plural(missing)}`
+  return usable === 0 ? 'No games to add' : `Add ${plural(usable)}`
 }
 
 interface RowProps {
@@ -141,7 +189,7 @@ function Row({ row, primary, disabled, onChoose }: RowProps) {
   const reason = reasonText(row, primary)
   const label = `game ${row.index + 1}`
   return (
-    <tr className={row.slot ? 'fills' : 'unused'}>
+    <tr className={needsColor(row) ? 'needs-color' : row.slot ? 'fills' : 'unused'}>
       <td>{row.white ?? '?'}</td>
       <td>{row.black ?? '?'}</td>
       <td>{row.result ?? '?'}</td>
@@ -183,6 +231,11 @@ function Row({ row, primary, disabled, onChoose }: RowProps) {
             <option value="white">White</option>
             <option value="black">Black</option>
           </select>
+        )}
+        {needsColor(row) && row.suggested_color && (
+          <span className="color-hint">
+            Detected: you played {row.suggested_color === 'white' ? 'White' : 'Black'}
+          </span>
         )}
       </td>
       <td>{row.slot ? SLOT_LABEL[row.slot] : <span className="slot-reason">{reason}</span>}</td>
