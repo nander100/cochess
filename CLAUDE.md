@@ -1,11 +1,11 @@
 # CLAUDE.md — CoChess
 
-CoChess is a web app that coaches intermediate chess players (roughly 1000–1800 Elo) to improve. Users upload games, a chess engine analyzes them, and an LLM coach (Claude API) explains the engine's findings in plain, encouraging language and teaches move by move.
+CoChess is a web app that coaches intermediate chess players (roughly 1000–1800 Elo) to improve. Users upload games, a chess engine analyzes them, and an LLM coach (Claude API) explains the engine's findings in plain, encouraging language, teaches move by move, and tracks the player's tendencies over time.
 
-- **Current work: v2.** The spec is `SPEC_V2.md`.
-- `SPEC.md` is the original v1 spec, kept for reference. `docs/v1-as-built.md` records what v1 actually became. `docs/v2-handoff.md` records v2's state, deviations from SPEC_V2, user feedback, known issues and gotchas: read it before starting v3.
-- Where the files disagree: `SPEC_V2.md` wins over `SPEC.md`, and the code as built wins over both until a checkpoint decides otherwise.
-- v3–v4 are listed in `SPEC_V2.md` §14 so v2's design doesn't block them. Do not implement them.
+- **Current work: v3.** The spec is `SPEC_V3.md`; the plan and decision log are `docs/PLAN_V3.md`.
+- `SPEC.md` (v1) and `SPEC_V2.md` (v2) are kept for reference. `docs/v1-as-built.md` and `docs/v2-as-built.md` record what each version actually became; `docs/v2-handoff.md` records v2's deviations, feedback, known issues and gotchas.
+- Where files disagree: `SPEC_V3.md` wins over older specs, `docs/PLAN_V3.md` decisions approved at a checkpoint win over the spec, and the code as built wins over all specs until a checkpoint decides otherwise.
+- v4 is listed in `SPEC_V3.md` §13 so v3's design doesn't block it. Do not implement it.
 
 ## The golden rules
 
@@ -15,172 +15,189 @@ CoChess is a web app that coaches intermediate chess players (roughly 1000–180
 - The backend validates every move the coach mentions. If you're writing code that asks the LLM "what's the best move?", stop.
 
 **2. Withhold, don't instruct.**
-- When the coach must not reveal something (the best move during a critical-moment exercise), leave it out of the payload. Never rely on the prompt alone to keep a secret.
-- The leak check (SPEC_V2 §8.4) is a backstop, not the main defense.
+- When the coach must not reveal something (any good-or-better move in an unsolved critical moment, or a walkthrough of its best line), leave it out of the payload.
+- The leak check covers text, move tags, line links and annotations, but it's a backstop, not the main defense.
 
 **3. Never trust the client for chess facts or identity.**
 - The frontend sends move paths (UCI). The backend replays them with python-chess to get FENs, SAN, and PGN.
 - Engine results come from the user's browser: check their FEN matches the replayed position, and never share or reuse them across users.
 - Every user-data query is scoped by `user_id`.
 
+**4. Every visual claim is checked.**
+- Arrows and highlights from the coach are validated against python-chess and the engine data (SPEC_V3 §6.2) before they're drawn. Anything that fails is dropped and logged.
+- Green arrows only ever mark moves the engine grades `best` or `good`.
+
 ## Stack
 
-- **Backend:** Python 3.12, FastAPI, python-chess, Anthropic Python SDK, SQLAlchemy + Alembic, SQLite (Postgres in v4), Pydantic v2 for all schemas.
-- **Frontend:** React + TypeScript + Vite, react-router, chessground (board), chess.js (legal moves and SAN while exploring on the board only), Stockfish.js (WASM) in a Web Worker.
-- **Testing:** pytest, Vitest, Playwright (end-to-end, with the engine faked).
+- **Backend:** Python 3.12, FastAPI, python-chess, Anthropic Python SDK, SQLAlchemy + Alembic, SQLite (Postgres in v4), Pydantic v2 for all schemas, httpx (game import only).
+- **Frontend:** React + TypeScript + Vite, react-router, `@lichess-org/chessground` (board, including drawable auto-shapes; the old `chessground` package is deprecated), chess.js (legal moves and SAN while exploring on the board only), Stockfish.js (WASM) in a Web Worker, react-markdown (coach text, no raw HTML), Recharts (dashboard charts only).
+- **Testing:** pytest, Vitest, Playwright (end-to-end and screenshots, with the engine and external APIs faked).
 - **Packaging:** `uv` for Python, `npm` for the frontend, Docker Compose for both.
 
-Ask before adding any dependency not listed here. State management uses React state/reducers; ask before adding a state library.
+Ask before adding any dependency not listed here. State management uses React state/reducers; ask before adding a state library. Styling uses CSS custom properties for design tokens; ask before adding a CSS framework.
 
-## Repo layout (v2 additions marked +)
+Stockfish build: `stockfish-19-lite` (multi-threaded) with `stockfish-19-lite-single` fallback when `crossOriginIsolated` is false. The full builds ship a 99 MB wasm.
+
+## Repo layout (v3 additions marked +)
 
 ```
 cochess/
 ├── CLAUDE.md
-├── SPEC.md                      # v1 spec (reference)
-├── SPEC_V2.md                   # current spec
+├── SPEC.md / SPEC_V2.md         # earlier specs (reference)
+├── SPEC_V3.md                   # current spec
 ├── docs/
-│   ├── v1-as-built.md           # + written at v2 M0
-│   ├── PLAN_V2.md               # + v2 implementation plan and decisions
-│   ├── v2-handoff.md            # + state, deviations, feedback, gotchas at the end of v2
-│   ├── PLAN.md                  # v1 plan and approved v1 decisions (Q1–Q29)
-│   └── DEPLOY.md                # single-server deploy guide
+│   ├── v1-as-built.md, v2-as-built.md (+), v2-handoff.md
+│   ├── PLAN.md, PLAN_V2.md      # earlier plans and decisions
+│   ├── PLAN_V3.md               # + v3 plan, adjustments, decision log
+│   └── DEPLOY.md                # single-server (EC2 + Caddy) deploy guide
 ├── docker-compose.yml
 ├── backend/
-│   ├── alembic/                 # + migrations
+│   ├── alembic/                 # migrations
 │   ├── app/
 │   │   ├── main.py              # create_app() factory, middleware (COOP/COEP)
-│   │   ├── config.py            # every threshold, engine tier, coach and limit setting
-│   │   ├── cli.py               # + create-user, invite, assign-games, backfill
-│   │   ├── auth/                # + invites, sessions, get_current_user
-│   │   ├── api/                 # games, engine, coach + moments (SSE), tendencies, onboarding routes; schemas; sse
+│   │   ├── config.py            # every threshold, engine tier, coach and limit setting (+ puzzle-theme mapping)
+│   │   ├── cli.py               # create-user, invite, assign-games, backfill
+│   │   ├── auth/                # invites, sessions, get_current_user
+│   │   ├── api/                 # routes, schemas, sse
 │   │   ├── analysis/
-│   │   │   ├── pgn.py           # PGN parsing + validation
-│   │   │   ├── paths.py         # + replay UCI paths → FEN/SAN/PGN
-│   │   │   ├── engine.py        # EngineResult schema, batch checks, UCI→SAN
-│   │   │   ├── evals.py         # Evaluation, win%, format_eval
-│   │   │   ├── accuracy.py      # Lichess accuracy
-│   │   │   ├── classify.py      # classification, missed mate
-│   │   │   ├── selection.py     # which plies get verified
-│   │   │   ├── moves.py         # MoveContext/GameContext built from a game + results
+│   │   │   ├── pgn.py           # PGN parsing + validation (+ export with variations, NAGs, evals)
+│   │   │   ├── paths.py         # replay UCI paths -> FEN/SAN/PGN
+│   │   │   ├── engine.py        # EngineResult checks, UCI->SAN
+│   │   │   ├── evals.py, accuracy.py, classify.py, selection.py, moves.py
 │   │   │   ├── material.py, pawns.py, phase.py
-│   │   │   ├── detectors/       # nine detectors (eight from SPEC + allowed_tactic)
-│   │   │   ├── moments.py       # + selection, grading, hint builder
-│   │   │   ├── tendencies.py    # + aggregation
-│   │   │   ├── onboarding.py    # + slots, time-control categories
-│   │   │   ├── summary.py       # builds the game summary
-│   │   │   └── summary_models.py
+│   │   │   ├── detectors/       # nine detectors
+│   │   │   ├── move_facts.py    # + per-step facts for walkthroughs and playback captions
+│   │   │   ├── moments.py       # selection, grading, hints
+│   │   │   ├── tendencies.py, onboarding.py, summary.py, summary_models.py
+│   │   │   └── dashboard.py     # + dashboard aggregation
 │   │   ├── coach/
-│   │   │   ├── payload.py       # payload models, coach view of the summary
+│   │   │   ├── payload.py, client.py, service.py, chat.py, moments.py, baseline.py, tools.py
 │   │   │   ├── prompts/         # coach_system.md (shared) + one file per task
-│   │   │   ├── client.py        # CoachClient protocol, Anthropic client, cached system blocks
-│   │   │   ├── service.py       # synopsis
-│   │   │   ├── chat.py          # chat + analyze_position round trip
-│   │   │   ├── moments.py       # + critical-moment exercise: payloads, leak check, progress
-│   │   │   ├── baseline.py      # + the baseline report after onboarding
-│   │   │   ├── tools.py         # analyze_position input checks and tool result
-│   │   │   └── validate.py      # move validation + moment leak check
+│   │   │   ├── annotations.py   # + tag parsing and validation
+│   │   │   ├── walkthrough.py   # + forced-tool walkthrough call
+│   │   │   └── validate.py      # move validation + leak check (text, tags, annotations)
+│   │   ├── importers/           # + lichess.py (Chess.com on hold)
 │   │   └── db/                  # models, session, persistence helpers per area
-│   ├── scripts/                 # print_summary, print_tendencies, synopsis (owner tools, not the app)
+│   ├── scripts/                 # print_summary, print_tendencies, synopsis (owner tools)
 │   └── tests/                   # fixtures/pgn/user = owner games, fixtures/engine = real results
 └── frontend/
-    └── src/
-        ├── engine/              # worker wrapper, search control, tiers, live analysis
-        ├── analysis/            # analysis pipeline (scan → verify), chat round trip, onboarding queue
-        ├── board/               # + chessground wrapper, game tree, move list, eval graph
-        ├── moments/             # + critical-moment stepper
-        ├── onboarding/          # + paste-and-check table, slot checklist, baseline report panel
-        ├── pages/               # + Games, Analysis, Onboarding, Profile, Redeem
-        ├── components/          # v1 components (ChatPanel, Synopsis, ProgressBar, ...)
-        ├── api/                 # typed client, SSE reader, TS mirrors of backend schemas
-        └── test/                # fake engine transport, scripted E2E engine, test helpers
-    e2e/                         # + Playwright: flows/ (scripted engine + coach), analysis.spec.ts (real Stockfish)
+    ├── src/
+    │   ├── styles/              # + design tokens, themes (v2: single styles.css)
+    │   ├── ui/                  # + shared components
+    │   ├── engine/              # worker wrapper, search control, tiers, live analysis
+    │   ├── analysis/            # analysis pipeline, chat round trip, onboarding queue
+    │   ├── board/               # chessground wrapper, game tree, move list, eval graph (+ annotations, saved variations, playback)
+    │   ├── moments/             # critical-moment stepper
+    │   ├── walkthrough/         # + stepper
+    │   ├── dashboard/           # + cards and charts
+    │   ├── onboarding/          # paste-and-check table, slots, baseline report
+    │   ├── components/          # ChatPanel, GameInput, Synopsis, ProgressBar, ...
+    │   ├── pages/               # Games, Analysis, Onboarding, Profile, Redeem (+ Dashboard, Settings)
+    │   ├── shortcuts/           # + keyboard shortcuts and help overlay
+    │   ├── api/                 # typed client, SSE reader, TS mirrors of backend schemas
+    │   └── test/                # fake engine transport, scripted E2E engine, fakes
+    └── e2e/                     # Playwright: flows/ (scripted engine + coach), analysis.spec.ts (real Stockfish)
 ```
 
 If the real layout differs, follow the code and update this section.
-
-Stockfish build: `stockfish-19-lite` (multi-threaded) with `stockfish-19-lite-single` fallback when `crossOriginIsolated` is false. The full builds ship a 99 MB wasm. The board package is `@lichess-org/chessground` (the old `chessground` npm package is deprecated).
 
 ## Commands
 
 Backend (run from `backend/`):
 - Install: `uv sync`
-- Dev server: `uv run uvicorn app.main:create_app --factory --reload` (app factory: importing `app.main` has no side effects; tests build apps on in-memory SQLite via `tests/conftest.py`)
-- Tests: `uv run pytest` (includes coverage; pytest plugin autoload is disabled in `pyproject.toml` so globally installed plugins, e.g. ROS on `PYTHONPATH`, can't break the run — add new pytest plugins there with `-p`)
+- Dev server: `uv run uvicorn app.main:create_app --factory --reload` (importing `app.main` has no side effects; tests build apps on in-memory SQLite via `tests/conftest.py`)
+- Tests: `uv run pytest` (includes coverage; pytest plugin autoload is disabled in `pyproject.toml` — add new pytest plugins there with `-p`)
 - Lint/format: `uv run ruff check . && uv run ruff format .`
 - Types: `uv run mypy app` (strict)
-- Config: copy `.env.example` to `.env`. Nested settings use `__`, e.g. `THRESHOLDS__BLUNDER=0.35`.
-- Migrations: `uv run alembic upgrade head` / `uv run alembic revision --autogenerate -m "..."`
+- Config: copy `.env.example` to `.env`. Nested settings use `__`, e.g. `THRESHOLDS__BLUNDER=0.35`. Engine tiers can't be partly overridden (`EngineTier` fields have no defaults): override a whole tier, or set it in code as `tests/e2e_app.py` does.
+- Migrations: `uv run alembic upgrade head` / `uv run alembic revision --autogenerate -m "..."`. The app also migrates at startup.
+- Users: `uv run python -m app.cli create-user --name "..."`, `uv run python -m app.cli invite --user "..."` (prints a one-time `PUBLIC_BASE_URL/redeem#token=…` link), `uv run python -m app.cli assign-games --user "..."`, `uv run python -m app.cli backfill [--user "..."]` (rebuilds summaries from stored engine results, no engine runs; lists duplicate uploads without deleting). In Docker: `docker compose exec backend uv run --no-dev python -m app.cli …`.
 - Optional per-player daily token cap: `USER_DAILY_TOKEN_LIMIT` (off by default).
-- Users: `uv run python -m app.cli create-user --name "..."`, `uv run python -m app.cli invite --user "..."` (prints a one-time `PUBLIC_BASE_URL/redeem#token=…` link), `uv run python -m app.cli assign-games --user "..."` (gives ownerless v1 games to a player), `uv run python -m app.cli backfill [--user "..."]` (rebuilds analyzed games' summaries from their stored engine results, no engine runs; gives v1 games their critical moments, theme facts, and a tendency snapshot; recomputes game fingerprints for duplicate checks and lists any duplicate uploads it finds, without deleting them). In Docker: `docker compose exec backend uv run --no-dev python -m app.cli …`. The app also runs migrations itself at startup.
-- Real synopsis for an owner game (calls the Claude API, needs `ANTHROPIC_API_KEY` in `.env`): `uv run python -m scripts.synopsis game5b --elo 800` (`--model`, `--effort` override; prints a cost estimate)
-- Game summary for an owner game: `uv run python -m scripts.print_summary game1w [--elo 1400] [--compact]` (built from `tests/fixtures/engine/<game>.json`, real engine results captured by the frontend E2E)
-- Tendencies with the math (per-game age and weight, per-theme counts and sums, then the report): `uv run python -m scripts.print_tendencies --user "..."` (reads `DATABASE_URL`; run `app.cli backfill` first for v1 games)
+- Owner tools (real games): `uv run python -m scripts.synopsis game5b --elo 800` (calls the Claude API), `uv run python -m scripts.print_summary game1w [--elo 1400] [--compact]`, `uv run python -m scripts.print_tendencies --user "..."`.
 
 Frontend (run from `frontend/`):
-- Install: `npm install` (its `postinstall` copies the Stockfish lite builds into `public/engine/`, which is gitignored)
+- Install: `npm install` (`postinstall` copies the Stockfish lite builds into `public/engine/`, gitignored)
 - Dev server: `npm run dev` (port 5173, sends COOP/COEP, proxies `/api` to `BACKEND_URL`, default `http://localhost:8000`)
 - Tests: `npm test` (Vitest)
 - Lint: `npm run lint` (oxlint, warnings fail)
 - Types: `npm run typecheck`
 - Build: `npm run build`
-- End-to-end: `npm run e2e` (= `npx playwright test`) runs the flows in `e2e/flows/` on the system Google Chrome (`channel: 'chrome'`, no browser download) against a **scripted engine** (`src/test/scriptedEngine.ts`: real chess rules, material-only eval, swapped in for the Stockfish worker by the `@engine-transport` Vite alias when `E2E_FAKE_ENGINE=1`) and a **scripted coach** (`backend/tests/e2e_app.py`, no paid calls). It starts its own backend on :8001 with a fresh `test-results/e2e.db` and Vite on :5174, creates players with the owner CLI and opens the printed links. About 40 s. `npm run e2e:real` (`E2E_REAL_ENGINE=1`) runs v1's `e2e/analysis.spec.ts` instead: real Stockfish on an owner game, which **overwrites `backend/tests/fixtures/engine/<game>.json`** (engine output varies run to run, so restore the committed fixture unless you mean to re-capture); `E2E_GAME=game3w.txt` picks the game; the real coach is off unless `E2E_COACH=1` (`E2E_QUESTIONS="a?|b?"` asks chat questions); `E2E_BASE_URL=http://localhost:8080` with `E2E_LOGIN_LINK` runs it against a running stack.
+- End-to-end: `npm run e2e` (= `npx playwright test`): flows in `e2e/flows/` on system Chrome against a scripted engine (`E2E_FAKE_ENGINE=1`) and scripted coach (`backend/tests/e2e_app.py`), own backend on :8001 with a fresh DB and Vite on :5174. `npm run e2e:real` runs real Stockfish on an owner game and **overwrites `backend/tests/fixtures/engine/<game>.json`** — `git restore` it unless you meant to re-capture.
 
-Everything: `docker compose up --build` → http://localhost:8080 (`COCHESS_PORT` changes the host port; server deploys: `docs/DEPLOY.md`). nginx serves the frontend with COOP/COEP and proxies `/api`; SQLite lives in the `cochess-data` volume. Needs `backend/.env`.
+Everything: `docker compose up --build` → http://localhost:8080 (`COCHESS_PORT` changes the host port; server deploys: `docs/DEPLOY.md`). Needs `backend/.env`.
 
 Keep this section accurate. If a command changes, update it here.
 
 ## Conventions
 
 - Python: type hints everywhere; Pydantic models for every request/response and every payload sent to Claude. No untyped dicts crossing module boundaries.
-- Evals are stored from White's perspective: centipawns (int) or mate-in-N (signed int). The one conversion from the engine's side-to-move score is the frontend's `engine/score.ts::toWhitePov`; the backend never converts again. Terminal positions (mate/stalemate) are never searched; the backend scores them from the board.
-- Display evals as `+0.3`, `-2.0`, `+M3`, `-M2` (one decimal; `0.0` for zero). Graphs use win% from White's perspective.
-- Engine tier settings live in backend config and reach the browser through `GET /api/engine-config`; the frontend never hard-codes them.
-- Every engine result is checked by the backend before it's stored: it must be for a position the backend expects, and every PV move must be legal (python-chess).
-- Coach replies are buffered and move-validated server-side before any text is streamed (SSE events: `status`, `text`, `done`, `error`, `engine_request`; keepalive comments while waiting).
+- Evals are stored from White's perspective: centipawns (int) or mate-in-N (signed int). The one conversion from the engine's side-to-move score is the frontend's `engine/score.ts::toWhitePov`; the backend never converts again. Terminal positions are never searched; the backend scores them from the board.
+- Display evals as `+0.3`, `-2.0`, `+M3`, `-M2`. Graphs use win% from White's perspective.
+- Engine tier settings live in backend config and reach the browser through `GET /api/engine-config`.
+- Every engine result is checked by the backend before it's used: right position, every PV move legal.
+- Coach replies are buffered and validated server-side before any text is streamed.
 - Plies are 1-indexed: ply 1 = White's first move. Move number = `(ply + 1) // 2`.
 - A board position is identified by its path: the list of UCI moves from the start position.
-- All thresholds, engine settings, decay half-life, moment limits, and attempt counts live in config.
-- Detectors are pure functions `(context) -> list[ThemeFact]`: no I/O, no engine calls.
+- All thresholds, engine settings, limits, and mappings live in config.
+- Detectors and move-facts builders are pure functions: no I/O, no engine calls.
+- Coach markup: move tags `{{move:Nxe5}}` (optionally numbered, `{{move:14...Qxd4}}`), line links `{{line:here.engine1|link text}}`, board tags `<board arrows="d1d4:red" squares="d4:red"/>`, and puzzle tags `{{puzzle:fork}}`. The backend parses, validates, and converts them to structured SSE events; the frontend never parses raw coach markup.
+- Coach text uses everyday language (SPEC_V3 §9.2). Raw notation outside a move tag, or more than one move in a row in the text, is a validation failure. The coach never writes out a line; it links to one, and the backend fills in the moves.
+- Line playback stops at the settle point computed on the backend (SPEC_V3 §9.6), never at a point chosen by the LLM.
+- `user_color` is always chosen by the user: no default anywhere (schemas, forms, state, fixtures).
+- Chat annotations refer to the position the message was sent from. Later positions are only annotated inside walkthroughs.
+- Structured coach output (walkthroughs) uses a forced tool call, not free-text JSON.
+- UI: no hard-coded colors, sizes, or fonts in components; use the design tokens. Chess-meaning colors (good/inaccuracy/mistake/blunder/plan) come from one shared map and always appear with a glyph or label.
 - One prompt file per coach task where instructions differ; shared rules live in one base file.
-- The Anthropic API key is backend-only and never logged. Model names come from env vars (`COACH_MODEL_SYNOPSIS`, `COACH_MODEL_CHAT`).
-- Session cookies: `httpOnly`, `SameSite=Lax`, `Secure` in production. Store only hashes of invite and session tokens.
-- Migrations: every schema change goes through Alembic. Never edit an applied migration. Data backfills are CLI commands (`app.cli backfill`), not migrations.
-- Games are deduplicated per player by `game_info.fingerprint` (players, result, UCI moves; no dates, no color). A second upload of the same game is a 409.
-- No `×` or `–` in Python comments or docstrings (ruff RUF003 rejects them; write `x` and `-`). oxlint warnings fail the lint; it flags `setState` inside effects.
-- Engine tiers can't be partly overridden by env vars (`EngineTier` fields have no defaults): override a whole tier, or set it in code as `tests/e2e_app.py` does.
-- Never default the player's color, on the backend or in a form (SPEC_V3 §4.6). The backend already requires it; v2's upload form still pre-selects White, and fixing that is v3 M1.
+- The Anthropic API key is backend-only and never logged. Model names come from env vars (`COACH_MODEL_SYNOPSIS`, `COACH_MODEL_CHAT`). `AnthropicCoachClient` takes the API key, not `Settings`.
+- Session cookies: `httpOnly`, `SameSite=Lax`, `Secure` in production. Store only hashes of invite and session tokens. Invite tokens travel in the URL fragment.
+- Games are deduplicated per player by fingerprint (players, result, UCI moves; no dates, no color). A second upload of the same game is a 409.
+- Migrations: every schema change goes through Alembic. Never edit an applied migration. Data backfills are CLI commands, not migrations.
+- No `×` or `–` in Python comments or docstrings (ruff RUF003). oxlint warnings fail the lint; it flags `setState` inside effects — derive state or use handlers.
 
 ## Testing rules
 
-- Every detector, grading rule, and hint builder gets unit tests from hand-built FENs (at least one positive and one negative case).
+- Every detector, grading rule, hint builder, move-facts builder, and annotation rule gets unit tests from hand-built FENs (at least one positive and one negative case). Annotation tests cover each arrow type and color, including a green arrow on a bad move being rejected.
 - Every user-data endpoint gets a test that another user's request returns 404.
-- Path replay tests: legal paths, illegal paths, paths into variations.
-- PGN parsing tests cover: valid game, illegal move, non-standard start (`SetUp`/`FEN` header or Chess960 variant → rejected), variations/comments stripped, `%clk` preserved.
-- Leak tests: for each moment task before reveal, assert the payload has no best move and the validator catches a leaked one.
-- Tendency math is tested with hand-computed expected values.
-- Coach tests mock the Anthropic client; never call the real API in tests. Frontend tests use the fake engine transport.
+- Leak tests: for each moment task before reveal, assert the payload has no withheld move, and the validator catches a leaked move in text, a move tag, a line link, or an annotation.
+- Walkthrough tests: wrong step count, a move in the text that isn't in the line, and invalid step annotations are all caught.
+- PGN export round-trips: export, re-import, replay, compare.
+- Plain-language tests: bare notation and multi-move sequences in coach text are caught; move tags render the right words (captures, checks, castling, promotion); line references resolve, and `best` before reveal is rejected.
+- Settle-point tests on hand-built lines: a piece win, an even exchange (never stops mid-exchange), a mate, and a quiet line.
+- Color tests: the API rejects a missing color, and no color is selected when a form loads.
+- The dashboard endpoint has a performance test with 200 generated games.
+- Coach tests mock the Anthropic client (`tests/coach_fakes.py`); never call the real API in tests. Import tests fake the Lichess API. Frontend tests use the fake engine transport.
 - Don't mark a milestone done with failing tests, lint errors, or type errors.
 
 ## Checkpoints — stop and ask
 
-Stop for owner review at every ✅ checkpoint in SPEC_V2 §13. At each one:
+Stop for owner review at every ✅ checkpoint in SPEC_V3 §12. At each one:
 1. Summarize what was built and what's next.
-2. Show evidence: test results, and for analysis/coach milestones, real output on the owner's games (including payloads where the milestone asks for them).
+2. Show evidence: test results; for UI milestones, Playwright screenshots; for coach milestones, real output on the owner's games (with screenshots of annotations where relevant).
 3. Wait for approval.
 
-Also stop and ask before: adding a dependency not listed here, changing an approved schema, deleting or rewriting v1 behavior the spec doesn't mention, or making a decision the spec doesn't cover.
+Also stop and ask before: adding a dependency not listed here, changing an approved schema, removing earlier behavior the spec doesn't mention, or making a decision the spec doesn't cover. Record decisions in `docs/PLAN_V3.md`.
+
+## Gotchas
+
+- Hooks: the Fact-Forcing Gate blocks the first Write of each new file until you state callers, no duplicate, data shape, and the user's instruction verbatim. A plugin hook reads `sed -n` in the same command as `git commit` as `--no-verify`; run commits on their own.
+- The branch and tag are both named `v2`; use `refs/tags/v2` when it matters.
+- The owner's local Docker app (compose project `cochcess`, port 8080) runs a pre-v2-M5 build with duplicate games. Ask before touching it.
+- Playwright strict mode: text like "3. Ng5" appears in several places; scope locators.
+- Deploy: see `docs/DEPLOY.md` and `docs/v2-handoff.md` (Caddy validate before reload, `COCHESS_PORT=127.0.0.1:8080`, exact `PUBLIC_BASE_URL`).
 
 ## Don't
 
 - Don't let the LLM pick or evaluate moves.
-- Don't put the best move in a payload before a moment is solved or revealed.
+- Don't put a withheld move in a payload, an arrow, a move tag, a line link, or a walkthrough before a moment is solved or revealed.
+- Don't draw an annotation that hasn't passed validation.
 - Don't trust FENs, SAN, or engine results from the client without checking them.
-- Don't invent puzzles, courses, or resources. Puzzle themes only, from the allowed list.
-- Don't build v3+ features (dashboard charts, coach-drawn arrows, line stepping, game import, Google sign-in, payments).
+- Don't invent puzzles, courses, or resources. Puzzle themes only, from the allowed list, as validated tags.
+- Don't build v4 features (Google sign-in, payments, credits, production AWS setup, mobile layout).
 - Don't accept PGNs from non-standard starting positions.
+- Don't default the user's color to White (or anything).
+- Don't let the coach write out move sequences; use line links.
 - Don't commit `.env`, API keys, the SQLite database, or invite links.
 
 ## Licensing note
 
-Stockfish.js and chessground are GPL-3. Shipping them to browsers has GPL implications for the frontend. Keep the frontend and backend cleanly separated so the backend can stay private. Flag any other GPL dependency before adding it.
+Stockfish.js and chessground are GPL-3. Shipping them to browsers has GPL implications for the frontend. Keep the frontend and backend cleanly separated so the backend can stay private. Check the license of any piece set or board theme before adding it, and flag any other GPL dependency first.
