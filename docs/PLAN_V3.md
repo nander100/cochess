@@ -97,3 +97,9 @@ Add decisions made while building below this line, as in PLAN_V2 §7.
 |---|---|---|
 | 2026-11-04 | Deleting a game keeps its `llm_usage` rows (game_id set to NULL) so the daily token budget still counts them. A deleted single game no longer counts toward the daily upload cap; acceptable while the cap is a testing limit. | Claude |
 | 2026-11-04 | Changing an onboarding game's color moves it to the matching slot; if that slot already has 3 games, the change is refused (409) and the player removes a game first. | Claude |
+| 2026-11-05 | Alternative piece set is **Merida** (GPLv2+), not California: lila's COPYING.md lists California as CC BY-NC-SA 4.0 (non-commercial), which v4's paid plan rules out. | Claude (owner to confirm at M1) |
+| 2026-11-05 | The Games page holds the upload form (Main.dc.html); `/new` redirects there. `GET /api/games` adds `time_control_category`, `moments_total`, `moments_done` for the page's filter and "Moments to practice". | Claude |
+| 2026-11-05 | Moments: `max_attempts` comes with each moment (the "Tries left" dots). "Get a hint" sends a fixed request through the existing moment question route, so the payload's withholding still applies. | Claude |
+| 2026-11-05 | "Log out" sits beside the player's name in the header (the design has no place for it). Errors use the blunder red as `--color-danger` (the design has no error color). | Claude (owner to confirm at M1) |
+| 2026-11-05 | The invite page shows "Invite accepted" with next steps instead of going straight in (Redeem.dc.html); a used link opened while logged in still goes straight in. | Claude |
+| 2026-11-05 | Backend errors from actions show as toasts; refusals about what the player typed (bad PGN, duplicate) stay inline next to the form. | Claude |
