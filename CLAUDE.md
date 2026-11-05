@@ -3,7 +3,7 @@
 CoChess is a web app that coaches intermediate chess players (roughly 1000–1800 Elo) to improve. Users upload games, a chess engine analyzes them, and an LLM coach (Claude API) explains the engine's findings in plain, encouraging language and teaches move by move.
 
 - **Current work: v2.** The spec is `SPEC_V2.md`.
-- `SPEC.md` is the original v1 spec, kept for reference. `docs/v1-as-built.md` records what v1 actually became.
+- `SPEC.md` is the original v1 spec, kept for reference. `docs/v1-as-built.md` records what v1 actually became. `docs/v2-handoff.md` records v2's state, deviations from SPEC_V2, user feedback, known issues and gotchas: read it before starting v3.
 - Where the files disagree: `SPEC_V2.md` wins over `SPEC.md`, and the code as built wins over both until a checkpoint decides otherwise.
 - v3–v4 are listed in `SPEC_V2.md` §14 so v2's design doesn't block them. Do not implement them.
 
@@ -42,6 +42,7 @@ cochess/
 ├── docs/
 │   ├── v1-as-built.md           # + written at v2 M0
 │   ├── PLAN_V2.md               # + v2 implementation plan and decisions
+│   ├── v2-handoff.md            # + state, deviations, feedback, gotchas at the end of v2
 │   ├── PLAN.md                  # v1 plan and approved v1 decisions (Q1–Q29)
 │   └── DEPLOY.md                # single-server deploy guide
 ├── docker-compose.yml
@@ -92,7 +93,8 @@ cochess/
         ├── pages/               # + Games, Analysis, Onboarding, Profile, Redeem
         ├── components/          # v1 components (ChatPanel, Synopsis, ProgressBar, ...)
         ├── api/                 # typed client, SSE reader, TS mirrors of backend schemas
-        └── test/                # fake engine transport, test helpers
+        └── test/                # fake engine transport, scripted E2E engine, test helpers
+    e2e/                         # + Playwright: flows/ (scripted engine + coach), analysis.spec.ts (real Stockfish)
 ```
 
 If the real layout differs, follow the code and update this section.
@@ -143,7 +145,11 @@ Keep this section accurate. If a command changes, update it here.
 - One prompt file per coach task where instructions differ; shared rules live in one base file.
 - The Anthropic API key is backend-only and never logged. Model names come from env vars (`COACH_MODEL_SYNOPSIS`, `COACH_MODEL_CHAT`).
 - Session cookies: `httpOnly`, `SameSite=Lax`, `Secure` in production. Store only hashes of invite and session tokens.
-- Migrations: every schema change goes through Alembic. Never edit an applied migration.
+- Migrations: every schema change goes through Alembic. Never edit an applied migration. Data backfills are CLI commands (`app.cli backfill`), not migrations.
+- Games are deduplicated per player by `game_info.fingerprint` (players, result, UCI moves; no dates, no color). A second upload of the same game is a 409.
+- No `×` or `–` in Python comments or docstrings (ruff RUF003 rejects them; write `x` and `-`). oxlint warnings fail the lint; it flags `setState` inside effects.
+- Engine tiers can't be partly overridden by env vars (`EngineTier` fields have no defaults): override a whole tier, or set it in code as `tests/e2e_app.py` does.
+- Never default the player's color, on the backend or in a form (SPEC_V3 §4.6). The backend already requires it; v2's upload form still pre-selects White, and fixing that is v3 M1.
 
 ## Testing rules
 

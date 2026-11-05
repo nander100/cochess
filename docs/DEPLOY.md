@@ -143,11 +143,12 @@ Replace `/etc/caddy/Caddyfile` (`sudo nano /etc/caddy/Caddyfile`) with your host
 ```
 
 ```bash
+sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile   # must end with "Valid configuration"
 sudo systemctl reload caddy
-curl -s https://3-141-59-26.sslip.io/api/health     # {"ok":true} once the certificate is issued
+curl -s https://3-15-12-174.sslip.io/api/health     # {"ok":true} once the certificate is issued
 ```
 
-The first request can take up to a minute while Caddy gets the certificate. If it doesn't work, `sudo journalctl -u caddy --no-pager | tail -30` says why; the usual cause is port 80 or 443 missing from the security group. Many people share sslip.io, so Let's Encrypt occasionally refuses it for a while (rate limits); Caddy then gets a certificate from ZeroSSL instead, automatically.
+The first request can take up to a minute while Caddy gets the certificate. If the reload fails, Caddy keeps its old config and shows its own welcome page: run the `validate` line to see the error (a stray comma or extra text in the site address is common). Manage Caddy with `systemctl` only; `caddy start` fails with "address already in use" because the service is already running. If the page doesn't load, `sudo journalctl -u caddy --no-pager | tail -30` says why; the usual cause is port 80 or 443 missing from the security group. Many people share sslip.io, so Let's Encrypt occasionally refuses it for a while (rate limits); Caddy then gets a certificate from ZeroSSL instead, automatically.
 
 Caddy passes nginx's response headers through unchanged, including `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy`, which multi-threaded Stockfish needs. If you use a different proxy, make sure it doesn't strip them and doesn't buffer `/api/` responses.
 

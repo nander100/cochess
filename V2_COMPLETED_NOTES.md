@@ -1,6 +1,6 @@
 # CoChess v2: completed work
 
-A handoff record for future sessions. It summarizes what v2 built, what was decided along the way, and the state things were left in. For detail, follow the pointers. The code wins over this file if they disagree.
+A handoff record for future sessions. Start with `docs/v2-handoff.md` (deviations, user feedback, known issues, gotchas); this file is the milestone-by-milestone summary. It summarizes what v2 built, what was decided along the way, and the state things were left in. For detail, follow the pointers. The code wins over this file if they disagree.
 
 - Spec: `SPEC_V2.md`. Workflow: `PROMPT_V2.md`. Plan and every decision made while building: `docs/PLAN_V2.md` (§7 is the decision log).
 - What v1 became: `docs/v1-as-built.md`. Commands and conventions: `CLAUDE.md`. Deploying: `docs/DEPLOY.md`.
