@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.db.chat import save_turn
 from app.db.coach import save_synopsis
 from app.db.engine_results import load_summary, save_summary
+from app.db.models import Game, GameSummaryRow, MomentProgressRow
 from tests.analysis_flow import analyzed_game
 from tests.auth_helpers import log_in
 from tests.engine_fakes import fake_result
@@ -63,6 +64,40 @@ class TestMyGames:
         assert game["status"] == "analyzed"
         assert isinstance(game["accuracy"], float)
         assert game["opening"] == "Philidor Defense"  # from the Opening header
+
+    def test_moments_and_the_time_control_category_are_listed(
+        self, client: TestClient, db_session: Session
+    ) -> None:
+        game_id = analyzed_game(client, "white")
+        row = db_session.get(GameSummaryRow, game_id)
+        assert row is not None
+        row.summary = {**row.summary, "moments": [{}, {}]}  # the count is all the list reads
+        db_session.commit()
+        (before,) = client.get("/api/games").json()
+        assert (before["moments_total"], before["moments_done"]) == (2, 0)
+        user_id = db_session.get(Game, game_id).user_id  # type: ignore[union-attr]
+        db_session.add_all(
+            [
+                MomentProgressRow(user_id=user_id, game_id=game_id, moment_index=1,
+                                  state="solved", attempts=[], messages=[]),
+                MomentProgressRow(user_id=user_id, game_id=game_id, moment_index=2,
+                                  state="attempt", attempts=[], messages=[]),
+            ]
+        )  # fmt: skip
+        db_session.commit()
+
+        (game,) = client.get("/api/games").json()
+
+        assert game["moments_done"] == 1  # an attempt in progress isn't finished
+        assert game["time_control_category"] is None  # the Opera game has no TimeControl
+
+    def test_the_time_control_category_comes_from_the_header(self, client: TestClient) -> None:
+        pgn = '[TimeControl "600+5"]\n\n1. e4 e5 *'
+        _upload(client, pgn, "white")
+
+        (game,) = client.get("/api/games").json()
+
+        assert game["time_control_category"] == "rapid"
 
 
 class TestGameDetail:

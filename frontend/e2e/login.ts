@@ -26,12 +26,12 @@ export function newLoginLink(name: string): string {
 }
 
 /** Open the login link and fill in the profile; the player lands on the onboarding assessment,
- * which they skip for now, then goes to the upload page as a person would. */
+ * which they skip for now, and lands on the Games page with its upload form. */
 export async function logInWithProfile(page: Page, link: string, elo: number): Promise<void> {
   await logIn(page, link, elo)
   await page.getByRole('link', { name: 'Skip for now' }).click()
-  await page.getByRole('heading', { name: 'My games' }).waitFor()
-  await page.getByRole('link', { name: /^Analyze (a|your first) game$/ }).first().click()
+  // The Games page holds the upload form (Main.dc.html).
+  await page.getByRole('heading', { name: 'Upload a game. Learn one idea from it.' }).waitFor()
   await page.getByLabel(/your game/i).waitFor()
 }
 

@@ -1,9 +1,9 @@
 """Game access, always scoped to one user (SPEC_V2 §4.2): another user's game is "not found"."""
 
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.analysis.engine import EngineResult, best_by_fen, position_evaluations
@@ -15,7 +15,14 @@ from app.analysis.summary import build_summary
 from app.analysis.summary_models import GameSummary, UserInfo
 from app.config import Settings
 from app.db.engine_results import load_results, save_summary
-from app.db.models import EngineResultRow, Game, GameSummaryRow, LlmUsageRow, User
+from app.db.models import (
+    EngineResultRow,
+    Game,
+    GameSummaryRow,
+    LlmUsageRow,
+    MomentProgressRow,
+    User,
+)
 from app.db.tendencies import refresh_tendencies, save_theme_facts
 
 
@@ -106,15 +113,40 @@ def assign_unowned_games(session: Session, user: User) -> int:
     return len(games)
 
 
-def list_games(session: Session, user_id: str) -> list[tuple[Game, float | None]]:
-    """The player's games, most recently played first, with the player's accuracy if analyzed."""
+class ListedGame(NamedTuple):
+    game: Game
+    accuracy: float | None  # the player's, once analyzed
+    moments_total: int
+    moments_done: int  # solved or revealed
+
+
+def list_games(session: Session, user_id: str) -> list[ListedGame]:
+    """The player's games, most recently played first, with the player's accuracy and how many
+    critical moments are finished, once analyzed."""
     rows = session.execute(
         select(Game, GameSummaryRow.summary)
         .outerjoin(GameSummaryRow, GameSummaryRow.game_id == Game.id)
         .where(Game.user_id == user_id)
         .order_by(Game.played_at.desc(), Game.created_at.desc())
-    )
-    return [(game, _user_accuracy(summary)) for game, summary in rows]
+    ).all()
+    finished = session.execute(
+        select(MomentProgressRow.game_id, func.count())
+        .where(
+            MomentProgressRow.user_id == user_id,
+            MomentProgressRow.state.in_(["solved", "revealed"]),
+        )
+        .group_by(MomentProgressRow.game_id)
+    ).all()
+    done = {game_id: count for game_id, count in finished}
+    return [
+        ListedGame(game, _user_accuracy(summary), _moment_count(summary), done.get(game.id, 0))
+        for game, summary in rows
+    ]
+
+
+def _moment_count(summary: dict[str, Any] | None) -> int:
+    moments = (summary or {}).get("moments") or []
+    return len(moments) if isinstance(moments, list) else 0
 
 
 def _user_accuracy(summary: dict[str, Any] | None) -> float | None:

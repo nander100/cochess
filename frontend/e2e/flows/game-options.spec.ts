@@ -30,6 +30,6 @@ test('a game analyzed as the wrong color is switched, then deleted', async ({ pa
   await page.getByRole('alertdialog', { name: 'Delete game' }).getByRole('button', { name: 'Delete game' }).click()
 
   await expect(page).toHaveURL(/\/games$/)
-  await expect(page.getByText('No games yet.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No games yet' })).toBeVisible()
   expect((await page.request.get(`/api/games/${gameId}`)).status()).toBe(404)
 })

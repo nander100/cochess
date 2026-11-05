@@ -20,16 +20,6 @@
 }
 
 
-.game-input {
-  max-width: 52rem;
-  display: grid;
-  gap: var(--space);
-  background: var(--color-surface);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius);
-  padding: 1.5rem;
-}
-
 .profile {
   display: flex;
   flex-wrap: wrap;
@@ -37,27 +27,12 @@
   align-items: end;
 }
 
-label,
-legend {
-  display: grid;
-  gap: 0.35rem;
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-
-fieldset {
+/* Bridges for pages not yet rebuilt on src/ui (M1): plain controls get the design's look. Shared
+ * components carry their own classes and aren't affected. */
+fieldset:where(:not([class])) {
   border: 0;
   padding: 0;
   margin: 0;
-  display: flex;
-  gap: 1rem;
-}
-
-.radio {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-weight: 400;
 }
 
 .optional {
@@ -65,52 +40,43 @@ fieldset {
   font-weight: 400;
 }
 
-input[type='number'] {
-  width: 8rem;
+:where(input:not([type='radio'], [type='checkbox'], [class]), textarea:not([class]), select:not([class])) {
+  box-sizing: border-box;
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-field);
+  color: var(--color-fg);
 }
 
-input,
-textarea {
-  font: inherit;
-  padding: 0.5rem 0.6rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius);
-  background: var(--color-paper);
-  color: inherit;
+textarea:where(:not([class])),
+textarea.pgn {
+  padding: var(--space-3);
 }
 
 textarea.pgn {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font: var(--text-pgn);
+  border: var(--border-width) solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-field);
+  color: var(--color-fg);
 }
 
-input:focus-visible,
-textarea:focus-visible,
-button:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
-button {
-  justify-self: start;
-  font: inherit;
-  font-weight: 600;
-  padding: 0.6rem 1.6rem;
+button:where(:not([class])) {
+  min-height: var(--control-height);
+  padding: 0 var(--space-5);
   border: 0;
-  border-radius: var(--radius);
-  background: var(--color-accent);
-  color: var(--color-accent-ink);
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+  font: var(--text-button);
   cursor: pointer;
-  transition: transform 120ms ease;
 }
 
-button:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-
-button:disabled {
-  opacity: 0.55;
-  cursor: progress;
+button:where(:not([class])):disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .form-error,
@@ -593,42 +559,6 @@ button.move[aria-current='step'] .glyph {
   gap: 0.6rem;
   justify-items: start;
   margin-bottom: 1rem;
-}
-
-.games-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-table.games {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-table.games th,
-table.games td {
-  text-align: left;
-  padding: 0.45rem 0.5rem;
-  border-bottom: 1px solid var(--color-line);
-}
-
-table.games td.win {
-  color: var(--color-accent);
-  font-weight: 600;
-}
-
-table.games td.loss {
-  color: var(--color-blunder);
-}
-
-.button-link {
-  background: var(--color-accent);
-  color: var(--color-accent-ink);
-  border-radius: var(--radius);
-  padding: 0.4rem 0.9rem;
-  font-weight: 600;
-  text-decoration: none;
 }
 
 @media (max-width: 60rem) {

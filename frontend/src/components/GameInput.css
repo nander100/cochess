@@ -1,0 +1,19 @@
+.game-input {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.game-input-label {
+  font: var(--text-small-heading);
+}
+
+.game-input-hint {
+  margin: 0;
+  font: var(--text-ui);
+  color: var(--color-muted);
+}
+
+.game-input-submit {
+  align-self: flex-end;
+}

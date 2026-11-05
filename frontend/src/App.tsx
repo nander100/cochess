@@ -7,7 +7,6 @@ import { type EngineHandle, StockfishEngine } from './engine/StockfishEngine'
 import { GamePage } from './pages/GamePage'
 import { GamesPage } from './pages/GamesPage'
 import { LatestGamePage } from './pages/LatestGamePage'
-import { NewGamePage } from './pages/NewGamePage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { RedeemPage } from './pages/RedeemPage'
@@ -129,7 +128,7 @@ function Shell({ deps }: AppProps) {
           {session.profile.complete ? (
             <>
               <Route path="/" element={<Navigate to="/games" replace />} />
-              <Route path="/games" element={<GamesPage api={pipeline.api} onLoggedOut={loggedOut} />} />
+              <Route path="/games" element={<GamesPage deps={pipeline} onLoggedOut={loggedOut} />} />
               <Route path="/games/:gameId" element={<GamePage deps={pipeline} onLoggedOut={loggedOut} />} />
               <Route
                 path="/analysis"
@@ -139,7 +138,7 @@ function Shell({ deps }: AppProps) {
                 path="/moments"
                 element={<LatestGamePage api={pipeline.api} target="moments" onLoggedOut={loggedOut} />}
               />
-              <Route path="/new" element={<NewGamePage deps={pipeline} onLoggedOut={loggedOut} />} />
+              <Route path="/new" element={<Navigate to="/games" replace />} />
               <Route path="/onboarding" element={<OnboardingPage deps={pipeline} onLoggedOut={loggedOut} />} />
             </>
           ) : (

@@ -33,7 +33,7 @@ async function submitGame() {
   fireEvent.change(screen.getByLabelText(/your game/i), {
     target: { value: '1. e4 e5 2. Nf3 *' },
   })
-  fireEvent.click(screen.getByRole('button', { name: 'Analyze' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Analyze game' }))
 }
 
 const LOGGED_OUT = new ApiError(401, "You're not logged in. Ask the owner for a new login link.")
@@ -48,6 +48,9 @@ const LISTED = {
   opening: 'Ruy Lopez',
   accuracy: 81.2,
   status: 'analyzed' as const,
+  time_control_category: 'rapid' as const,
+  moments_total: 3,
+  moments_done: 1,
 }
 
 test('the header has the logo, the main nav, the player and a theme toggle', async () => {
@@ -133,7 +136,7 @@ test('shows the server error when the PGN is rejected', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent(
     "Non-standard starting positions aren't supported.",
   )
-  expect(screen.getByRole('button', { name: 'Analyze' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Analyze game' })).toBeEnabled()
 })
 
 test('a coach error is shown in the synopsis panel and can be retried', async () => {
@@ -157,19 +160,7 @@ test('a coach error is shown in the synopsis panel and can be retried', async ()
 
 test('my games lists the games; opening one does not write a synopsis by itself', async () => {
   const deps = fakeDeps({
-    listGames: vi.fn(async () => [
-      {
-        id: 'game-1',
-        played_at: '2026-10-01T18:04:05Z',
-        opponent: 'Rival',
-        user_color: 'white' as const,
-        user_result: 'win' as const,
-        time_control: '600+5',
-        opening: 'Ruy Lopez',
-        accuracy: 81.2,
-        status: 'analyzed' as const,
-      },
-    ]),
+    listGames: vi.fn(async () => [LISTED]),
   })
   renderApp(deps, '/')
 

@@ -24,6 +24,14 @@ a {
   color: var(--color-link);
 }
 
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
 a:hover {
   color: var(--color-link-hover);
 }

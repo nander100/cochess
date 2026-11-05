@@ -116,6 +116,9 @@ export interface GameListItem {
   opening: string | null
   accuracy: number | null
   status: GameStatus
+  time_control_category: TimeControl | 'correspondence' | null
+  moments_total: number
+  moments_done: number
 }
 
 export interface MoveInfo {

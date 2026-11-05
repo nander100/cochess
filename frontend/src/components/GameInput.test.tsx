@@ -4,7 +4,7 @@ import { GameInput } from './GameInput'
 function setup() {
   const onSubmit = vi.fn()
   render(<GameInput disabled={false} onSubmit={onSubmit} />)
-  const analyze = () => screen.getByRole('button', { name: 'Analyze' })
+  const analyze = () => screen.getByRole('button', { name: 'Analyze game' })
   const pgnBox = () => screen.getByLabelText(/your game/i)
   return { onSubmit, analyze, pgnBox }
 }

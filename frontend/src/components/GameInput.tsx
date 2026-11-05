@@ -1,6 +1,7 @@
 import { type FormEvent, useId, useState } from 'react'
 import type { Color, CreateGameRequest } from '../api/types'
-import { SegmentedToggle, type ToggleOption } from '../ui'
+import { Button, SegmentedToggle, type ToggleOption } from '../ui'
+import './GameInput.css'
 
 interface GameInputProps {
   disabled: boolean
@@ -51,35 +52,32 @@ export function GameInput({ disabled, onSubmit }: GameInputProps) {
         describedBy={needsColor ? `${id}-hint` : undefined}
       />
       {needsColor && (
-        <p id={`${id}-hint`} className="form-hint">
+        <p id={`${id}-hint`} className="game-input-hint">
           {COLOR_HINT}
         </p>
       )}
-
-      <label htmlFor={`${id}-pgn`}>
-        Your game (PGN)
-        <textarea
-          id={`${id}-pgn`}
-          className="pgn"
-          rows={10}
-          spellCheck={false}
-          placeholder={'[Event "Live Chess"]\n…\n1. d4 d5 2. Bf4 …'}
-          value={pgn}
-          onChange={(e) => setPgn(e.target.value)}
-          disabled={disabled || needsColor}
-          required
-        />
+      <label className="game-input-label" htmlFor={`${id}-pgn`}>
+        Paste your game (PGN)
       </label>
-
+      <textarea
+        id={`${id}-pgn`}
+        className="ui-input ui-textarea ui-mono"
+        rows={6}
+        spellCheck={false}
+        placeholder={'[Event "Rated Rapid game"]\n1. e4 e5 2. Nf3 Nc6 ...'}
+        value={pgn}
+        onChange={(e) => setPgn(e.target.value)}
+        disabled={disabled || needsColor}
+        required
+      />
       {error && (
         <p className="form-error" role="alert">
           {error}
         </p>
       )}
-
-      <button type="submit" disabled={disabled || needsColor}>
-        Analyze
-      </button>
+      <Button type="submit" className="game-input-submit" disabled={disabled || needsColor}>
+        Analyze game
+      </Button>
     </form>
   )
 }

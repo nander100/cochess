@@ -35,7 +35,6 @@ test('upload errors are explained', async ({ page }) => {
   await analyze.click()
   await expect(page).toHaveURL(/\/games\//, { timeout: 60_000 })
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Games' }).click()
-  await page.getByRole('link', { name: /^Analyze (a|your first) game$/ }).first().click()
   await page.getByLabel('I played White').check()
   await page.getByLabel(/your game/i).fill(HUNG_KNIGHT)
   await page.getByRole('button', { name: 'Analyze' }).click()

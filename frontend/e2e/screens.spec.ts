@@ -9,12 +9,20 @@ const WIDTHS = [1280, 1920] as const
 const THEMES = ['light', 'dark'] as const
 const OUT = `${TEST_RESULTS}/screens`
 
+/** Switch theme the way a player does (header toggle, or the invite page's button), so the app's
+ * theme state and its settings controls agree with what's shown. */
+async function switchTheme(page: Page, theme: 'light' | 'dark') {
+  const current = await page.evaluate(() => document.documentElement.dataset.theme)
+  if (current === theme) return
+  const toggle = page.getByRole('button', { name: /^Switch to (light|dark) mode$|^(Light|Dark) mode$/ })
+  await toggle.first().click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
+}
+
 async function shoot(page: Page, name: string) {
+  await page.mouse.move(0, 0)
   for (const theme of THEMES) {
-    await page.evaluate((t) => {
-      localStorage.setItem('cochess-theme', t)
-      document.documentElement.dataset.theme = t
-    }, theme)
+    await switchTheme(page, theme)
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: 1000 })
       await page.waitForTimeout(150) // layout and transitions settle
@@ -41,13 +49,13 @@ test('every page, light and dark, 1280 and 1920', async ({ page, browser }) => {
   await expect(page.getByRole('progressbar')).toBeVisible()
   await shoot(page, 'redeem-checking')
   release()
-  await expect(page.getByRole('heading', { name: 'Invite accepted' })).toBeVisible()
+  await expect(page.getByText('Invite accepted')).toBeVisible()
   await page.unroute('**/api/auth/redeem')
   await shoot(page, 'redeem-accepted')
 
   const other = await browser.newPage()
   await other.goto(`${url.pathname}${url.hash}`)
-  await expect(other.getByRole('heading', { name: /expired|already used/i })).toBeVisible()
+  await expect(other.getByRole('heading', { name: "This invite link can't be used." })).toBeVisible()
   await shoot(other, 'redeem-invalid')
   await other.close()
 

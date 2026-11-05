@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.analysis.evals import Color
 from app.analysis.game_info import opening_name
+from app.analysis.onboarding import time_control_category
 from app.analysis.pgn import PgnError, parse_pgn
 from app.api.deps import get_app_settings, get_session
 from app.api.game_detail import build_detail
@@ -83,11 +84,11 @@ def create_game(
 
 
 @router.get("")
-def my_games(user: CurrentUser, session: SessionDep) -> list[GameListItem]:
+def my_games(user: CurrentUser, session: SessionDep, settings: SettingsDep) -> list[GameListItem]:
     """My games (SPEC_V2 §11), most recently played first."""
     items = []
-    for game, accuracy in list_games(session, user.id):
-        headers = game.headers
+    for listed in list_games(session, user.id):
+        game, headers = listed.game, listed.game.headers
         color = cast(Color, game.user_color)
         opponent = headers.get("Black" if color == "white" else "White", "?")
         items.append(
@@ -99,8 +100,12 @@ def my_games(user: CurrentUser, session: SessionDep) -> list[GameListItem]:
                 user_result=cast(UserResult | None, game.user_result),
                 time_control=headers.get("TimeControl"),
                 opening=opening_name(headers),
-                accuracy=accuracy,
+                accuracy=listed.accuracy,
                 status=cast(GameStatus, game.status),
+                time_control_category=game.time_control_category
+                or time_control_category(headers.get("TimeControl"), settings.onboarding),
+                moments_total=listed.moments_total,
+                moments_done=listed.moments_done,
             )
         )
     return items

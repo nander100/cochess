@@ -113,6 +113,9 @@ class GameListItem(BaseModel):
     opening: str | None
     accuracy: float | None  # the player's, once analyzed
     status: GameStatus
+    time_control_category: TimeControl | Literal["correspondence"] | None = None
+    moments_total: int = 0  # critical moments, once analyzed
+    moments_done: int = 0  # solved or revealed
 
 
 class MoveInfo(BaseModel):
