@@ -146,7 +146,7 @@ Keep this section accurate. If a command changes, update it here.
 - `user_color` is always chosen by the user: no default anywhere (schemas, forms, state, fixtures).
 - Chat annotations refer to the position the message was sent from. Later positions are only annotated inside walkthroughs.
 - Structured coach output (walkthroughs) uses a forced tool call, not free-text JSON.
-- UI: no hard-coded colors, sizes, or fonts in components; use the design tokens. Chess-meaning colors (good/inaccuracy/mistake/blunder/plan) come from one shared map and always appear with a glyph or label.
+- UI: no hard-coded colors, sizes, or fonts in components; use the design tokens (`frontend/src/styles/tokens.css`, from `docs/design/tokens.md`; `src/styles/tokens.guard.test.ts` fails on raw colors or font stacks). Fonts are self-hosted woff2 (OFL, licenses in `src/styles/fonts/`), never Google Fonts: the COEP header would block them. Themes: `<html data-theme="light|dark">`, light by default; "match system" is resolved in `src/theme/theme.ts`. Chess-meaning colors (good/inaccuracy/mistake/blunder/plan) come from one shared map and always appear with a glyph or label.
 - One prompt file per coach task where instructions differ; shared rules live in one base file.
 - The Anthropic API key is backend-only and never logged. Model names come from env vars (`COACH_MODEL_SYNOPSIS`, `COACH_MODEL_CHAT`). `AnthropicCoachClient` takes the API key, not `Settings`.
 - Session cookies: `httpOnly`, `SameSite=Lax`, `Secure` in production. Store only hashes of invite and session tokens. Invite tokens travel in the URL fragment.

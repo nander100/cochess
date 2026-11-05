@@ -1,23 +1,14 @@
-/* v1 base styles. Visual polish is M6; this keeps the page readable and calm. */
+/* v1/v2 page styles, now on the v3 design tokens (src/styles/tokens.css). The old variable names
+ * below are aliases; M1 replaces this file with shared components (src/ui/) and page styles. */
 :root {
-  --color-ink: #1f2320;
-  --color-muted: #5d655f;
-  --color-paper: #f7f5ef;
-  --color-surface: #ffffff;
-  --color-line: #d9d5c8;
-  --color-accent: #2f6b4f;
-  --color-accent-ink: #ffffff;
-  --color-danger: #a33a2b;
-  --radius: 6px;
-  --space: 1rem;
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  color: var(--color-ink);
-  background: var(--color-paper);
-  line-height: 1.5;
-}
-
-body {
-  margin: 0;
+  --color-ink: var(--color-fg);
+  --color-paper: var(--color-bg);
+  --color-surface: var(--color-field);
+  --color-line: var(--color-border);
+  --color-accent: var(--color-primary);
+  --color-accent-ink: var(--color-primary-fg);
+  --radius: var(--radius-control);
+  --space: var(--space-4);
 }
 
 main {
@@ -27,7 +18,6 @@ main {
 }
 
 h1 {
-  font-family: ui-serif, Georgia, 'Times New Roman', serif;
   font-size: 2.25rem;
   margin: 0 0 0.25rem;
 }
@@ -97,7 +87,7 @@ textarea {
 }
 
 textarea.pgn {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
 }
 
@@ -186,7 +176,7 @@ progress {
 }
 
 .engine-stats .line {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--font-mono);
 }
 
 .headline {
@@ -203,7 +193,7 @@ progress {
 }
 
 .synopsis h2 {
-  font-family: ui-serif, Georgia, 'Times New Roman', serif;
+  font-family: var(--font-heading);
   font-size: 1.35rem;
   margin: 0 0 0.5rem;
 }
@@ -249,7 +239,7 @@ progress {
 }
 
 .chat h2 {
-  font-family: ui-serif, Georgia, 'Times New Roman', serif;
+  font-family: var(--font-heading);
   font-size: 1.35rem;
   margin: 0;
 }
@@ -376,10 +366,10 @@ button.link-button:hover:not(:disabled) {
 
 /* v2 — analysis board (SPEC_V2 §5.1). */
 :root {
-  --color-inaccuracy: #8a6d00;
-  --color-mistake: #b5560f;
-  --color-blunder: #a33a2b;
-  --color-board-dark: #2b2f2c;
+  --color-inaccuracy: var(--chess-inaccuracy);
+  --color-mistake: var(--chess-mistake);
+  --color-blunder: var(--chess-blunder);
+  --color-board-dark: var(--eval-black);
 }
 
 .panel {
@@ -458,12 +448,12 @@ button.link-button:hover:not(:disabled) {
   bottom: 0;
   left: 0;
   right: 0;
-  background: #f4f1e8;
+  background: var(--eval-white);
   transition: height 300ms ease-out;
 }
 
 .eval-bar.flipped {
-  background: #f4f1e8;
+  background: var(--eval-white);
 }
 
 .eval-bar.flipped .eval-bar-bottom {
@@ -483,11 +473,11 @@ button.link-button:hover:not(:disabled) {
   font-size: 0.7rem;
   font-weight: 700;
   /* Light text with a dark outline: readable on both the light and the dark part of the bar. */
-  color: #ffffff;
+  color: var(--brand-white);
   text-shadow:
-    0 0 2px #000000,
-    0 0 2px #000000,
-    0 0 3px #000000;
+    0 0 2px var(--brand-black),
+    0 0 2px var(--brand-black),
+    0 0 3px var(--brand-black);
 }
 
 .move-list {
@@ -512,7 +502,7 @@ button.move {
 }
 
 button.move:hover:not(:disabled) {
-  background: #ecebe4;
+  background: var(--color-tint);
 }
 
 button.move[aria-current='step'],
@@ -571,11 +561,11 @@ button.move[aria-current='step'] .glyph {
 }
 
 .eval-graph-white {
-  fill: #e8e4d8;
+  fill: var(--eval-white);
 }
 
 .eval-graph-mid {
-  stroke: #9b9b9b;
+  stroke: var(--eval-graph-midline);
   stroke-dasharray: 4 4;
 }
 
@@ -591,11 +581,11 @@ button.move[aria-current='step'] .glyph {
 }
 
 .eval-graph-hover {
-  stroke: #7a7a7a;
+  stroke: var(--color-muted);
 }
 
 .eval-graph-dot {
-  stroke: #ffffff;
+  stroke: var(--color-bg);
   stroke-width: 1;
 }
 
@@ -772,7 +762,7 @@ button.explain {
 }
 
 .moments h2 {
-  font-family: ui-serif, Georgia, 'Times New Roman', serif;
+  font-family: var(--font-heading);
   font-size: 1.35rem;
   margin: 0;
 }

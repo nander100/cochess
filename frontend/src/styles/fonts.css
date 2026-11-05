@@ -1,0 +1,18 @@
+/* Self-hosted fonts (SIL Open Font License 1.1; licenses next to the files). Served from our own
+ * origin so the COEP header (require-corp) never blocks them. Latin subset, variable weight. */
+
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 700;
+  src: url('./fonts/space-grotesk-latin-wght.woff2') format('woff2-variations');
+}
+
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('./fonts/inter-latin-wght.woff2') format('woff2-variations');
+}
