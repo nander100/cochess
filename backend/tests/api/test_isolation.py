@@ -44,7 +44,7 @@ def _request(client: TestClient, method: str, path: str, game_id: str) -> int:
 def setup() -> tuple[FastAPI, TestClient, TestClient, str]:
     app = _app()
     owner, other = log_in(app, "Owner"), log_in(app, "Other")
-    return app, owner, other, analyzed_game(owner)
+    return app, owner, other, analyzed_game(owner, "white")
 
 
 def test_the_route_table_has_the_routes_we_expect() -> None:

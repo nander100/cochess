@@ -83,6 +83,12 @@ v2 is merged and tagged; branch `v3` is clean. SPEC_V3 §12 M0 asks for: `docs/v
 |---|---|---|
 | 2026-11-04 | M7 is built for **Lichess only**; Chess.com is on hold. | owner |
 | 2026-11-04 | Wrong-side games get **both** "Change color" (rebuild from stored engine results) and "Delete game" (also used to remove onboarding games), in M1 after the color fix. | owner |
-| — | Adjustments 1–8 above | pending (M0 checkpoint) |
+| 2026-11-04 | Adjustments 1–10 above approved with M0. | owner |
+| 2026-11-04 | M1 brief: design in `docs/design/` (tokens.md, screens.md, source/); light theme by default; Settings as a section on Profile; proposed chess-meaning colors used until the M1 checkpoint; moment page restyled to Moment.dc.html with 2 tries and a neutral title ("Find a better move"). | owner |
+| 2026-11-04 | "Get a hint" is enabled only after the player has made an attempt; it serves the next allowed hint, never the move. | owner |
+| 2026-11-04 | Change color / Delete game come right after the color-fix follow-up, before the UI foundation. | owner |
+| 2026-11-04 | Change color reuses every stored engine result and verifies only the new side's missing positions (the game goes back to `scanned`; the browser tops up on next open), so moments stay as reliable as a fresh upload. | owner |
+| 2026-11-04 | The Analysis move list stays collapsed by default, leaving room for the coach conversation. | owner |
+| 2026-11-04 | Fonts self-hosted (OFL woff2 from fontsource builds, no npm dependency); pieces: cburnett default + California alternative, licenses checked before adding. | Claude (plan accepted) |
 
 Add decisions made while building below this line, as in PLAN_V2 §7.

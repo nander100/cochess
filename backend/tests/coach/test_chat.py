@@ -29,7 +29,7 @@ def setup(
     settings = Settings(_env_file=None, database_url="sqlite://", coach=coach or CoachSettings())
     app = create_app(settings, fake)
     client = log_in(app, "Owner")
-    return client, fake, app, analyzed_game(client)
+    return client, fake, app, analyzed_game(client, "white")
 
 
 def chat(client: TestClient, game_id: str, message: str) -> list[tuple[str, dict[str, Any]]]:

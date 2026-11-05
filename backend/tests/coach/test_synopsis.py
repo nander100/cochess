@@ -43,7 +43,7 @@ async def synopsis_for(coach: FakeCoachClient, app: FastAPI, game_id: str) -> An
 class TestService:
     async def test_a_valid_synopsis_is_stored_with_its_usage(self) -> None:
         client, coach, app = make(VALID)
-        game_id = analyzed_game(client)
+        game_id = analyzed_game(client, "white")
 
         result = await synopsis_for(coach, app, game_id)
 
@@ -64,7 +64,7 @@ class TestService:
 
     async def test_invalid_moves_trigger_one_regeneration_with_a_note(self) -> None:
         client, coach, app = make(INVALID, VALID)
-        game_id = analyzed_game(client)
+        game_id = analyzed_game(client, "white")
 
         result = await synopsis_for(coach, app, game_id)
 
@@ -79,7 +79,7 @@ class TestService:
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         client, coach, app = make(INVALID, INVALID)
-        game_id = analyzed_game(client)
+        game_id = analyzed_game(client, "white")
 
         with caplog.at_level(logging.WARNING):
             result = await synopsis_for(coach, app, game_id)
@@ -92,7 +92,7 @@ class TestService:
 
     async def test_a_stored_synopsis_is_reused_without_calling_claude(self) -> None:
         client, coach, app = make(VALID)
-        game_id = analyzed_game(client)
+        game_id = analyzed_game(client, "white")
         await synopsis_for(coach, app, game_id)
 
         again = await synopsis_for(coach, app, game_id)
@@ -105,7 +105,7 @@ class TestService:
     async def test_an_overlong_synopsis_is_logged(self, caplog: pytest.LogCaptureFixture) -> None:
         long_text = VALID + " word" * 400
         client, coach, app = make(long_text)
-        game_id = analyzed_game(client)
+        game_id = analyzed_game(client, "white")
 
         with caplog.at_level(logging.WARNING):
             result = await synopsis_for(coach, app, game_id)
@@ -117,7 +117,7 @@ class TestService:
 class TestEndpoint:
     def test_streams_status_then_the_validated_text_then_done(self) -> None:
         client, _, _ = make(VALID)
-        game_id = analyzed_game(client)
+        game_id = analyzed_game(client, "white")
 
         response = client.post(f"/api/games/{game_id}/synopsis")
 
@@ -130,7 +130,7 @@ class TestEndpoint:
 
     def test_an_api_failure_becomes_an_error_event(self) -> None:
         client, _, _ = make(CoachUnavailableError("The coach is unavailable right now."))
-        game_id = analyzed_game(client)
+        game_id = analyzed_game(client, "white")
 
         events = sse_events(client.post(f"/api/games/{game_id}/synopsis").text)
 
@@ -145,7 +145,7 @@ class TestEndpoint:
         assert client.post("/api/games/nope/synopsis").status_code == 404
 
     def test_without_an_api_key_the_coach_is_unavailable(self, client: TestClient) -> None:
-        game_id = analyzed_game(client)  # the default test app has no coach client
+        game_id = analyzed_game(client, "white")  # the default test app has no coach client
 
         response = client.post(f"/api/games/{game_id}/synopsis")
 

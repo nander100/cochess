@@ -20,7 +20,7 @@ def make(limit: int | None) -> tuple[FastAPI, TestClient, str]:
     settings = Settings(_env_file=None, database_url="sqlite://", user_daily_token_limit=limit)
     app = create_app(settings, FakeCoachClient(*[ANSWER] * 5))
     client = log_in(app, "Owner")
-    return app, client, analyzed_game(client)
+    return app, client, analyzed_game(client, "white")
 
 
 def ask(client: TestClient, game_id: str) -> int:
@@ -53,7 +53,7 @@ def test_the_limit_is_per_player_and_per_day() -> None:
     app, client, game_id = make(2_500)
     client.post(f"/api/games/{game_id}/synopsis")
     other = log_in(app, "Sam")
-    other_game = analyzed_game(other)
+    other_game = analyzed_game(other, "white")
 
     assert other.post(f"/api/games/{other_game}/synopsis").status_code == 200
 

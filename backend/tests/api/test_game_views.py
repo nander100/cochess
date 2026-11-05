@@ -56,7 +56,7 @@ class TestMyGames:
         assert len(other.get("/api/games").json()) == 1
 
     def test_an_analyzed_game_shows_accuracy_and_status(self, client: TestClient) -> None:
-        analyzed_game(client)
+        analyzed_game(client, "white")
 
         (game,) = client.get("/api/games").json()
 
@@ -69,7 +69,7 @@ class TestGameDetail:
     def test_an_analyzed_game_has_moves_evals_labels_and_engine_lines(
         self, client: TestClient
     ) -> None:
-        game_id = analyzed_game(client)
+        game_id = analyzed_game(client, "white")
 
         detail = client.get(f"/api/games/{game_id}").json()
 
@@ -107,7 +107,7 @@ class TestGameDetail:
         assert detail["verify_fens"] == [] and detail["synopsis"] is None and detail["chat"] == []
 
     def test_labels_come_from_the_summary(self, client: TestClient, db_session: Session) -> None:
-        game_id = analyzed_game(client)
+        game_id = analyzed_game(client, "white")
         summary = load_summary(db_session, game_id)
         assert summary is not None
         moves = [m.model_copy(update={"classification": "blunder"}) if m.ply == 3 else m
@@ -142,7 +142,7 @@ class TestGameDetail:
     def test_shows_the_synopsis_and_the_chat_as_the_player_saw_it(
         self, client: TestClient, db_session: Session
     ) -> None:
-        game_id = analyzed_game(client)
+        game_id = analyzed_game(client, "white")
         save_synopsis(db_session, game_id, "### Overall\nA tidy game.", ["Nf9"])
         payload = {"task": "chat", "user_prompt": "What if I take on e5?"}
         rendered = f"The player's new chat message, as JSON.\n\n{json.dumps(payload)}"
@@ -170,7 +170,7 @@ class TestGameDetail:
         ]
 
     def test_needs_a_login_and_the_owner(self, app: FastAPI, client: TestClient) -> None:
-        game_id = analyzed_game(client)
+        game_id = analyzed_game(client, "white")
 
         assert log_in(app, "Other").get(f"/api/games/{game_id}").status_code == 404
         assert client.get("/api/games/nope").status_code == 404

@@ -29,7 +29,7 @@ def test_empty_before_the_first_analyzed_game(client: TestClient) -> None:
 def test_an_analyzed_game_stores_its_facts_and_a_snapshot(
     client: TestClient, db_session: Session
 ) -> None:
-    game_id = analyzed_game(client)
+    game_id = analyzed_game(client, "white")
 
     facts = list(db_session.scalars(select(GameThemeFactRow)))
     snapshots = list(db_session.scalars(select(TendencySnapshotRow)))
@@ -45,8 +45,8 @@ def test_an_analyzed_game_stores_its_facts_and_a_snapshot(
 
 
 def test_each_analyzed_game_adds_a_snapshot(client: TestClient, db_session: Session) -> None:
-    analyzed_game(client)
-    analyzed_game(client, "annotated_clock_game.pgn")
+    analyzed_game(client, "white")
+    analyzed_game(client, "white", "annotated_clock_game.pgn")
 
     snapshots = db_session.scalars(select(TendencySnapshotRow.games_analyzed)).all()
     assert sorted(snapshots) == [1, 2]
@@ -54,7 +54,7 @@ def test_each_analyzed_game_adds_a_snapshot(client: TestClient, db_session: Sess
 
 
 def test_tendencies_are_only_the_players_own(app: FastAPI, client: TestClient) -> None:
-    analyzed_game(client)
+    analyzed_game(client, "white")
     other = log_in(app, "Someone else")
 
     assert other.get("/api/tendencies").json()["games_analyzed"] == 0
