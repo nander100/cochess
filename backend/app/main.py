@@ -11,6 +11,7 @@ from app.api import games, profile, settings_routes, validation
 from app.api import moments as moment_routes
 from app.api import onboarding as onboarding_routes
 from app.api import tendencies as tendency_routes
+from app.api import variations as variation_routes
 from app.auth import routes as auth_routes
 from app.coach.client import AnthropicCoachClient, CoachClient
 from app.config import Settings, get_settings
@@ -64,4 +65,5 @@ def create_app(
     app.include_router(tendency_routes.router)
     app.include_router(onboarding_routes.router)
     app.include_router(settings_routes.router)
+    app.include_router(variation_routes.router)
     return app

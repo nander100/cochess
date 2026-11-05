@@ -107,6 +107,10 @@ class Game(Base):
     # games uploaded before v2 M5 until `cli backfill`.
     fingerprint: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+    # When the player's variations were first saved (SPEC_V3 §5.1). Until then the board seeds
+    # finished moments' tries as variations; after, the saved list is the whole truth, so a
+    # deleted moment line stays deleted.
+    variations_saved_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
 
 
 class EngineResultRow(Base):
@@ -277,4 +281,22 @@ class UserSettingsRow(Base):
     piece_set: Mapped[str] = mapped_column(String(16))  # cburnett | merida
     sounds: Mapped[bool] = mapped_column(Boolean)
     engine_panel: Mapped[bool] = mapped_column(Boolean)  # show the live engine by default
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)
+
+
+class GameVariationRow(Base):
+    """A line the player explored on the board (SPEC_V3 §5.1): the path it starts from and its
+    moves, both UCI, replayed and checked by the backend. `position` is the display order."""
+
+    __tablename__ = "game_variations"
+
+    __table_args__ = (Index("ix_game_variations_game_id_position", "game_id", "position"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    position: Mapped[int] = mapped_column(Integer)
+    start_path: Mapped[list[str]] = mapped_column(JSON)
+    moves: Mapped[list[str]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)

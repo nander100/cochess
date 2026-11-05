@@ -154,6 +154,9 @@ class Limits(BaseModel):
     # don't count.
     max_games_per_day: int = 10
     max_playstyle_chars: int = 500
+    # Saved variations per game, and moves per variation (SPEC_V3 §5.1).
+    max_variations: int = 200
+    max_variation_moves: int = 200
 
 
 class AuthSettings(BaseModel):

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.analysis.engine import EngineResult, Tier
 from app.analysis.pgn import PgnErrorCode, Position
 from app.analysis.summary_models import Accuracy, Counts, GameInfo, MoveLabel
+from app.analysis.variations import SavedVariation
 from app.db.chat import ChatEntry
 
 # Profile input rules from SPEC_V2 §4.3, not tunable thresholds.
@@ -192,6 +193,18 @@ class MomentInfo(BaseModel):
     max_attempts: int = 2
 
 
+class SaveVariationsRequest(BaseModel):
+    """The player's whole variation list for a game, in display order. Replaces what's stored."""
+
+    variations: list[SavedVariation] = Field(max_length=1000)
+
+
+class VariationsResponse(BaseModel):
+    variations: list[SavedVariation]
+    # False until the first save: the board then seeds finished moments' tries as variations.
+    saved: bool
+
+
 class GameDetail(BaseModel):
     """Everything the analysis board needs (SPEC_V2 §5.1): nothing is re-analyzed on open."""
 
@@ -213,3 +226,5 @@ class GameDetail(BaseModel):
     synopsis: StoredSynopsis | None
     chat: list[ChatEntry]
     moments: list[MomentInfo] = []
+    # The saved variations, or None if they were never saved (see VariationsResponse.saved).
+    variations: list[SavedVariation] | None = None

@@ -29,6 +29,7 @@ from app.db.models import (
 )
 from app.db.onboarding import filled_slots, onboarding_games, slot_for
 from app.db.tendencies import refresh_tendencies
+from app.db.variations import delete_variations
 
 
 class SlotFullError(Exception):
@@ -62,6 +63,7 @@ def delete_game(session: Session, settings: Settings, game: Game) -> None:
     game_id, user_id = game.id, game.user_id
     session.execute(update(LlmUsageRow).where(LlmUsageRow.game_id == game_id).values(game_id=None))
     _clear_coaching(session, game_id)
+    delete_variations(session, game_id)
     for table in (EngineResultRow, GameSummaryRow, GameThemeFactRow):
         session.execute(delete(table).where(table.game_id == game_id))
     session.delete(game)

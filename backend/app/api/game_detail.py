@@ -29,6 +29,7 @@ from app.db.coach import load_synopsis
 from app.db.engine_results import load_results, load_summary
 from app.db.models import Game, MomentProgressRow
 from app.db.moments import load_progress
+from app.db.variations import load_variations
 
 
 def build_detail(session: Session, game: Game, settings: Settings) -> GameDetail:
@@ -90,6 +91,7 @@ def build_detail(session: Session, game: Game, settings: Settings) -> GameDetail
         else None,
         chat=chat_history(session, game.id),
         moments=moments,
+        variations=load_variations(session, game),
     )
 
 
