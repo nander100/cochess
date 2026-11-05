@@ -206,6 +206,8 @@ export interface MomentInfo {
   messages: MomentMessage[]
   best_san: string | null
   best_uci: string | null
+  /** Failed tries before the answer is shown (the "Tries left" dots). */
+  max_attempts: number
 }
 
 /** An attempt at a moment: the move, the player's reasoning, and the browser's deep searches of

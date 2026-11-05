@@ -130,6 +130,7 @@ export const MOMENT: MomentInfo = {
   messages: [],
   best_san: null,
   best_uci: null,
+  max_attempts: 2,
 }
 
 export const EMPTY_SLOTS: SlotCount[] = (['white_win', 'white_loss', 'black_win', 'black_loss'] as const).map(

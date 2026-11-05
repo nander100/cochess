@@ -108,11 +108,6 @@ progress {
   margin-top: 1.5rem;
 }
 
-
-
-
-
-
 .coach-writing {
   color: var(--color-muted);
   font-style: italic;
@@ -126,43 +121,6 @@ progress {
   .coach-columns:has(.chat) {
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   }
-}
-
-.chat-log {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.75rem;
-  max-height: 32rem;
-  overflow-y: auto;
-}
-
-.chat-message {
-  padding: 0.6rem 0.8rem;
-  border-radius: var(--radius);
-  background: var(--color-paper);
-}
-
-.chat-message.player {
-  border-left: 3px solid var(--color-line);
-}
-
-.chat-message.coach {
-  border-left: 3px solid var(--color-accent);
-}
-
-.chat-message p {
-  margin: 0.2rem 0;
-}
-
-.chat-author {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-muted);
 }
 
 .visually-hidden {
@@ -402,118 +360,6 @@ button.move[aria-current='step'] .glyph {
   margin-top: 0.3rem;
 }
 
-
-
-
-
-
-
-
-
-
-.moments {
-  background: var(--color-surface);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius);
-  padding: 1.25rem 1.5rem;
-  display: grid;
-  gap: 0.75rem;
-}
-
-.moments h2 {
-  font-family: var(--font-heading);
-  font-size: 1.35rem;
-  margin: 0;
-}
-
-.moment-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.moment-chip {
-  background: var(--color-paper);
-  color: var(--color-ink);
-  border: 1px solid var(--color-line);
-  border-radius: 999px;
-  padding: 0.2rem 0.7rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.moment-chip[aria-current='step'] {
-  border-color: var(--color-accent);
-  box-shadow: inset 0 0 0 1px var(--color-accent);
-}
-
-.moment-chip.solved::before {
-  content: '✓ ';
-  color: var(--color-accent);
-}
-
-.moment-chip.revealed::before {
-  content: '• ';
-  color: var(--color-muted);
-}
-
-.moment-summary {
-  margin: 0;
-  color: var(--color-muted);
-}
-
-.moment-grade {
-  margin: 0;
-  font-weight: 700;
-}
-
-.moment-grade.best,
-.moment-grade.good {
-  color: var(--color-accent);
-}
-
-.moment-grade.mistake,
-.moment-grade.blunder {
-  color: var(--color-danger);
-}
-
-.moment-controls,
-.moment-attempt {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.moment-attempt p {
-  margin: 0;
-}
-
-.moment-attempt textarea {
-  font: inherit;
-  padding: 0.4rem 0.5rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius);
-  resize: vertical;
-}
-
-.moment-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.moment-controls > button,
-.moment-actions > button {
-  justify-self: start;
-}
-
-.moment-best {
-  margin: 0;
-}
-
-
-
 button.secondary {
   background: var(--color-surface);
   color: var(--color-accent);
@@ -524,8 +370,6 @@ button.danger {
   background: var(--color-danger);
   color: var(--color-accent-ink);
 }
-
-
 
 .report-date {
   margin: 0;

@@ -59,9 +59,9 @@ test('a player uploads a game, reads the coach, and steps through a critical mom
   await expect(page.locator('.moment-grade')).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText(/E2E (feedback|moment)/).last()).toBeVisible()
 
-  // "Show me" reveals the engine's move and unlocks the board.
-  if (await page.getByRole('button', { name: 'Show me' }).isVisible()) {
-    await page.getByRole('button', { name: 'Show me' }).click()
+  // "Show the answer" reveals the engine's move and unlocks the board.
+  if (await page.getByRole('button', { name: 'Show the answer' }).isVisible()) {
+    await page.getByRole('button', { name: 'Show the answer' }).click()
   }
   await expect(page.getByText(/The engine's move:/)).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText(/The engine is off/)).toBeHidden()

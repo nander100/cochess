@@ -5,7 +5,7 @@ import type { ApiClient } from '../api/client'
 import type { CoachEvent } from '../api/sse'
 import type { MomentInfo } from '../api/types'
 import { DETAIL, MOMENT, fakeApi } from '../test/fakes'
-import { MomentStepper } from './MomentStepper'
+import { HINT_REQUEST, MomentStepper } from './MomentStepper'
 
 const FEN = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2'
 const INTRO = { role: 'coach' as const, text: 'What would you play instead?', kind: 'intro' }
@@ -66,7 +66,7 @@ test('wrap-up is offered only once every moment is finished', () => {
   renderStepper([{ ...MOMENT, state: 'solved' }, second])
 
   expect(screen.queryByRole('button', { name: 'Wrap up' })).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Next moment' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Next moment →' })).toBeInTheDocument()
 })
 
 test('the stored wrap-up is shown after the last moment', () => {
@@ -91,4 +91,50 @@ test('a coach error is shown and nothing is lost', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('The coach is unavailable right now.')
   expect(onUpdated).not.toHaveBeenCalled()
   expect(screen.getByRole('button', { name: 'Start this moment' })).toBeEnabled()
+})
+
+test('the title is neutral and the tries left are shown as dots', () => {
+  renderStepper([{ ...MOMENT, state: 'attempt', messages: [INTRO], attempts: [{ uci: 'f1c4', san: 'Bc4', grade: 'mistake' }] }])
+
+  expect(screen.getByRole('heading', { name: 'Find a better move' })).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: '1 of 2 tries left' })).toBeInTheDocument()
+})
+
+test('"Get a hint" waits for a first try', () => {
+  renderStepper([{ ...MOMENT, state: 'intro', messages: [INTRO] }])
+
+  expect(screen.getByRole('button', { name: 'Get a hint' })).toBeDisabled()
+})
+
+test('"Get a hint" asks for the next hint and shows it in the hint panel', async () => {
+  const tried = { ...MOMENT, state: 'attempt' as const, messages: [INTRO], attempts: [{ uci: 'f1c4', san: 'Bc4', grade: 'mistake' as const }] }
+  const hinted = {
+    ...tried,
+    messages: [
+      INTRO,
+      { role: 'player' as const, text: HINT_REQUEST, kind: 'question' },
+      { role: 'coach' as const, text: 'Look at the loose bishop.', kind: 'answer' },
+    ],
+  }
+  const api = fakeApi({
+    momentAsk: vi.fn(async (_g: string, _i: number, _t: string, onEvent: (event: CoachEvent) => void) => {
+      onEvent({ type: 'text', text: 'Look at the loose bishop.' })
+      onEvent({ type: 'done', invalid_moves_removed: [] })
+    }),
+    getGame: vi.fn(async () => ({ ...DETAIL, moments: [hinted] })),
+  })
+  renderStepper([tried], api)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Get a hint' }))
+
+  expect(await screen.findByText('Hint')).toBeInTheDocument()
+  expect(api.momentAsk).toHaveBeenCalledWith('game-1', 1, HINT_REQUEST, expect.any(Function))
+  expect(screen.getByText('Look at the loose bishop.').closest('.moment-hint')).not.toBeNull()
+})
+
+test('the solution appears only once the moment is finished', () => {
+  renderStepper([{ ...MOMENT, state: 'revealed', messages: [INTRO], best_san: 'd4', best_uci: 'd2d4' }])
+
+  expect(screen.getByText('Solution')).toBeInTheDocument()
+  expect(screen.getByText(/The engine's move:/)).toHaveTextContent('2. d4')
 })

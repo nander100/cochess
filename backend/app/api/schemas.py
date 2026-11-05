@@ -188,6 +188,8 @@ class MomentInfo(BaseModel):
     messages: list[MomentMessage]
     best_san: str | None = None
     best_uci: str | None = None
+    # Failed tries before the answer is shown (config moments.max_attempts): the "Tries left" dots.
+    max_attempts: int = 2
 
 
 class GameDetail(BaseModel):

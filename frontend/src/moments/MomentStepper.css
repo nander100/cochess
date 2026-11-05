@@ -1,0 +1,192 @@
+/* The critical-moment exercise (Moment.dc.html). */
+.moments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.moment-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.moment-back {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-link);
+  font: var(--text-ui-strong);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.moment-task {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.moment-title {
+  margin: 0;
+  font: var(--text-title);
+  letter-spacing: var(--tracking-title);
+}
+
+.moment-summary,
+.moment-instruction {
+  margin: 0;
+  color: var(--color-muted);
+  font: var(--text-body-large);
+}
+
+.moment-tries {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-box);
+}
+
+.moment-tries-label {
+  flex: 1 1 auto;
+  font: var(--text-ui-strong);
+}
+
+.moment-tries-dots {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.moment-tries-dots span {
+  width: var(--swatch-size);
+  height: var(--swatch-size);
+  border: var(--board-frame-width) solid var(--color-field-border);
+  border-radius: var(--radius-pill);
+}
+
+.moment-tries-dots span.left {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.moment-log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: var(--chat-log-max);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.moment-feedback.ui-feature-card {
+  flex-direction: row;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.moment-feedback-text {
+  color: var(--color-feature-muted);
+  font: var(--text-body);
+}
+
+.moment-feedback-text > :first-child,
+.moment-hint > p:first-of-type {
+  margin-top: 0;
+}
+
+.moment-feedback-text > :last-child,
+.moment-hint > :last-child {
+  margin-bottom: 0;
+}
+
+.moment-hint.ui-tinted-panel {
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  font: var(--text-body);
+}
+
+.moment-panel-label {
+  color: var(--color-label);
+  font: var(--text-chip);
+  font-weight: 700;
+}
+
+.moment-solution {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: var(--board-frame-width) solid var(--color-primary);
+  border-radius: var(--radius-card);
+}
+
+.moment-best {
+  margin: 0;
+  font: var(--text-body);
+}
+
+.moment-grade {
+  margin: 0;
+  font: var(--text-small-heading);
+}
+
+.moment-grade.best,
+.moment-grade.good {
+  color: var(--chess-good);
+}
+
+.moment-grade.inaccuracy {
+  color: var(--chess-inaccuracy);
+}
+
+.moment-grade.mistake {
+  color: var(--chess-mistake);
+}
+
+.moment-grade.blunder {
+  color: var(--chess-blunder);
+}
+
+.moment-attempt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.moment-attempt p {
+  margin: 0;
+}
+
+.moment-why-label {
+  font: var(--text-small-heading);
+}
+
+.moment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.moment-next {
+  margin-left: auto;
+}
+
+.moment-start {
+  align-self: flex-start;
+}
+
+.moment-ask {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.moment-ask .ui-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}

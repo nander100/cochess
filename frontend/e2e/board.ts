@@ -2,6 +2,8 @@ import type { Page } from '@playwright/test'
 
 /** Click a square on the chessground board, seen from `orientation`'s side. */
 export async function clickSquare(page: Page, square: string, orientation: 'white' | 'black'): Promise<void> {
+  // A mouse click outside the viewport doesn't scroll: bring the whole board into view first.
+  await page.locator('cg-board').scrollIntoViewIfNeeded()
   const box = await page.locator('cg-board').boundingBox()
   if (!box) throw new Error('No board on the page.')
   const size = box.width / 8

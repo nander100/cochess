@@ -41,7 +41,12 @@ def build_detail(session: Session, game: Game, settings: Settings) -> GameDetail
     summary = load_summary(session, game.id)
     labels = {move.ply: move.classification for move in summary.move_list} if summary else {}
     synopsis = load_synopsis(session, game.id)
-    moments = _moments(summary, load_progress(session, game.id), best_by_fen(results))
+    moments = _moments(
+        summary,
+        load_progress(session, game.id),
+        best_by_fen(results),
+        settings.moments.max_attempts,
+    )
     # An unsolved moment's position stays without engine lines: its top line is the answer.
     hidden = (
         {m.fen_before for m in summary.moments if not _done(moments, m.index)} if summary else set()
@@ -92,6 +97,7 @@ def _moments(
     summary: GameSummary | None,
     progress: Mapping[int, MomentProgressRow],
     by_fen: Mapping[str, EngineResult],
+    max_attempts: int,
 ) -> list[MomentInfo]:
     if summary is None:
         return []
@@ -123,6 +129,7 @@ def _moments(
                 messages=[MomentMessage.model_validate(m) for m in row.messages] if row else [],
                 best_san=best_san,
                 best_uci=best_uci,
+                max_attempts=max_attempts,
             )
         )
     return moments

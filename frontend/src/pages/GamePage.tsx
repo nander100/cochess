@@ -34,7 +34,7 @@ import { analyzeAll } from '../engine/runner'
 import { BoardNav, GameHeading, MovesPanel } from './AnalysisParts'
 import { GameOptions } from './GameOptions'
 import Markdown from 'react-markdown'
-import { Button, FeatureCard, Tabs } from '../ui'
+import { Button, ColorSwatch, FeatureCard, Tabs } from '../ui'
 import './GamePage.css'
 import { errorText } from './util'
 
@@ -272,6 +272,8 @@ function AnalysisBoard({
       )}
       <div className="analysis-layout">
         <section className="board-column" aria-label="Board">
+          {/* Always shown, so the board never shifts (chessground keeps its screen position). */}
+          <BoardTurn fen={boardFen} moveNumber={locked && moment ? moment.move_number : Math.floor(node.ply / 2) + 1} />
           <div className="board-row">
             <EvalBar winPct={evaluation.winPct} evalText={evaluation.evalText} orientation={orientation} />
             <Board
@@ -342,6 +344,7 @@ function AnalysisBoard({
               searches={searches}
               onUpdated={momentsUpdated}
               onLoggedOut={onLoggedOut}
+              onBack={() => openTab('coach')}
             />
           )}
           {detail.status === 'analyzed' && tab === 'coach' && (
@@ -371,6 +374,17 @@ function AnalysisBoard({
       </div>
     )
   }
+}
+
+/** "White to move · move 3" for the position on the board (Moment.dc.html). */
+function BoardTurn({ fen, moveNumber }: { fen: string; moveNumber: number }) {
+  const side = fen.split(' ')[1] === 'b' ? 'black' : 'white'
+  return (
+    <p className="board-turn">
+      <ColorSwatch color={side} />
+      {side === 'white' ? 'White' : 'Black'} to move · move {moveNumber}
+    </p>
+  )
 }
 
 /** An analysis that didn't finish (the tab was closed): pick it up from where the server says. */

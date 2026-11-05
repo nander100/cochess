@@ -278,6 +278,7 @@ class TestDetail:
         [info] = before["moments"]
         assert (info["state"], info["best_san"], info["san"]) == ("intro", None, "Qxf3")
         assert info["messages"] == [{"role": "coach", "text": INTRO, "kind": "intro"}]
+        assert info["max_attempts"] == 2  # the "Tries left" dots (config moments.max_attempts)
         assert MOMENT_FEN in [r["fen"] for r in revealed["engine_results"]]
 
     def test_an_unopened_moment_is_new(self) -> None:

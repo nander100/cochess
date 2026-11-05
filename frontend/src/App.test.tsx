@@ -218,6 +218,15 @@ test('the move list marks my mistake, and moves are explored with clicks, the bo
   expect(within(moves).getByRole('button', { name: '2. Nf3, mistake' })).toHaveAttribute('aria-current', 'step')
 })
 
+test('the side to move and the move number are shown above the board', async () => {
+  renderApp(fakeDeps(), '/games/game-1')
+
+  expect(await screen.findByText('White to move · move 1')).toBeInTheDocument()
+  await openMoves()
+  fireEvent.click(screen.getByRole('button', { name: '2. Nf3, mistake' }))
+  expect(screen.getByText('Black to move · move 2')).toBeInTheDocument()
+})
+
 test('the eval bar follows the position', async () => {
   renderApp(fakeDeps(), '/games/game-1')
 
@@ -502,7 +511,7 @@ describe('critical moments', () => {
     renderApp(deps, '/games/game-1')
     fireEvent.click(await screen.findByRole('tab', { name: /Critical moments/ }))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show me' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show the answer' }))
 
     expect(await screen.findByText(/The engine's move:/)).toHaveTextContent('2. d4')
     fireEvent.click(screen.getByRole('tab', { name: 'Coach' }))
