@@ -318,3 +318,28 @@ export interface OnboardingStatus {
   report_ready: boolean
   report: BaselineReport | null
 }
+
+/** GET /api/tendencies (SPEC_V2 §9; backend app/analysis/tendencies.py). */
+export type Trend = 'improving' | 'worsening' | 'steady'
+
+export interface Tendency {
+  theme: string
+  label: string
+  rate_per_game: number
+  score: number
+  trend: Trend | null
+  games_seen: number
+  provisional: boolean
+  recent_example: { game_id: string; move_number: number | null; move_san: string | null }
+}
+
+export interface TendencyReport {
+  games_analyzed: number
+  provisional: boolean
+  tendencies: Tendency[]
+  accuracy: {
+    overall: number | null
+    by_color: Record<Color, number | null>
+    by_phase: Record<string, number | null>
+  }
+}

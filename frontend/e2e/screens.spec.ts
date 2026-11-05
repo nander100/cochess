@@ -57,7 +57,7 @@ test('every page, light and dark, 1280 and 1920', async ({ page, browser }) => {
 
   // Onboarding with a few games checked.
   await page.getByLabel(/rating/i).fill('1200')
-  await page.getByLabel(/time control/i).selectOption('rapid')
+  await page.getByLabel('Rapid', { exact: true }).check()
   await page.getByRole('button', { name: /^Save/ }).click()
   await page.getByRole('heading', { name: 'Your baseline assessment' }).waitFor()
   const games = [rapidGame(0, 'white', '1-0'), rapidGame(1, 'black', '0-1'), rapidGame(2, 'white', '0-1')]

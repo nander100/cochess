@@ -355,7 +355,7 @@ test('a new player fills in the profile first, then sees the assessment (which t
   renderApp(deps, '/')
 
   fireEvent.change(await screen.findByLabelText(/rating/i), { target: { value: '1450' } })
-  fireEvent.change(screen.getByLabelText(/time control/i), { target: { value: 'blitz' } })
+  fireEvent.click(screen.getByLabelText('Blitz'))
   fireEvent.click(screen.getByRole('button', { name: 'Save and continue' }))
 
   expect(await screen.findByRole('heading', { name: 'Your baseline assessment' })).toBeInTheDocument()

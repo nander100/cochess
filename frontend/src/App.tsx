@@ -9,7 +9,6 @@ import { GamesPage } from './pages/GamesPage'
 import { LatestGamePage } from './pages/LatestGamePage'
 import { NewGamePage } from './pages/NewGamePage'
 import { OnboardingPage } from './pages/OnboardingPage'
-import { BaselineReportPanel } from './onboarding/BaselineReportPanel'
 import { ProfilePage } from './pages/ProfilePage'
 import { RedeemPage } from './pages/RedeemPage'
 import { errorText, tokenFromHash } from './pages/util'
@@ -114,8 +113,7 @@ function Shell({ deps }: AppProps) {
           <Route
             path="/profile"
             element={
-              <>
-                <ProfilePage
+              <ProfilePage
                   api={pipeline.api}
                   profile={session.profile}
                   onSaved={(profile) => {
@@ -126,8 +124,6 @@ function Shell({ deps }: AppProps) {
                   }}
                   onLoggedOut={loggedOut}
                 />
-                {session.profile.complete && <BaselineReportPanel api={pipeline.api} onLoggedOut={loggedOut} />}
-              </>
             }
           />
           {session.profile.complete ? (

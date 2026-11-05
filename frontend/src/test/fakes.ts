@@ -178,6 +178,13 @@ export function fakeEngine(): EngineHandle {
   }
 }
 
+export const EMPTY_TENDENCIES = {
+  games_analyzed: 0,
+  provisional: true,
+  tendencies: [],
+  accuracy: { overall: null, by_color: { white: null, black: null }, by_phase: {} },
+}
+
 export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
   return {
     redeem: vi.fn(async () => {}),
@@ -189,6 +196,7 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     getGame: vi.fn(async () => DETAIL),
     changeColor: vi.fn(async (_gameId: string, color: Color) => ({ ...DETAIL, user_color: color })),
     deleteGame: vi.fn(async () => {}),
+    tendencies: vi.fn(async () => EMPTY_TENDENCIES),
     engineConfig: vi.fn(async () => ENGINE_CONFIG),
     submitScan: vi.fn(async () => ({ verify_fens: ['fen-1 b', 'fen-2 w'] })),
     submitVerify: vi.fn(async () => ({ summary_ready: false, counts: null, accuracy: null })),

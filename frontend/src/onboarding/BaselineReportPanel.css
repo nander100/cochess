@@ -1,0 +1,25 @@
+.baseline-card.ui-feature-card {
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border-radius: var(--radius-panel);
+}
+
+.baseline-title {
+  margin: 0;
+  font: var(--text-section);
+  color: var(--color-feature-fg);
+}
+
+.baseline-card p {
+  margin: 0;
+}
+
+.baseline-read.ui-button {
+  align-self: flex-start;
+  background: var(--header-accent);
+  color: var(--header-accent-fg);
+}
+
+.baseline-text {
+  font: var(--text-body);
+}

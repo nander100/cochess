@@ -17,6 +17,7 @@ import type {
   Profile,
   ProfileUpdate,
   ScanResponse,
+  TendencyReport,
   SubmitGame,
   SubmitResponse,
   VerifyResponse,
@@ -52,6 +53,8 @@ export interface ApiClient {
   changeColor(gameId: string, color: Color): Promise<GameDetail>
   /** Delete a game and everything stored for it (also removes an onboarding game). */
   deleteGame(gameId: string): Promise<void>
+  /** The player's tendencies across analyzed games (recent games count more). */
+  tendencies(): Promise<TendencyReport>
   engineConfig(): Promise<EngineConfig>
   submitScan(gameId: string, results: EngineResult[]): Promise<ScanResponse>
   submitVerify(gameId: string, results: EngineResult[]): Promise<VerifyResponse>
@@ -154,6 +157,7 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
     deleteGame: async (gameId) => {
       await send(`/api/games/${encodeURIComponent(gameId)}`, { method: 'DELETE' })
     },
+    tendencies: () => request('/api/tendencies'),
     engineConfig: () => request('/api/engine-config'),
     submitScan: (gameId, results) => post(`/api/games/${gameId}/engine/scan`, { results }),
     submitVerify: (gameId, results) => post(`/api/games/${gameId}/engine/verify`, { results }),

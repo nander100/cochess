@@ -1,6 +1,11 @@
-import { type FormEvent, useId, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { type ApiClient, isLoggedOut } from '../api/client'
-import type { Profile, TimeControl } from '../api/types'
+import type { Profile, TendencyReport, TimeControl } from '../api/types'
+import { BaselineReportPanel } from '../onboarding/BaselineReportPanel'
+import type { ThemePreference } from '../theme/theme'
+import { useTheme } from '../theme/themeContext'
+import { Button, Card, Input, SegmentedToggle, Skeleton, Textarea, type ToggleOption } from '../ui'
+import './ProfilePage.css'
 import { errorText } from './util'
 
 // Profile rules from SPEC_V2 §4.3, mirrored from backend/app/api/schemas.py.
@@ -9,12 +14,20 @@ export const MAX_ELO = 3000
 export const MAX_PLAYSTYLE_CHARS = 500
 export const MAX_NAME_CHARS = 60
 
-const TIME_CONTROLS: { value: TimeControl; label: string }[] = [
-  { value: 'bullet', label: 'Bullet (under 3 minutes)' },
-  { value: 'blitz', label: 'Blitz (3–8 minutes)' },
-  { value: 'rapid', label: 'Rapid (8–25 minutes)' },
-  { value: 'classical', label: 'Classical (25 minutes or more)' },
+const TIME_CONTROLS: readonly ToggleOption<TimeControl>[] = [
+  { value: 'bullet', label: 'Bullet' },
+  { value: 'blitz', label: 'Blitz' },
+  { value: 'rapid', label: 'Rapid' },
+  { value: 'classical', label: 'Classical' },
 ]
+
+const THEMES: readonly ToggleOption<ThemePreference>[] = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'Match system' },
+]
+
+const TIME_CONTROL_NAME: Record<TimeControl, string> = { bullet: 'Bullet', blitz: 'Blitz', rapid: 'Rapid', classical: 'Classical' }
 
 interface ProfilePageProps {
   api: ApiClient
@@ -23,16 +36,80 @@ interface ProfilePageProps {
   onLoggedOut: () => void
 }
 
-/** The player's profile (SPEC_V2 §4.3). Filled in on first login, editable any time. */
+/** The player's profile and settings (SPEC_V2 §4.3, SPEC_V3 §4.3; Profile.dc.html). Filled in on
+ * first login, editable any time. */
 export function ProfilePage({ api, profile, onSaved, onLoggedOut }: ProfilePageProps) {
-  const id = useId()
+  const [report, setReport] = useState<TendencyReport | null>(null)
+
+  useEffect(() => {
+    if (!profile.complete) return
+    api.tendencies().then(setReport, (caught: unknown) => {
+      if (isLoggedOut(caught)) onLoggedOut()
+    })
+  }, [api, profile.complete, onLoggedOut])
+
+  return (
+    <div className="profile-page">
+      <ProfileHeading profile={profile} gamesAnalyzed={report?.games_analyzed ?? null} />
+      <div className="profile-columns">
+        <div className="profile-main">
+          <AboutYou api={api} profile={profile} onSaved={onSaved} onLoggedOut={onLoggedOut} />
+          <SettingsSection />
+        </div>
+        {profile.complete && (
+          <aside className="profile-aside" aria-label="Your progress">
+            <BaselineReportPanel api={api} onLoggedOut={onLoggedOut} />
+            <Tendencies report={report} />
+          </aside>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ProfileHeading({ profile, gamesAnalyzed }: { profile: Profile; gamesAnalyzed: number | null }) {
+  const facts = [
+    profile.elo !== null ? `Elo ${profile.elo}` : null,
+    profile.time_control ? TIME_CONTROL_NAME[profile.time_control] : null,
+    gamesAnalyzed !== null ? `${gamesAnalyzed} game${gamesAnalyzed === 1 ? '' : 's'} analyzed` : null,
+  ].filter(Boolean)
+  return (
+    <div className="profile-heading">
+      <span className="profile-avatar" aria-hidden="true">
+        {profile.name.trim().charAt(0).toUpperCase() || '?'}
+      </span>
+      <div>
+        <h1 className="profile-name">{profile.name}</h1>
+        {facts.length > 0 && <p className="profile-facts">{facts.join(' · ')}</p>}
+      </div>
+    </div>
+  )
+}
+
+interface AboutYouProps {
+  api: ApiClient
+  profile: Profile
+  onSaved: (profile: Profile) => void
+  onLoggedOut: () => void
+}
+
+function AboutYou({ api, profile, onSaved, onLoggedOut }: AboutYouProps) {
   const [name, setName] = useState(profile.name)
   const [elo, setElo] = useState(profile.elo === null ? '' : String(profile.elo))
-  const [timeControl, setTimeControl] = useState<TimeControl | ''>(profile.time_control ?? '')
+  const [timeControl, setTimeControl] = useState<TimeControl | null>(profile.time_control)
   const [playstyle, setPlaystyle] = useState(profile.playstyle ?? '')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  function reset() {
+    setName(profile.name)
+    setElo(profile.elo === null ? '' : String(profile.elo))
+    setTimeControl(profile.time_control)
+    setPlaystyle(profile.playstyle ?? '')
+    setError(null)
+    setSaved(false)
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -41,17 +118,12 @@ export function ProfilePage({ api, profile, onSaved, onLoggedOut }: ProfilePageP
     if (elo.trim() === '' || !Number.isInteger(eloValue) || eloValue < MIN_ELO || eloValue > MAX_ELO) {
       return setError(`Enter your rating as a whole number from ${MIN_ELO} to ${MAX_ELO}.`)
     }
-    if (timeControl === '') return setError('Choose the time control you play most.')
+    if (timeControl === null) return setError('Choose the time control you play most.')
     setError(null)
     setSaving(true)
     setSaved(false)
     try {
-      const updated = await api.updateMe({
-        name: name.trim(),
-        elo: eloValue,
-        time_control: timeControl,
-        playstyle: playstyle.trim(),
-      })
+      const updated = await api.updateMe({ name: name.trim(), elo: eloValue, time_control: timeControl, playstyle: playstyle.trim() })
       setSaved(true)
       onSaved(updated)
     } catch (caught) {
@@ -63,26 +135,15 @@ export function ProfilePage({ api, profile, onSaved, onLoggedOut }: ProfilePageP
   }
 
   return (
-    <form className="profile-form" onSubmit={(e) => void handleSubmit(e)} noValidate aria-label="Your profile">
-      <h2>Your profile</h2>
-      {!profile.complete && (
-        <p className="intro">Welcome! Tell your coach a little about your chess before you start.</p>
-      )}
-      <label htmlFor={`${id}-name`}>
-        Name
-        <input
-          id={`${id}-name`}
-          maxLength={MAX_NAME_CHARS}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          disabled={saving}
-          required
-        />
-      </label>
-      <label htmlFor={`${id}-elo`}>
-        Your rating (Elo)
-        <input
-          id={`${id}-elo`}
+    <form className="ui-card profile-card" onSubmit={(e) => void handleSubmit(e)} noValidate aria-labelledby="profile-about">
+      <h2 id="profile-about" className="profile-card-title">
+        About you
+      </h2>
+      {!profile.complete && <p className="profile-intro">Welcome! Tell your coach a little about your chess before you start.</p>}
+      <div className="profile-fields">
+        <Input label="Display name" maxLength={MAX_NAME_CHARS} value={name} onChange={(e) => setName(e.target.value)} disabled={saving} required />
+        <Input
+          label="Elo rating"
           type="number"
           inputMode="numeric"
           min={MIN_ELO}
@@ -91,46 +152,99 @@ export function ProfilePage({ api, profile, onSaved, onLoggedOut }: ProfilePageP
           onChange={(e) => setElo(e.target.value)}
           disabled={saving}
           required
+          help={`${MIN_ELO}–${MAX_ELO}. Your coach pitches explanations to this level.`}
         />
-      </label>
-      <label htmlFor={`${id}-tc`}>
-        Time control you play most
-        <select
-          id={`${id}-tc`}
-          value={timeControl}
-          onChange={(e) => setTimeControl(e.target.value as TimeControl | '')}
-          disabled={saving}
-          required
-        >
-          <option value="">Choose…</option>
-          {TIME_CONTROLS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label htmlFor={`${id}-playstyle`}>
-        How do you like to play? <span className="optional">(optional)</span>
-        <textarea
-          id={`${id}-playstyle`}
-          rows={2}
+      </div>
+      <SegmentedToggle legend="Main time control" options={TIME_CONTROLS} value={timeControl} onChange={setTimeControl} disabled={saving} />
+      <div className="profile-playstyle">
+        <Textarea
+          label={
+            <>
+              How you like to play <span className="profile-optional">(optional)</span>
+            </>
+          }
+          rows={4}
           maxLength={MAX_PLAYSTYLE_CHARS}
-          placeholder="e.g. aggressive, I like the London System"
+          placeholder="e.g. I like open positions and attacking the king, but I get nervous in endgames."
           value={playstyle}
           onChange={(e) => setPlaystyle(e.target.value)}
           disabled={saving}
         />
-      </label>
+        <span className="profile-counter" aria-live="polite">
+          {playstyle.length} / {MAX_PLAYSTYLE_CHARS}
+        </span>
+      </div>
       {error && (
         <p className="form-error" role="alert">
           {error}
         </p>
       )}
-      {saved && <p role="status">Saved.</p>}
-      <button type="submit" disabled={saving}>
-        {profile.complete ? 'Save' : 'Save and continue'}
-      </button>
+      {saved && (
+        <p className="profile-saved" role="status">
+          Saved.
+        </p>
+      )}
+      <div className="profile-actions">
+        {profile.complete && (
+          <Button variant="outline" onClick={reset} disabled={saving}>
+            Cancel
+          </Button>
+        )}
+        <Button type="submit" disabled={saving}>
+          {profile.complete ? 'Save changes' : 'Save and continue'}
+        </Button>
+      </div>
     </form>
+  )
+}
+
+/** Settings (SPEC_V3 §4.3) as a section of the profile, styled like the design's Appearance block.
+ * Changes apply at once; there's nothing to save. */
+function SettingsSection() {
+  const { preference, setPreference } = useTheme()
+  return (
+    <Card as="section" className="profile-card" aria-labelledby="profile-settings">
+      <h2 id="profile-settings" className="profile-card-title">
+        Settings
+      </h2>
+      <SegmentedToggle legend="Appearance" options={THEMES} value={preference} onChange={setPreference} />
+    </Card>
+  )
+}
+
+function Tendencies({ report }: { report: TendencyReport | null }) {
+  const top = report?.tendencies.slice(0, 5) ?? []
+  const max = Math.max(...top.map((t) => t.score), 0)
+  return (
+    <Card as="section" className="profile-side-card" aria-labelledby="profile-tendencies">
+      <h2 id="profile-tendencies" className="profile-side-title">
+        Your tendencies
+      </h2>
+      <p className="profile-side-note">Recent games count more than old ones.</p>
+      {report === null && <Skeleton lines={3} label="Loading your tendencies…" />}
+      {report !== null && top.length === 0 && (
+        <p className="profile-side-note">Analyze a few games and the mistakes that keep coming up show here.</p>
+      )}
+      {top.length > 0 && (
+        <ul className="profile-tendencies">
+          {top.map((tendency) => (
+            <li key={tendency.theme}>
+              <div className="profile-tendency-row">
+                <span className="profile-tendency-name">{tendency.label}</span>
+                <span className="profile-side-note">
+                  {tendency.games_seen} game{tendency.games_seen === 1 ? '' : 's'}
+                </span>
+              </div>
+              <div className="profile-bar" aria-hidden="true">
+                <span style={{ inlineSize: `${max > 0 ? Math.round((tendency.score / max) * 100) : 0}%` }} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {report?.provisional && top.length > 0 && (
+        <p className="profile-side-note">Based on only a few games so far.</p>
+      )}
+    </Card>
   )
 }
