@@ -238,6 +238,20 @@ export interface GameDetail {
   synopsis: { text: string; invalid_moves_removed: string[] } | null
   chat: ChatEntry[]
   moments: MomentInfo[]
+  /** The saved variations in display order, or null if they were never saved (SPEC_V3 §5.1). */
+  variations?: SavedVariation[] | null
+}
+
+/** A line the player explored: where it starts and its moves, both UCI (SPEC_V3 §5.1). */
+export interface SavedVariation {
+  start_path: string[]
+  moves: string[]
+}
+
+/** An exported game, ready to download (SPEC_V3 §5.2). */
+export interface PgnExport {
+  filename: string
+  text: string
 }
 
 // Onboarding (SPEC_V2 §10), mirroring backend/app/api/onboarding_schemas.py.

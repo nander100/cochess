@@ -10,6 +10,8 @@ import { EnginePanel, type LiveEngine } from '../board/EnginePanel'
 import { EvalBar } from '../board/EvalBar'
 import { EvalGraph, type GraphPoint } from '../board/EvalGraph'
 import { MoveList } from '../board/MoveList'
+import { useVariationSaver } from '../board/useVariationSaver'
+import { deleteVariation, fromUci, isWithin, promoteVariation, withVariations } from '../board/variations'
 import {
   type GameTree,
   ROOT,
@@ -137,9 +139,14 @@ function AnalysisBoard({
   detail, deps, fresh, onLoggedOut, onAnalyzed, autoResume, onColorChanged, onDeleted,
   initialTab, initialMoment, onTabChange,
 }: AnalysisBoardProps) {
-  const [tree, setTree] = useState<GameTree>(() =>
-    detail.moments.filter((m) => !isUnsolved(m)).reduce(withMomentLines, fromMoves(detail.moves, detail.final_fen)),
-  )
+  const [tree, setTree] = useState<GameTree>(() => initialTree(detail))
+  // The player's variations save themselves (SPEC_V3 §5.1); every change to the tree goes
+  // through changeTree.
+  const saver = useVariationSaver(deps.api, detail.id, detail.variations, onLoggedOut)
+  function changeTree(updated: GameTree) {
+    setTree(updated)
+    saver.schedule(updated)
+  }
   // Opening on a finished moment shows its position, as choosing it in the moments list does.
   const [current, setCurrent] = useState(() => {
     const opened = initialTab === 'moments' ? detail.moments.find((m) => m.index === initialMoment) : undefined
@@ -257,7 +264,7 @@ function AnalysisBoard({
     setMoments(fresh)
     if (finished.length === 0) return
     const updated = finished.reduce(withMomentLines, tree)
-    setTree(updated)
+    changeTree(updated)
     setCurrent(mainlineNode(updated, finished[0].ply - 1))
   }
 
@@ -268,9 +275,16 @@ function AnalysisBoard({
     }
     const result = addMove(tree, current, move)
     if (!result) return // chessground only offers legal moves; nothing to do otherwise
-    setTree(result.tree)
+    if (result.tree !== tree) changeTree(result.tree)
     setCurrent(result.nodeId)
   }
+
+  function deleteLine(startId: string) {
+    changeTree(deleteVariation(tree, startId))
+    if (isWithin(current, startId)) setCurrent(tree.nodes[startId].parent ?? ROOT)
+  }
+
+  const promoteLine = (startId: string) => changeTree(promoteVariation(tree, startId))
 
   const momentFen = momentNodeId !== null ? tree.nodes[momentNodeId].fen : null
   const boardFen = locked && momentFen ? ((candidate && fenAfter(momentFen, candidate)) ?? momentFen) : node.fen
@@ -292,6 +306,7 @@ function AnalysisBoard({
         onColorChanged={onColorChanged}
         onDeleted={onDeleted}
         onLoggedOut={onLoggedOut}
+        beforeExport={saver.flush}
       />
       {detail.status !== 'analyzed' && (
         <ResumeAnalysis
@@ -394,7 +409,7 @@ function AnalysisBoard({
               onExplainReady={registerExplain}
               moves={
                 <MovesPanel count={detail.moves.length}>
-                  <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} />
+                  <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} onDelete={deleteLine} onPromote={promoteLine} />
                 </MovesPanel>
               }
               onLoggedOut={onLoggedOut}
@@ -402,7 +417,7 @@ function AnalysisBoard({
           )}
           {detail.status !== 'analyzed' && (
             <MovesPanel count={detail.moves.length}>
-              <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} />
+              <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} onDelete={deleteLine} onPromote={promoteLine} />
             </MovesPanel>
           )}
       </div>
@@ -661,8 +676,11 @@ function toUci(move: BoardMove): string {
   return `${move.from}${move.to}${move.promotion ?? ''}`
 }
 
-function fromUci(uci: string): BoardMove {
-  return { from: uci.slice(0, 2), to: uci.slice(2, 4), ...(uci.length > 4 ? { promotion: uci[4] } : {}) }
+/** The game, then the saved variations; before the first save, finished moments' lines. */
+function initialTree(detail: GameDetail): GameTree {
+  const game = fromMoves(detail.moves, detail.final_fen)
+  if (detail.variations) return withVariations(game, detail.variations)
+  return detail.moments.filter((m) => !isUnsolved(m)).reduce(withMomentLines, game)
 }
 
 /** A finished moment's tries and the engine's move, as variations from its position. */

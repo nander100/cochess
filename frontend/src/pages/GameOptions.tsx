@@ -12,15 +12,18 @@ interface GameOptionsProps {
   onColorChanged: (detail: GameDetail) => void
   onDeleted: () => void
   onLoggedOut: () => void
+  /** Runs before an export: saves variations still waiting, so the file has them. */
+  beforeExport?: () => Promise<void>
 }
 
 type Confirm = null | 'color' | 'delete'
 
 const NAME: Record<Color, string> = { white: 'White', black: 'Black' }
+const REVOKE_AFTER_MS = 1000
 
 /** Fix a game analyzed from the wrong side, or delete it (PLAN_V3 M1). Each action asks once
  * before it runs, saying what will be lost. */
-export function GameOptions({ detail, api, onColorChanged, onDeleted, onLoggedOut }: GameOptionsProps) {
+export function GameOptions({ detail, api, onColorChanged, onDeleted, onLoggedOut, beforeExport }: GameOptionsProps) {
   const [confirm, setConfirm] = useState<Confirm>(null)
   const [busy, setBusy] = useState(false)
   const { show } = useToast()
@@ -46,10 +49,21 @@ export function GameOptions({ detail, api, onColorChanged, onDeleted, onLoggedOu
       onDeleted()
     })
 
+  // SPEC_V3 §5.2: the game with variations, mistakes, evaluations and moment notes, as a file.
+  const exportGame = () =>
+    run(async () => {
+      await beforeExport?.()
+      const { filename, text } = await api.exportPgn(detail.id)
+      download(filename, text)
+    })
+
   return (
     <div className="game-options" role="region" aria-label="Game options">
       {confirm === null && (
         <>
+          <Button variant="outline" onClick={() => void exportGame()} disabled={busy}>
+            Export PGN
+          </Button>
           <Button variant="outline" onClick={() => setConfirm('color')}>
             I played {NAME[other]}
           </Button>
@@ -85,4 +99,13 @@ export function GameOptions({ detail, api, onColorChanged, onDeleted, onLoggedOu
       )}
     </div>
   )
+}
+
+function download(filename: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/x-chess-pgn' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS) // some browsers read it after click()
 }

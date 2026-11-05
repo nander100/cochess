@@ -71,3 +71,41 @@ test('a server refusal is shown in plain language, as a toast', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('four games in one assessment slot')
   expect(onColorChanged).not.toHaveBeenCalled()
 })
+
+test('export saves waiting variations first, then downloads the PGN', async () => {
+  const order: string[] = []
+  const api = fakeApi({
+    exportPgn: vi.fn(async () => {
+      order.push('export')
+      return { filename: 'Alex-vs-Rival.pgn', text: '1. e4 *\n' }
+    }),
+  })
+  const beforeExport = vi.fn(async () => {
+    order.push('save')
+  })
+  const createObjectURL = vi.fn(() => 'blob:pgn')
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+  Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() })
+  render(
+    <ToastProvider>
+      <GameOptions detail={DETAIL} api={api} onColorChanged={vi.fn()} onDeleted={vi.fn()} onLoggedOut={vi.fn()} beforeExport={beforeExport} />
+    </ToastProvider>,
+  )
+
+  fireEvent.click(screen.getByRole('button', { name: 'Export PGN' }))
+
+  await vi.waitFor(() => expect(click).toHaveBeenCalled())
+  expect(order).toEqual(['save', 'export'])
+  expect(api.exportPgn).toHaveBeenCalledWith('game-1')
+  expect(click.mock.contexts[0]).toMatchObject({ download: 'Alex-vs-Rival.pgn', href: 'blob:pgn' })
+  click.mockRestore()
+})
+
+test('a failed export is shown as a toast', async () => {
+  const api = fakeApi({ exportPgn: vi.fn(async () => { throw new ApiError(500, 'Something went wrong.') }) })
+  setup(api)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Export PGN' }))
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong.')
+})

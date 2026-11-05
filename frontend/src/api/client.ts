@@ -13,9 +13,11 @@ import type {
   GameListItem,
   OnboardingStatus,
   ParseResponse,
+  PgnExport,
   PositionRequest,
   Profile,
   ProfileUpdate,
+  SavedVariation,
   ScanResponse,
   TendencyReport,
   UserSettings,
@@ -54,6 +56,10 @@ export interface ApiClient {
   changeColor(gameId: string, color: Color): Promise<GameDetail>
   /** Delete a game and everything stored for it (also removes an onboarding game). */
   deleteGame(gameId: string): Promise<void>
+  /** Replace the game's saved variations with `variations`, in display order. */
+  saveVariations(gameId: string, variations: SavedVariation[]): Promise<void>
+  /** The game as an annotated PGN (variations, mistakes, evaluations, moment notes). */
+  exportPgn(gameId: string): Promise<PgnExport>
   /** The player's tendencies across analyzed games (recent games count more). */
   tendencies(): Promise<TendencyReport>
   settings(): Promise<UserSettings>
@@ -160,6 +166,18 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
       }),
     deleteGame: async (gameId) => {
       await send(`/api/games/${encodeURIComponent(gameId)}`, { method: 'DELETE' })
+    },
+    saveVariations: async (gameId, variations) => {
+      await send(`/api/games/${encodeURIComponent(gameId)}/variations`, {
+        method: 'PUT',
+        body: JSON.stringify({ variations }),
+      })
+    },
+    exportPgn: async (gameId) => {
+      const response = await send(`/api/games/${encodeURIComponent(gameId)}/export.pgn`)
+      const disposition = response.headers.get('Content-Disposition') ?? ''
+      const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'game.pgn'
+      return { filename, text: await response.text() }
     },
     tendencies: () => request('/api/tendencies'),
     settings: () => request('/api/settings'),

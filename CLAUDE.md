@@ -60,7 +60,9 @@ cochess/
 │   │   ├── auth/                # invites, sessions, get_current_user
 │   │   ├── api/                 # routes, schemas, sse
 │   │   ├── analysis/
-│   │   │   ├── pgn.py           # PGN parsing + validation (+ export with variations, NAGs, evals)
+│   │   │   ├── pgn.py           # PGN parsing + validation
+│   │   │   ├── pgn_export.py    # + export with variations, NAGs, evals, moment notes
+│   │   │   ├── variations.py    # + saved-variation model and replay check
 │   │   │   ├── paths.py         # replay UCI paths -> FEN/SAN/PGN
 │   │   │   ├── engine.py        # EngineResult checks, UCI->SAN
 │   │   │   ├── evals.py, accuracy.py, classify.py, selection.py, moves.py

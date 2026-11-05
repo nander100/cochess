@@ -1,4 +1,5 @@
 import { type Page, expect, test } from '@playwright/test'
+import { playMove } from './board.ts'
 import { newLoginLink } from './login.ts'
 import { HUNG_KNIGHT, rapidGame } from './flows/games.ts'
 import { TEST_RESULTS } from './paths.ts'
@@ -13,11 +14,14 @@ const OUT = `${TEST_RESULTS}/../screenshots`
 /** Switch theme the way a player does (header toggle, or the invite page's button), so the app's
  * theme state and its settings controls agree with what's shown. */
 async function switchTheme(page: Page, theme: 'light' | 'dark') {
-  const current = await page.evaluate(() => document.documentElement.dataset.theme)
-  if (current === theme) return
   const toggle = page.getByRole('button', { name: /^Switch to (light|dark) mode$|^(Light|Dark) mode$/ })
-  await toggle.first().click()
-  await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
+  // Just after login the saved settings arrive and may set the theme under us: retry until the
+  // theme we asked for sticks.
+  await expect(async () => {
+    const current = await page.evaluate(() => document.documentElement.dataset.theme)
+    if (current !== theme) await toggle.first().click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme, { timeout: 1000 })
+  }).toPass({ timeout: 15_000 })
 }
 
 async function shoot(page: Page, name: string) {
@@ -96,6 +100,27 @@ test('every page, light and dark, 1280 and 1920', async ({ page, browser }) => {
   await nav(page, 'Critical moments')
   await page.waitForLoadState('networkidle')
   await shoot(page, 'moment')
+
+  // M2: saved variations in the move list, with a variation's menu open.
+  await nav(page, 'Analysis')
+  await page.locator('cg-board').waitFor()
+  await page.getByRole('button', { name: /^Moves/ }).click()
+  const moves = page.getByLabel('Moves')
+  for (const uci of ['f1c4', 'd2d4']) {
+    await moves.getByRole('button', { name: '1... e5' }).click()
+    await playMove(page, uci, 'white')
+  }
+  await page.mouse.move(0, 0)
+  for (const theme of THEMES) {
+    await switchTheme(page, theme) // a click elsewhere closes the menu, so open it per theme
+    await moves.getByRole('group', { name: 'Variation' }).nth(1).getByRole('button', { name: 'Variation options' }).click()
+    for (const width of WIDTHS) {
+      await page.setViewportSize({ width, height: 1000 })
+      await page.waitForTimeout(150)
+      await page.screenshot({ path: `${OUT}/analysis-variations-${theme}-${width}.png`, fullPage: true })
+    }
+    await page.keyboard.press('Escape')
+  }
 
   await nav(page, 'Games')
   await page.locator('table').waitFor()

@@ -58,3 +58,59 @@ button.move.explored {
   border-left: var(--board-frame-width) solid var(--color-border);
   color: var(--color-muted);
 }
+
+/* Saved-variation options (SPEC_V3 §5.1): a quiet button at the start of each variation. */
+.variation-options {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--move-button-height);
+  min-height: var(--move-button-height);
+  margin-right: var(--space-1);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-nav);
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.variation-options:hover,
+.variation-options[aria-expanded='true'] {
+  background: var(--color-tint);
+  color: var(--color-fg);
+}
+
+.variation-menu {
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  margin: var(--space-1) 0;
+  padding: var(--space-1);
+  border: var(--board-frame-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg);
+  line-height: normal;
+}
+
+.variation-menu button {
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-nav);
+  background: none;
+  color: var(--color-fg);
+  font: var(--text-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.variation-menu button:hover:not(:disabled),
+.variation-menu button:focus-visible {
+  background: var(--color-tint);
+}
+
+.variation-menu button:disabled {
+  color: var(--color-muted);
+  cursor: default;
+}
