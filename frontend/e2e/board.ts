@@ -4,6 +4,8 @@ import type { Page } from '@playwright/test'
 export async function clickSquare(page: Page, square: string, orientation: 'white' | 'black'): Promise<void> {
   // A mouse click outside the viewport doesn't scroll: bring the whole board into view first.
   await page.locator('cg-board').scrollIntoViewIfNeeded()
+  // Chessground caches the board's screen position and refreshes it on scroll: let that run first.
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   const box = await page.locator('cg-board').boundingBox()
   if (!box) throw new Error('No board on the page.')
   const size = box.width / 8

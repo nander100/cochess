@@ -183,55 +183,6 @@ button.link-button:hover:not(:disabled) {
   --color-board-dark: var(--eval-black);
 }
 
-.board {
-  width: 100%;
-  aspect-ratio: 1;
-}
-
-.eval-bar {
-  position: relative;
-  background: var(--color-board-dark);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.eval-bar-bottom {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: var(--eval-white);
-  transition: height 300ms ease-out;
-}
-
-.eval-bar.flipped {
-  background: var(--eval-white);
-}
-
-.eval-bar.flipped .eval-bar-bottom {
-  background: var(--color-board-dark);
-}
-
-.eval-bar.unknown .eval-bar-bottom {
-  opacity: 0.45;
-}
-
-.eval-bar-text {
-  position: absolute;
-  bottom: 0.25rem;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 0.7rem;
-  font-weight: 700;
-  /* Light text with a dark outline: readable on both the light and the dark part of the bar. */
-  color: var(--brand-white);
-  text-shadow:
-    0 0 2px var(--brand-black),
-    0 0 2px var(--brand-black),
-    0 0 3px var(--brand-black);
-}
-
 .move-list {
   max-height: 22rem;
   overflow-y: auto;
@@ -296,69 +247,6 @@ button.move[aria-current='step'] .glyph {
   font-size: 0.92rem;
 }
 
-.eval-graph {
-  margin: 0;
-}
-
-.eval-graph svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-
-.eval-graph-black {
-  fill: var(--color-board-dark);
-}
-
-.eval-graph-white {
-  fill: var(--eval-white);
-}
-
-.eval-graph-mid {
-  stroke: var(--eval-graph-midline);
-  stroke-dasharray: 4 4;
-}
-
-.eval-graph-line {
-  fill: none;
-  stroke: var(--color-accent);
-  stroke-width: 1.5;
-}
-
-.eval-graph-current {
-  stroke: var(--color-accent);
-  stroke-width: 2;
-}
-
-.eval-graph-hover {
-  stroke: var(--color-muted);
-}
-
-.eval-graph-dot {
-  stroke: var(--color-bg);
-  stroke-width: 1;
-}
-
-.eval-graph-dot.inaccuracy {
-  fill: var(--color-inaccuracy);
-}
-
-.eval-graph-dot.mistake {
-  fill: var(--color-mistake);
-}
-
-.eval-graph-dot.blunder,
-.eval-graph-dot.missed_mate {
-  fill: var(--color-blunder);
-}
-
-.eval-graph-caption {
-  color: var(--color-muted);
-  font-size: 0.85rem;
-  margin-top: 0.3rem;
-}
 
 button.secondary {
   background: var(--color-surface);

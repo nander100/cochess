@@ -1,0 +1,221 @@
+/* The chessground board in the design's colors (docs/design/tokens.md "Board"). Replaces
+ * chessground's brown theme; pieces are cburnett by default, Merida as a setting. */
+
+.board-frame {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--board-max);
+  overflow: hidden;
+  border: var(--board-frame);
+  border-radius: var(--radius-control);
+}
+
+.board {
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+/* 8x8 squares from two tokens: a8 (top left) is a light square. */
+cg-board {
+  background-color: var(--board-light);
+  background-image: repeating-conic-gradient(var(--board-dark) 0 25%, var(--board-light) 0 50%);
+  background-size: 25% 25%;
+}
+
+cg-board square.last-move {
+  background-color: var(--board-last-move);
+}
+
+cg-board square.selected {
+  background-color: var(--board-selected);
+}
+
+cg-board square.move-dest {
+  background: radial-gradient(var(--board-dest) 22%, transparent 0);
+}
+
+cg-board square.oc.move-dest {
+  background: radial-gradient(transparent 0%, transparent 80%, var(--board-dest) 80%);
+}
+
+cg-board square.move-dest:hover,
+cg-board square.move-dest.hover {
+  background: var(--board-dest-hover);
+}
+
+cg-board square.check {
+  background: radial-gradient(ellipse at center, var(--board-check) 0%, transparent 85%);
+}
+
+/* Coordinates: bold, navy on light squares, black on dark squares. */
+.cg-wrap coords {
+  font-weight: 700;
+  font-size: var(--board-coord-size);
+}
+
+.orientation-white .ranks :nth-child(odd),
+.orientation-white .files :nth-child(even),
+.orientation-black .ranks :nth-child(even),
+.orientation-black .files :nth-child(odd) {
+  color: var(--board-coord-on-light);
+}
+
+.orientation-white .ranks :nth-child(even),
+.orientation-white .files :nth-child(odd),
+.orientation-black .ranks :nth-child(odd),
+.orientation-black .files :nth-child(even) {
+  color: var(--board-coord-on-dark);
+}
+
+/* Merida pieces (Settings: piece set). */
+:root[data-pieces='merida'] .cg-wrap piece.pawn.white { background-image: url('./pieces/merida/wP.svg'); }
+:root[data-pieces='merida'] .cg-wrap piece.knight.white { background-image: url('./pieces/merida/wN.svg'); }
+:root[data-pieces='merida'] .cg-wrap piece.bishop.white { background-image: url('./pieces/merida/wB.svg'); }
+:root[data-pieces='merida'] .cg-wrap piece.rook.white { background-image: url('./pieces/merida/wR.svg'); }
+:root[data-pieces='merida'] .cg-wrap piece.queen.white { background-image: url('./pieces/merida/wQ.svg'); }
+:root[data-pieces='merida'] .cg-wrap piece.king.white { background-image: url('./pieces/merida/wK.svg'); }
+:root[data-pieces='merida'] .cg-wrap piece.pawn.black { background-image: url('./pieces/merida/bP.svg'); }
+:root[data-pieces='merida'] .cg-wrap piece.knight.black { background-image: url('./pieces/merida/bN.svg'); }
+:root[data-pieces='merida'] .cg-wrap piece.bishop.black { background-image: url('./pieces/merida/bB.svg'); }
+:root[data-pieces='merida'] .cg-wrap piece.rook.black { background-image: url('./pieces/merida/bR.svg'); }
+:root[data-pieces='merida'] .cg-wrap piece.queen.black { background-image: url('./pieces/merida/bQ.svg'); }
+:root[data-pieces='merida'] .cg-wrap piece.king.black { background-image: url('./pieces/merida/bK.svg'); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cg-wrap piece.anim,
+  .cg-wrap piece.fading {
+    transition: none;
+  }
+}
+
+/* Eval bar: 22px, black for Black's share on top, white below, value at the bottom. */
+.eval-bar {
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: var(--border-width) solid var(--color-eval-border);
+  border-radius: var(--radius-eval);
+  background: var(--eval-black);
+}
+
+.eval-bar-bottom {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--eval-white);
+  transition: height var(--duration-normal) var(--ease);
+}
+
+.eval-bar.flipped {
+  background: var(--eval-white);
+}
+
+.eval-bar.flipped .eval-bar-bottom {
+  background: var(--eval-black);
+}
+
+.eval-bar.unknown .eval-bar-bottom {
+  opacity: 0.45;
+}
+
+.eval-bar-text {
+  position: absolute;
+  right: 0;
+  bottom: var(--space-1);
+  left: 0;
+  color: var(--eval-black);
+  font: var(--text-eval);
+  text-align: center;
+}
+
+.eval-bar.flipped .eval-bar-text {
+  color: var(--eval-white);
+}
+
+/* Eval graph: 120px, black and white fills, dashed midline, current-move line and dot. */
+.eval-graph {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.eval-graph-title {
+  font: var(--text-chip);
+  color: var(--color-muted);
+}
+
+.eval-graph svg {
+  display: block;
+  width: 100%;
+  height: var(--eval-graph-height);
+  overflow: hidden;
+  border-radius: var(--radius-eval);
+  outline: var(--border-width) solid var(--color-border);
+  cursor: pointer;
+}
+
+.eval-graph-black {
+  fill: var(--eval-black);
+}
+
+.eval-graph-white {
+  fill: var(--eval-white);
+}
+
+.eval-graph-mid {
+  stroke: var(--eval-graph-midline);
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.eval-graph-line {
+  fill: none;
+  stroke: none;
+}
+
+.eval-graph-current {
+  stroke: var(--eval-graph-current);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.eval-graph-hover {
+  stroke: var(--color-muted);
+  vector-effect: non-scaling-stroke;
+}
+
+.eval-graph-selected {
+  fill: var(--eval-graph-dot);
+  stroke: var(--eval-graph-dot-outline);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.eval-graph-dot {
+  stroke: var(--eval-graph-dot-outline);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.eval-graph-dot.inaccuracy {
+  fill: var(--chess-inaccuracy);
+}
+
+.eval-graph-dot.mistake {
+  fill: var(--chess-mistake);
+}
+
+.eval-graph-dot.blunder,
+.eval-graph-dot.missed_mate {
+  fill: var(--chess-blunder);
+}
+
+.eval-graph-caption {
+  color: var(--color-muted);
+  font: var(--text-small);
+}

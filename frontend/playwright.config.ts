@@ -35,6 +35,7 @@ export default defineConfig({
     baseURL: EXTERNAL_URL ?? `http://localhost:${FRONTEND_PORT}`,
     channel: 'chrome',
     headless: true,
+    viewport: { width: 1280, height: 1000 }, // the smallest desktop layout, with the board in view
   },
   webServer: EXTERNAL_URL ? [] : [
     {

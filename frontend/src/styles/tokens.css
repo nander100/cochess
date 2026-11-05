@@ -27,6 +27,11 @@
   --board-light: var(--brand-white);
   --board-dark: var(--brand-baby-blue);
   --board-last-move: rgb(111 174 224 / 45%); /* one overlay for #CFE3FA / #6FAEE0 (see M1 notes) */
+  --board-selected: rgb(11 47 143 / 35%);
+  --board-dest: rgb(11 47 143 / 45%);
+  --board-dest-hover: rgb(11 47 143 / 25%);
+  --board-check: rgb(180 35 24 / 90%);
+  --board-coord-size: clamp(9px, 1.4vw, 12px);
   --board-coord-on-light: var(--brand-navy);
   --board-coord-on-dark: var(--brand-black);
   --board-frame-width: 2px;

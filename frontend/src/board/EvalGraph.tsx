@@ -45,11 +45,15 @@ export function EvalGraph({ points, userColor, currentPly, onSelectPly }: EvalGr
     return points.find((p) => p.ply === ply) ?? points[0]
   }
 
+  const current = currentPly === null ? null : (points.find((p) => p.ply === currentPly) ?? null)
   const mistakes = points.filter(
     (p) => p.label !== null && p.side === userColor && DOT_LABELS.includes(p.label),
   )
   return (
     <figure className="eval-graph">
+      <span className="eval-graph-title" aria-hidden="true">
+        Win chance for White, move by move
+      </span>
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         role="img"
@@ -68,6 +72,7 @@ export function EvalGraph({ points, userColor, currentPly, onSelectPly }: EvalGr
         {hovered && (
           <line className="eval-graph-hover" x1={x(hovered.ply)} x2={x(hovered.ply)} y1={0} y2={HEIGHT} />
         )}
+        {current && <circle className="eval-graph-selected" cx={x(current.ply)} cy={y(current.winPct)} r={6} />}
         {mistakes.map((p) => (
           <circle
             key={p.ply}
@@ -76,7 +81,9 @@ export function EvalGraph({ points, userColor, currentPly, onSelectPly }: EvalGr
             cy={y(p.winPct)}
             r={4}
             data-ply={p.ply}
-          />
+          >
+            <title>{describe(p)}</title>
+          </circle>
         ))}
       </svg>
       <figcaption className="eval-graph-caption" aria-live="polite">
@@ -88,5 +95,6 @@ export function EvalGraph({ points, userColor, currentPly, onSelectPly }: EvalGr
 
 function describe(point: GraphPoint): string {
   if (point.moveText === null) return 'Start of the game'
-  return `${point.moveText}: ${point.evalText ?? '?'}`
+  const label = point.label ? ` (${point.label.replace('_', ' ')})` : ''
+  return `${point.moveText}${label}: ${point.evalText ?? '?'}`
 }

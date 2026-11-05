@@ -1,10 +1,10 @@
 import { Chessground } from '@lichess-org/chessground'
 import type { Api } from '@lichess-org/chessground/api'
 import '@lichess-org/chessground/assets/chessground.base.css'
-import '@lichess-org/chessground/assets/chessground.brown.css'
 import '@lichess-org/chessground/assets/chessground.cburnett.css'
 import { useEffect, useRef } from 'react'
 import type { Color } from '../api/types'
+import './board.css'
 import { boardConfig, isPromotion } from './rules'
 
 export interface BoardMove {
@@ -50,5 +50,11 @@ export function Board({ fen, orientation, lastMove, movable, onMove }: BoardProp
     )
   }, [fen, orientation, lastMove, movable])
 
-  return <div ref={element} className="board" data-fen={fen} />
+  // The frame wraps chessground's element: chessground sizes the board from its own element's box,
+  // so the border can't sit on that element.
+  return (
+    <div className="board-frame">
+      <div ref={element} className="board" data-fen={fen} />
+    </div>
+  )
 }
