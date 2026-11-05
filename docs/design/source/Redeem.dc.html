@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CoChess — Redeem invite</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B2F8F}a:hover{color:#1846C7}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: {{t.fg}}; background: {{t.bg}}; min-height: 800px; display: flex; flex-wrap: wrap">
+
+  <section aria-hidden="true" style="flex: 1 1 420px; min-width: 0; min-height: 320px; background: #0A0A0A; color: #FFFFFF; padding: 48px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; gap: 32px">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <span style="width: 40px; height: 40px; border-radius: 10px; background: #A9D6F5; display: flex; align-items: center; justify-content: center; color: #0A0A0A; font-size: 26px; line-height: 1">♞︎</span>
+      <span style="font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 24px; letter-spacing: -0.01em">CoChess</span>
+    </div>
+    <div style="width: 100%; max-width: 320px; aspect-ratio: 1 / 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-radius: 12px; overflow: hidden; border: 2px solid #A9D6F5">
+      <sc-for list="{{tiles}}" as="tl" hint-placeholder-count="16">
+        <span style="background: {{tl.bg}}"></span>
+      </sc-for>
+    </div>
+    <p style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 28px; line-height: 1.2; max-width: 380px">The engine finds the moves. Your coach explains them.</p>
+  </section>
+
+  <main style="flex: 1 1 480px; min-width: 0; padding: 48px 24px; box-sizing: border-box; display: flex; align-items: center; justify-content: center">
+    <div style="width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 20px">
+
+      <sc-if value="{{valid}}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 20px">
+          <span style="align-self: flex-start; padding: 6px 12px; border-radius: 999px; background: #A9D6F5; color: #0A0A0A; font-size: 13px; font-weight: 600">Invite accepted</span>
+          <h1 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 40px; line-height: 1.08; letter-spacing: -0.02em">Welcome, [Player name].</h1>
+          <p style="margin: 0; font-size: 16px; line-height: 1.6; color: {{t.muted}}">You're signed in on this device. Next, tell your coach a little about your chess so explanations fit your level.</p>
+          <div style="border: 1px solid {{t.border}}; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+            <sc-for list="{{steps}}" as="s" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; gap: 12px; font-size: 15px">
+                <span style="width: 28px; height: 28px; border-radius: 50%; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; background: {{s.bg}}; color: {{s.fg}}; border: 1px solid {{s.border}}">{{s.n}}</span>
+                <span style="font-weight: 500">{{s.label}}</span>
+              </div>
+            </sc-for>
+          </div>
+          <a href="Profile.dc.html" style="height: 48px; border-radius: 10px; background: {{t.primary}}; color: {{t.primaryFg}}; font-weight: 600; font-size: 16px; text-decoration: none; display: flex; align-items: center; justify-content: center">Set up my profile</a>
+          <p style="margin: 0; font-size: 13px; color: {{t.muted}}">Invite links work once and expire after 7 days. If you sign out or switch devices, ask [the owner] for a new link.</p>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{expired}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 20px">
+          <span style="align-self: flex-start; padding: 6px 12px; border-radius: 999px; border: 1px solid {{t.border}}; color: {{t.muted}}; font-size: 13px; font-weight: 600">Link not valid</span>
+          <h1 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 40px; line-height: 1.08; letter-spacing: -0.02em">This invite link can't be used.</h1>
+          <p style="margin: 0; font-size: 16px; line-height: 1.6; color: {{t.muted}}">It has already been used, or it's more than 7 days old. Ask [the owner] to send you a new one — your games and progress are kept.</p>
+          <div style="background: {{t.tint}}; border: 1px solid {{t.tintBorder}}; border-radius: 14px; padding: 16px 18px; font-size: 14px; line-height: 1.55">Already signed in on another device? Open CoChess there instead.</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{checking}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <h1 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 32px; letter-spacing: -0.01em">Checking your invite…</h1>
+          <div role="progressbar" aria-label="Checking invite" style="height: 8px; border-radius: 999px; background: {{t.tint}}; overflow: hidden">
+            <div style="width: 40%; height: 100%; border-radius: 999px; background: {{t.primary}}"></div>
+          </div>
+        </div>
+      </sc-if>
+
+      <button type="button" onClick="{{toggleDark}}" style="align-self: flex-start; height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid {{t.border}}; background: transparent; color: {{t.fg}}; font-size: 14px; font-weight: 500; cursor: pointer">{{themeLabel}}</button>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"status":{"editor":"enum","options":["valid","expired","checking"],"default":"valid"},"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { dark: null };
+  }
+  theme(dark) {
+    return dark
+      ? { bg: '#0A0A0A', fg: '#FFFFFF', muted: '#B8C2CE', border: '#26303D', tint: '#0E1A2E', tintBorder: '#1E3A5F', primary: '#A9D6F5', primaryFg: '#0A0A0A' }
+      : { bg: '#FFFFFF', fg: '#0A0A0A', muted: '#3F4652', border: '#D5E3F0', tint: '#EAF4FD', tintBorder: '#A9D6F5', primary: '#0B2F8F', primaryFg: '#FFFFFF' };
+  }
+  renderVals() {
+    const dark = this.state.dark ?? (this.props.dark ?? false);
+    const t = this.theme(dark);
+    const status = this.props.status ?? 'valid';
+    const tiles = [];
+    for (let r = 0; r < 4; r++) for (let f = 0; f < 4; f++) tiles.push({ bg: (r + f) % 2 === 0 ? '#FFFFFF' : '#A9D6F5' });
+    const now = { bg: t.primary, fg: t.primaryFg, border: t.primary };
+    const later = { bg: 'transparent', fg: t.muted, border: t.border };
+    return {
+      t, tiles,
+      valid: status === 'valid',
+      expired: status === 'expired',
+      checking: status === 'checking',
+      steps: [
+        { n: '1', label: 'Your profile: name, Elo, time control', ...now },
+        { n: '2', label: '12-game assessment (optional)', ...later },
+        { n: '3', label: 'Your baseline report', ...later }
+      ],
+      themeLabel: dark ? 'Light mode' : 'Dark mode',
+      toggleDark: () => this.setState({ dark: !dark })
+    };
+  }
+}
+</script>
+</body>
+</html>

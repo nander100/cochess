@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CoChess — Critical moment</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B2F8F}a:hover{color:#1846C7}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: {{t.fg}}; background: {{t.bg}}; min-height: 1180px">
+
+  <header style="background: #0A0A0A; color: #FFFFFF; border-bottom: 1px solid {{t.headerBorder}}">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 24px">
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #FFFFFF">
+        <span style="width: 34px; height: 34px; border-radius: 8px; background: #A9D6F5; display: flex; align-items: center; justify-content: center; color: #0A0A0A; font-size: 22px; line-height: 1">♞︎</span>
+        <span style="font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 20px; letter-spacing: -0.01em">CoChess</span>
+      </a>
+      <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto">
+        <a href="Main.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Games</a>
+        <a href="Analysis.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Analysis</a>
+        <a href="Moment.dc.html" aria-current="page" style="color: #0A0A0A; background: #A9D6F5; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 600; font-size: 14px">Critical moments</a>
+        <a href="Onboarding.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Assessment</a>
+        <a href="Profile.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Profile</a>
+      </nav>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <span style="font-size: 14px; color: #CFE6F8">[Player name]</span>
+        <button type="button" onClick="{{toggleDark}}" aria-label="{{themeLabel}}" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #2F3A48; background: #0A0A0A; cursor: pointer; display: flex; align-items: center; justify-content: center">
+          <sc-if value="{{dark}}" hint-placeholder-val="{{ false }}">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A9D6F5" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          </sc-if>
+          <sc-if value="{{light}}" hint-placeholder-val="{{ true }}">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A9D6F5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+          </sc-if>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width: 1240px; margin: 0 auto; padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 22px">
+
+    <nav aria-label="Moments in this game" style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+      <a href="Analysis.dc.html" style="font-size: 14px; font-weight: 600; margin-right: 12px; color: {{t.link}}">← Back to game</a>
+      <span style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: {{t.doneBg}}; color: {{t.doneFg}}; font-size: 13px; font-weight: 600">
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A9D6F5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg>Moment 1
+      </span>
+      <span aria-current="step" style="padding: 8px 14px; border-radius: 999px; background: {{t.primary}}; color: {{t.primaryFg}}; font-size: 13px; font-weight: 600">Moment 2</span>
+      <span style="padding: 8px 14px; border-radius: 999px; border: 1px solid {{t.border}}; color: {{t.muted}}; font-size: 13px; font-weight: 600">Moment 3</span>
+    </nav>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start">
+
+      <section aria-label="Board" style="flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; align-items: center; gap: 10px">
+          <span aria-hidden="true" style="width: 14px; height: 14px; border-radius: 4px; border: 2px solid {{t.fg}}; background: #FFFFFF"></span>
+          <span style="font-weight: 600">White to move · move [N]</span>
+        </div>
+        <div style="width: 100%; max-width: 600px; aspect-ratio: 1 / 1; container-type: inline-size; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); border-radius: 10px; overflow: hidden; border: 2px solid #0A0A0A">
+          <sc-for list="{{squares}}" as="sq" hint-placeholder-count="64">
+            <div style="position: relative; background: {{sq.bg}}; display: flex; align-items: center; justify-content: center">
+              <span style="font-size: 10cqw; line-height: 1; color: {{sq.fg}}; text-shadow: {{sq.shadow}}">{{sq.glyph}}</span>
+              <span style="position: absolute; top: 3px; left: 4px; font-size: 2.1cqw; font-weight: 700; color: {{sq.coordFg}}">{{sq.rank}}</span>
+              <span style="position: absolute; bottom: 2px; right: 4px; font-size: 2.1cqw; font-weight: 700; color: {{sq.coordFg}}">{{sq.file}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <section aria-labelledby="task" style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+        <p style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: {{t.label}}">Critical moment</p>
+        <h1 id="task" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 34px; line-height: 1.1; letter-spacing: -0.01em">Find the move that wins material.</h1>
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: {{t.muted}}">In the game you played something else here. Move a piece on the board to try your answer.</p>
+
+        <div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; border: 1px solid {{t.border}}">
+          <span style="font-size: 14px; font-weight: 600; flex: 1 1 auto">Tries left</span>
+          <span role="img" aria-label="{{triesLabel}}" style="display: flex; gap: 6px">
+            <sc-for list="{{tries}}" as="tr" hint-placeholder-count="3">
+              <span style="width: 14px; height: 14px; border-radius: 50%; border: 2px solid {{tr.ring}}; background: {{tr.fill}}"></span>
+            </sc-for>
+          </span>
+        </div>
+
+        <sc-if value="{{showFeedback}}" hint-placeholder-val="{{ true }}">
+          <div style="background: {{t.feature}}; color: #FFFFFF; border-radius: 14px; padding: 16px 18px; display: flex; gap: 12px">
+            <span aria-hidden="true" style="flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; background: #A9D6F5; color: #0A0A0A; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px">C</span>
+            <p style="margin: 0; font-size: 15px; line-height: 1.55; color: {{t.featureMuted}}">[Coach feedback on the last try: what it does well, and what it leaves undefended.]</p>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{hint}}" hint-placeholder-val="{{ false }}">
+          <div style="background: {{t.tint}}; border: 1px solid {{t.tintBorder}}; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 13px; font-weight: 700; color: {{t.label}}">Hint</span>
+            <p style="margin: 0; font-size: 15px; line-height: 1.55">[Hint from the hint builder: which piece is loose, without naming the move.]</p>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{revealed}}" hint-placeholder-val="{{ false }}">
+          <div style="border: 2px solid {{t.primary}}; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 13px; font-weight: 700; color: {{t.label}}">Solution</span>
+            <p style="margin: 0; font-size: 15px; line-height: 1.55">[Engine's best move and the coach's explanation, shown only after reveal.]</p>
+          </div>
+        </sc-if>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 10px">
+          <button type="button" onClick="{{toggleHint}}" style="height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid {{t.fieldBorder}}; background: {{t.field}}; color: {{t.fg}}; font-weight: 600; font-size: 14px; cursor: pointer">{{hintLabel}}</button>
+          <button type="button" onClick="{{reveal}}" style="height: 44px; padding: 0 18px; border-radius: 10px; border: 0; background: {{t.secondaryBg}}; color: {{t.secondaryFg}}; font-weight: 600; font-size: 14px; cursor: pointer">Show the answer</button>
+          <a href="Moment.dc.html" style="height: 44px; padding: 0 18px; border-radius: 10px; background: {{t.primary}}; color: {{t.primaryFg}}; font-weight: 600; font-size: 14px; text-decoration: none; display: inline-flex; align-items: center; margin-left: auto">Next moment →</a>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"lightSquare":{"editor":"color","default":"#FFFFFF","options":["#FFFFFF","#EAF4FD","#CFE8FB"]},"darkSquare":{"editor":"color","default":"#A9D6F5","options":["#A9D6F5","#8EC3EC","#CFE8FB"]},"$preview":{"width":1280,"height":1180}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { dark: null, hint: false, revealed: false };
+  }
+  theme(dark) {
+    return dark
+      ? { bg: '#0A0A0A', fg: '#FFFFFF', muted: '#B8C2CE', border: '#26303D', tint: '#0E1A2E', tintBorder: '#1E3A5F', field: '#111821', fieldBorder: '#2F4A6B', feature: '#0B2F8F', featureMuted: '#D6E4F5', primary: '#A9D6F5', primaryFg: '#0A0A0A', link: '#A9D6F5', label: '#A9D6F5', headerBorder: '#26303D', secondaryBg: '#FFFFFF', secondaryFg: '#0A0A0A', doneBg: '#1C2430', doneFg: '#FFFFFF' }
+      : { bg: '#FFFFFF', fg: '#0A0A0A', muted: '#3F4652', border: '#D5E3F0', tint: '#EAF4FD', tintBorder: '#A9D6F5', field: '#FFFFFF', fieldBorder: '#8EC3EC', feature: '#0A0A0A', featureMuted: '#E3E8EE', primary: '#0B2F8F', primaryFg: '#FFFFFF', link: '#0B2F8F', label: '#0B2F8F', headerBorder: '#0A0A0A', secondaryBg: '#0A0A0A', secondaryFg: '#FFFFFF', doneBg: '#0A0A0A', doneFg: '#FFFFFF' };
+  }
+  renderVals() {
+    const dark = this.state.dark ?? (this.props.dark ?? false);
+    const t = this.theme(dark);
+    const lightSq = this.props.lightSquare ?? '#FFFFFF';
+    const darkSq = this.props.darkSquare ?? '#A9D6F5';
+    const squares = this.board('r3k2r/ppp2ppp/2n5/3q4/3P4/2N2N2/PPP2PPP/R2QKB1R', lightSq, darkSq);
+    const left = this.state.revealed ? 0 : 2;
+    const tries = [0, 1, 2].map((i) => ({ ring: t.fg, fill: i < left ? '#A9D6F5' : 'transparent' }));
+    return {
+      t, dark, light: !dark, squares, tries,
+      themeLabel: dark ? 'Switch to light mode' : 'Switch to dark mode',
+      toggleDark: () => this.setState({ dark: !dark }),
+      triesLabel: left + ' of 3 tries left',
+      hint: this.state.hint,
+      revealed: this.state.revealed,
+      showFeedback: !this.state.revealed,
+      hintLabel: this.state.hint ? 'Hide hint' : 'Get a hint',
+      toggleHint: () => this.setState({ hint: !this.state.hint }),
+      reveal: () => this.setState({ revealed: true })
+    };
+  }
+  board(fen, lightSq, darkSq) {
+    const glyphs = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
+    const files = 'abcdefgh';
+    const out = [];
+    fen.split('/').forEach((row, r) => {
+      let f = 0;
+      const push = (ch) => {
+        const isLight = (r + f) % 2 === 0;
+        const white = ch && ch === ch.toUpperCase();
+        out.push({
+          bg: isLight ? lightSq : darkSq,
+          glyph: ch ? glyphs[ch.toLowerCase()] + '︎' : '',
+          fg: white ? '#FFFFFF' : '#0A0A0A',
+          shadow: white ? '0 0 1px #0A0A0A, 0 0 1px #0A0A0A, 0 0 1px #0A0A0A, 0 0 1px #0A0A0A' : '0 0 1px #FFFFFF, 0 0 1px #FFFFFF',
+          coordFg: isLight ? '#0B2F8F' : '#0A0A0A',
+          rank: f === 0 ? String(8 - r) : '',
+          file: r === 7 ? files[f] : ''
+        });
+        f++;
+      };
+      for (const ch of row) {
+        if (/\d/.test(ch)) { for (let i = 0; i < Number(ch); i++) push(null); } else { push(ch); }
+      }
+    });
+    return out;
+  }
+}
+</script>
+</body>
+</html>

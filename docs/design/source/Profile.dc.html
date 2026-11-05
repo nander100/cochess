@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CoChess — Profile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B2F8F}a:hover{color:#1846C7}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: {{t.fg}}; background: {{t.bg}}; min-height: 1180px">
+
+  <header style="background: #0A0A0A; color: #FFFFFF; border-bottom: 1px solid {{t.headerBorder}}">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 24px">
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #FFFFFF">
+        <span style="width: 34px; height: 34px; border-radius: 8px; background: #A9D6F5; display: flex; align-items: center; justify-content: center; color: #0A0A0A; font-size: 22px; line-height: 1">♞︎</span>
+        <span style="font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 20px; letter-spacing: -0.01em">CoChess</span>
+      </a>
+      <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto">
+        <a href="Main.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Games</a>
+        <a href="Analysis.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Analysis</a>
+        <a href="Moment.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Critical moments</a>
+        <a href="Onboarding.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Assessment</a>
+        <a href="Profile.dc.html" aria-current="page" style="color: #0A0A0A; background: #A9D6F5; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 600; font-size: 14px">Profile</a>
+      </nav>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <span style="font-size: 14px; color: #CFE6F8">[Player name]</span>
+        <button type="button" onClick="{{toggleDark}}" aria-label="{{themeLabel}}" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #2F3A48; background: #0A0A0A; cursor: pointer; display: flex; align-items: center; justify-content: center">
+          <sc-if value="{{dark}}" hint-placeholder-val="{{ false }}">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A9D6F5" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          </sc-if>
+          <sc-if value="{{light}}" hint-placeholder-val="{{ true }}">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A9D6F5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+          </sc-if>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width: 1200px; margin: 0 auto; padding: 40px 24px 64px; display: flex; flex-direction: column; gap: 28px">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 18px">
+      <span aria-hidden="true" style="width: 64px; height: 64px; border-radius: 50%; background: {{t.primary}}; color: {{t.primaryFg}}; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 26px">P</span>
+      <div style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto">
+        <h1 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 34px; letter-spacing: -0.01em">[Player name]</h1>
+        <span style="font-size: 15px; color: {{t.muted}}">Elo [1400] · Rapid · [N] games analyzed</span>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+      <form aria-labelledby="about" style="flex: 3 1 520px; min-width: 0; border: 1px solid {{t.border}}; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 20px">
+        <h2 id="about" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px">About you</h2>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px">
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <label for="name" style="font-size: 14px; font-weight: 600">Display name</label>
+            <input id="name" type="text" value="[Player name]" style="height: 44px; padding: 0 12px; border: 1px solid {{t.fieldBorder}}; border-radius: 10px; background: {{t.field}}; color: {{t.fg}}; font-size: 15px">
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <label for="elo" style="font-size: 14px; font-weight: 600">Elo</label>
+            <input id="elo" type="number" min="100" max="3000" value="1400" style="height: 44px; padding: 0 12px; border: 1px solid {{t.fieldBorder}}; border-radius: 10px; background: {{t.field}}; color: {{t.fg}}; font-size: 15px">
+            <span style="font-size: 12px; color: {{t.muted}}">100–3000. Your coach pitches explanations to this level.</span>
+          </div>
+        </div>
+
+        <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px">
+          <legend style="font-size: 14px; font-weight: 600; padding: 0; margin-bottom: 8px">Main time control</legend>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <sc-for list="{{tcs}}" as="c" hint-placeholder-count="4">
+              <button type="button" aria-pressed="{{c.pressed}}" onClick="{{c.pick}}" style="height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid {{c.border}}; background: {{c.bg}}; color: {{c.fg}}; font-weight: 600; font-size: 14px; cursor: pointer">{{c.label}}</button>
+            </sc-for>
+          </div>
+        </fieldset>
+
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <label for="style" style="font-size: 14px; font-weight: 600">How you like to play</label>
+          <textarea id="style" rows="4" maxlength="500" placeholder="e.g. I like open positions and attacking the king, but I get nervous in endgames." style="padding: 12px; border: 1px solid {{t.fieldBorder}}; border-radius: 10px; background: {{t.field}}; color: {{t.fg}}; font-family: inherit; font-size: 15px; line-height: 1.5; resize: vertical"></textarea>
+          <span style="font-size: 12px; color: {{t.muted}}; align-self: flex-end">0 / 500</span>
+        </div>
+
+        <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px">
+          <legend style="font-size: 14px; font-weight: 600; padding: 0; margin-bottom: 8px">Appearance</legend>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <button type="button" aria-pressed="{{lightPressed}}" onClick="{{setLight}}" style="height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid {{lightBtn.border}}; background: {{lightBtn.bg}}; color: {{lightBtn.fg}}; font-weight: 600; font-size: 14px; cursor: pointer">Light</button>
+            <button type="button" aria-pressed="{{darkPressed}}" onClick="{{setDark}}" style="height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid {{darkBtn.border}}; background: {{darkBtn.bg}}; color: {{darkBtn.fg}}; font-weight: 600; font-size: 14px; cursor: pointer">Dark</button>
+          </div>
+        </fieldset>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; border-top: 1px solid {{t.border}}; padding-top: 18px">
+          <button type="button" style="height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid {{t.border}}; background: transparent; color: {{t.fg}}; font-weight: 600; font-size: 14px; cursor: pointer">Cancel</button>
+          <button type="button" style="height: 44px; padding: 0 22px; border-radius: 10px; border: 0; background: {{t.primary}}; color: {{t.primaryFg}}; font-weight: 600; font-size: 14px; cursor: pointer">Save changes</button>
+        </div>
+      </form>
+
+      <aside style="flex: 2 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+        <section aria-labelledby="base" style="background: {{t.feature}}; color: #FFFFFF; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 10px">
+          <span style="font-size: 13px; font-weight: 600; color: #A9D6F5; letter-spacing: 0.08em; text-transform: uppercase">Baseline report</span>
+          <h2 id="base" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px">Written [date] from your 12 games</h2>
+          <p style="margin: 0; font-size: 14px; line-height: 1.55; color: {{t.featureMuted}}">[First line of the report's overview.]</p>
+          <a href="Onboarding.dc.html" style="align-self: flex-start; color: #0A0A0A; background: #A9D6F5; text-decoration: none; padding: 10px 16px; border-radius: 10px; font-weight: 600; font-size: 14px">Read the report</a>
+        </section>
+
+        <section aria-labelledby="tend" style="border: 1px solid {{t.border}}; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 14px">
+          <h2 id="tend" style="margin: 0; font-size: 16px; font-weight: 600">Your tendencies</h2>
+          <p style="margin: 0; font-size: 13px; color: {{t.muted}}">Recent games count more than old ones.</p>
+          <sc-for list="{{tend}}" as="x" hint-placeholder-count="4">
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <div style="display: flex; gap: 8px; font-size: 14px">
+                <span style="font-weight: 600; flex: 1 1 auto">{{x.name}}</span>
+                <span style="color: {{x.muted}}">{{x.games}}</span>
+              </div>
+              <div aria-hidden="true" style="height: 8px; border-radius: 999px; background: {{x.track}}; overflow: hidden">
+                <div style="width: {{x.w}}; height: 100%; border-radius: 999px; background: {{x.bar}}"></div>
+              </div>
+            </div>
+          </sc-for>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":1180}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { dark: null, tc: 'Rapid' };
+  }
+  theme(dark) {
+    return dark
+      ? { bg: '#0A0A0A', fg: '#FFFFFF', muted: '#B8C2CE', border: '#26303D', field: '#111821', fieldBorder: '#2F4A6B', feature: '#0B2F8F', featureMuted: '#D6E4F5', primary: '#A9D6F5', primaryFg: '#0A0A0A', headerBorder: '#26303D', track: '#1C2430' }
+      : { bg: '#FFFFFF', fg: '#0A0A0A', muted: '#3F4652', border: '#D5E3F0', field: '#FFFFFF', fieldBorder: '#8EC3EC', feature: '#0A0A0A', featureMuted: '#E3E8EE', primary: '#0B2F8F', primaryFg: '#FFFFFF', headerBorder: '#0A0A0A', track: '#EAF4FD' };
+  }
+  renderVals() {
+    const dark = this.state.dark ?? (this.props.dark ?? false);
+    const t = this.theme(dark);
+    const on = { bg: t.primary, fg: t.primaryFg, border: t.primary };
+    const off = { bg: t.field, fg: t.fg, border: t.fieldBorder };
+    const tcs = ['Bullet', 'Blitz', 'Rapid', 'Classical'].map((label) => {
+      const sel = this.state.tc === label;
+      return { label, pressed: sel ? 'true' : 'false', ...(sel ? on : off), pick: () => this.setState({ tc: label }) };
+    });
+    const tr = (name, games, w) => ({ name, games, w, muted: t.muted, track: t.track, bar: t.primary });
+    return {
+      t, dark, light: !dark, tcs,
+      themeLabel: dark ? 'Switch to light mode' : 'Switch to dark mode',
+      toggleDark: () => this.setState({ dark: !dark }),
+      lightPressed: dark ? 'false' : 'true',
+      darkPressed: dark ? 'true' : 'false',
+      lightBtn: dark ? off : on,
+      darkBtn: dark ? on : off,
+      setLight: () => this.setState({ dark: false }),
+      setDark: () => this.setState({ dark: true }),
+      tend: [
+        tr('[Theme: hanging pieces]', '[N] games', '82%'),
+        tr('[Theme: missed fork]', '[N] games', '58%'),
+        tr('[Theme: back-rank weakness]', '[N] games', '36%'),
+        tr('[Theme: endgame technique]', '[N] games', '22%')
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

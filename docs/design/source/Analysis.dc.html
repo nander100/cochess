@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CoChess — Game analysis</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B2F8F}a:hover{color:#1846C7}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: {{t.fg}}; background: {{t.bg}}; min-height: 1180px">
+
+  <header style="background: #0A0A0A; color: #FFFFFF; border-bottom: 1px solid {{t.headerBorder}}">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 24px">
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #FFFFFF">
+        <span style="width: 34px; height: 34px; border-radius: 8px; background: #A9D6F5; display: flex; align-items: center; justify-content: center; color: #0A0A0A; font-size: 22px; line-height: 1">♞︎</span>
+        <span style="font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 20px; letter-spacing: -0.01em">CoChess</span>
+      </a>
+      <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto">
+        <a href="Main.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Games</a>
+        <a href="Analysis.dc.html" aria-current="page" style="color: #0A0A0A; background: #A9D6F5; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 600; font-size: 14px">Analysis</a>
+        <a href="Moment.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Critical moments</a>
+        <a href="Onboarding.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Assessment</a>
+        <a href="Profile.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Profile</a>
+      </nav>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <span style="font-size: 14px; color: #CFE6F8">[Player name]</span>
+        <button type="button" onClick="{{toggleDark}}" aria-label="{{themeLabel}}" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #2F3A48; background: #0A0A0A; cursor: pointer; display: flex; align-items: center; justify-content: center">
+          <sc-if value="{{dark}}" hint-placeholder-val="{{ false }}">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A9D6F5" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          </sc-if>
+          <sc-if value="{{light}}" hint-placeholder-val="{{ true }}">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A9D6F5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+          </sc-if>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width: 1240px; margin: 0 auto; padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline">
+      <h1 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 30px; letter-spacing: -0.01em; flex: 1 1 auto">You vs [Opponent A]</h1>
+      <span style="font-size: 14px; color: {{t.muted}}">White · Rapid 10+0 · Win</span>
+      <span style="padding: 4px 10px; border-radius: 999px; background: #A9D6F5; color: #0A0A0A; font-size: 12px; font-weight: 600">Accuracy [84]</span>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+      <section aria-label="Board" style="flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; gap: 12px; align-items: stretch">
+          <div role="img" aria-label="Evaluation +0.4, White slightly better" style="width: 22px; border-radius: 6px; overflow: hidden; border: 1px solid {{t.evalBorder}}; display: flex; flex-direction: column">
+            <div style="flex: 45 1 0; background: #0A0A0A"></div>
+            <div style="flex: 55 1 0; background: #FFFFFF; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px; font-size: 10px; font-weight: 700; color: #0A0A0A">0.4</div>
+          </div>
+          <div style="flex: 1 1 auto; max-width: 600px; aspect-ratio: 1 / 1; container-type: inline-size; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); border-radius: 10px; overflow: hidden; border: 2px solid #0A0A0A">
+            <sc-for list="{{squares}}" as="sq" hint-placeholder-count="64">
+              <div style="position: relative; background: {{sq.bg}}; display: flex; align-items: center; justify-content: center">
+                <span style="font-size: 10cqw; line-height: 1; color: {{sq.fg}}; text-shadow: {{sq.shadow}}">{{sq.glyph}}</span>
+                <span style="position: absolute; top: 3px; left: 4px; font-size: 2.1cqw; font-weight: 700; color: {{sq.coordFg}}">{{sq.rank}}</span>
+                <span style="position: absolute; bottom: 2px; right: 4px; font-size: 2.1cqw; font-weight: 700; color: {{sq.coordFg}}">{{sq.file}}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; padding-left: 34px">
+          <button type="button" aria-label="First move" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid {{t.border}}; background: {{t.field}}; cursor: pointer; display: flex; align-items: center; justify-content: center">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{t.fg}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6l-6 6 6 6"></path><path d="M6 6v12"></path></svg>
+          </button>
+          <button type="button" aria-label="Previous move" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid {{t.border}}; background: {{t.field}}; cursor: pointer; display: flex; align-items: center; justify-content: center">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{t.fg}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
+          </button>
+          <button type="button" aria-label="Next move" style="width: 44px; height: 44px; border-radius: 10px; border: 0; background: {{t.primary}}; cursor: pointer; display: flex; align-items: center; justify-content: center">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{t.primaryFg}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+          </button>
+          <button type="button" aria-label="Last move" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid {{t.border}}; background: {{t.field}}; cursor: pointer; display: flex; align-items: center; justify-content: center">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{t.fg}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l6 6-6 6"></path><path d="M18 6v12"></path></svg>
+          </button>
+          <button type="button" style="height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid {{t.border}}; background: {{t.field}}; color: {{t.fg}}; cursor: pointer; font-size: 14px; font-weight: 500">Flip board</button>
+        </div>
+
+        <figure style="margin: 0; padding: 16px; border: 1px solid {{t.border}}; border-radius: 14px; display: flex; flex-direction: column; gap: 8px">
+          <figcaption style="font-size: 13px; font-weight: 600; color: {{t.muted}}">Win chance for White, move by move</figcaption>
+          <svg role="img" aria-label="Evaluation graph across the game" viewBox="0 0 600 120" preserveAspectRatio="none" style="width: 100%; height: 120px; display: block; border-radius: 6px; outline: 1px solid {{t.border}}">
+            <rect x="0" y="0" width="600" height="120" fill="#0A0A0A"></rect>
+            <path d="M0 60 L40 58 L80 55 L120 57 L160 52 L200 50 L240 62 L280 70 L320 48 L360 40 L400 36 L440 30 L480 26 L520 20 L560 16 L600 12 L600 120 L0 120 Z" fill="#FFFFFF"></path>
+            <line x1="0" y1="60" x2="600" y2="60" stroke="#8EC3EC" stroke-width="1" stroke-dasharray="4 4"></line>
+            <line x1="280" y1="0" x2="280" y2="120" stroke="#1846C7" stroke-width="3"></line>
+            <circle cx="280" cy="70" r="6" fill="#A9D6F5" stroke="#0A0A0A" stroke-width="2"></circle>
+          </svg>
+        </figure>
+      </section>
+
+      <aside aria-label="Coach" style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+        <section style="background: {{t.feature}}; color: #FFFFFF; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 10px">
+            <span aria-hidden="true" style="width: 30px; height: 30px; border-radius: 50%; background: #A9D6F5; color: #0A0A0A; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px">C</span>
+            <h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 18px">Coach's summary</h2>
+          </div>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: {{t.featureMuted}}">[Synopsis from the coach: two or three sentences on the game's story, the one turning point, and the habit to work on.]</p>
+          <a href="Moment.dc.html" style="align-self: flex-start; color: #0A0A0A; background: #A9D6F5; text-decoration: none; padding: 10px 16px; border-radius: 10px; font-weight: 600; font-size: 14px">Practice [N] critical moments</a>
+        </section>
+
+        <section aria-labelledby="moves" style="border: 1px solid {{t.border}}; border-radius: 16px; padding: 6px 16px; display: flex; flex-direction: column; gap: 10px">
+          <h2 id="moves" style="margin: 0; font-size: 15px; font-weight: 600">
+            <button type="button" aria-expanded="{{movesExpanded}}" aria-controls="move-list" onClick="{{toggleMoves}}" style="width: 100%; min-height: 44px; padding: 0; border: 0; background: transparent; color: {{t.fg}}; font: inherit; cursor: pointer; display: flex; align-items: center; gap: 10px; text-align: left">
+              <span style="flex: 1 1 auto">Moves</span>
+              <span style="font-size: 13px; font-weight: 500; color: {{t.muted}}">{{movesSummary}}</span>
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{t.fg}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: {{chevron}}; transition: transform 150ms ease"><path d="M6 9l6 6 6-6"></path></svg>
+            </button>
+          </h2>
+          <sc-if value="{{movesOpen}}" hint-placeholder-val="{{ false }}">
+          <ol id="move-list" style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: 36px minmax(0, 1fr) minmax(0, 1fr); gap: 4px; font-size: 14px">
+            <sc-for list="{{moves}}" as="m" hint-placeholder-count="6">
+              <li style="display: contents">
+                <span style="padding: 8px 0; color: {{m.muted}}; font-variant-numeric: tabular-nums">{{m.n}}.</span>
+                <button type="button" style="text-align: left; height: 36px; padding: 0 10px; border-radius: 8px; border: 0; cursor: pointer; font: inherit; font-weight: 500; background: {{m.wBg}}; color: {{m.wFg}}">{{m.w}}</button>
+                <button type="button" style="text-align: left; height: 36px; padding: 0 10px; border-radius: 8px; border: 0; cursor: pointer; font: inherit; font-weight: 500; background: {{m.bBg}}; color: {{m.bFg}}">{{m.b}}</button>
+              </li>
+            </sc-for>
+          </ol>
+          </sc-if>
+        </section>
+
+        <section aria-labelledby="chat" style="border: 1px solid {{t.tintBorder}}; background: {{t.tint}}; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+          <h2 id="chat" style="margin: 0; font-size: 15px; font-weight: 600">Ask your coach about this position</h2>
+          <div style="align-self: flex-end; max-width: 85%; background: {{t.primary}}; color: {{t.primaryFg}}; padding: 10px 14px; border-radius: 14px 14px 4px 14px; font-size: 14px; line-height: 1.5">Why was Bd2 not the best here?</div>
+          <div style="align-self: flex-start; max-width: 90%; background: {{t.field}}; border: 1px solid {{t.tintBorder}}; padding: 10px 14px; border-radius: 14px 14px 14px 4px; font-size: 14px; line-height: 1.5">[Coach reply, based on the engine's line for this position.]</div>
+          <form style="display: flex; gap: 8px">
+            <label for="ask" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Your question</label>
+            <input id="ask" type="text" placeholder="Ask about this move…" style="flex: 1 1 auto; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid {{t.fieldBorder}}; border-radius: 10px; background: {{t.field}}; color: {{t.fg}}; font-size: 14px">
+            <button type="button" style="height: 44px; padding: 0 18px; border: 0; border-radius: 10px; background: {{t.secondaryBg}}; color: {{t.secondaryFg}}; font-weight: 600; font-size: 14px; cursor: pointer">Send</button>
+          </form>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"lightSquare":{"editor":"color","default":"#FFFFFF","options":["#FFFFFF","#EAF4FD","#CFE8FB"]},"darkSquare":{"editor":"color","default":"#A9D6F5","options":["#A9D6F5","#8EC3EC","#CFE8FB"]},"$preview":{"width":1280,"height":1180}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { dark: null, movesOpen: false };
+  }
+  theme(dark) {
+    return dark
+      ? { bg: '#0A0A0A', fg: '#FFFFFF', muted: '#B8C2CE', border: '#26303D', tint: '#0E1A2E', tintBorder: '#1E3A5F', field: '#111821', fieldBorder: '#2F4A6B', feature: '#0B2F8F', featureMuted: '#D6E4F5', primary: '#A9D6F5', primaryFg: '#0A0A0A', headerBorder: '#26303D', secondaryBg: '#FFFFFF', secondaryFg: '#0A0A0A', evalBorder: '#5B6676' }
+      : { bg: '#FFFFFF', fg: '#0A0A0A', muted: '#3F4652', border: '#D5E3F0', tint: '#EAF4FD', tintBorder: '#A9D6F5', field: '#FFFFFF', fieldBorder: '#8EC3EC', feature: '#0A0A0A', featureMuted: '#E3E8EE', primary: '#0B2F8F', primaryFg: '#FFFFFF', headerBorder: '#0A0A0A', secondaryBg: '#0A0A0A', secondaryFg: '#FFFFFF', evalBorder: '#0A0A0A' };
+  }
+  renderVals() {
+    const dark = this.state.dark ?? (this.props.dark ?? false);
+    const t = this.theme(dark);
+    const lightSq = this.props.lightSquare ?? '#FFFFFF';
+    const darkSq = this.props.darkSquare ?? '#A9D6F5';
+    const squares = this.board('r1bq1rk1/ppp1bppp/2n1pn2/3p4/2PP4/2N1PN2/PP1B1PPP/R2QKB1R', lightSq, darkSq, { b8: true, c6: true });
+    const on = { bg: t.primary, fg: t.primaryFg };
+    const off = { bg: 'transparent', fg: t.fg };
+    const mark = { bg: '#A9D6F5', fg: '#0A0A0A' };
+    const mv = (n, w, b, wo, bo) => ({ n, w, b, wBg: wo.bg, wFg: wo.fg, bBg: bo.bg, bFg: bo.fg, muted: t.muted });
+    const moves = [
+      mv(1, 'd4', 'd5', off, off),
+      mv(2, 'c4', 'e6', off, off),
+      mv(3, 'Nc3', 'Nf6', off, off),
+      mv(4, 'Nf3', 'Be7', off, off),
+      mv(5, 'e3', 'O-O', off, off),
+      mv(6, 'Bd2', 'Nc6', mark, on)
+    ];
+    return {
+      t, dark, light: !dark, squares, moves,
+      movesOpen: this.state.movesOpen,
+      movesExpanded: this.state.movesOpen ? 'true' : 'false',
+      movesSummary: this.state.movesOpen ? 'Hide' : moves.length + ' moves · Show',
+      chevron: this.state.movesOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+      toggleMoves: () => this.setState({ movesOpen: !this.state.movesOpen }),
+      themeLabel: dark ? 'Switch to light mode' : 'Switch to dark mode',
+      toggleDark: () => this.setState({ dark: !dark })
+    };
+  }
+  board(fen, lightSq, darkSq, highlight) {
+    const glyphs = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
+    const files = 'abcdefgh';
+    const out = [];
+    fen.split('/').forEach((row, r) => {
+      let f = 0;
+      const push = (ch) => {
+        const name = files[f] + (8 - r);
+        const isLight = (r + f) % 2 === 0;
+        const white = ch && ch === ch.toUpperCase();
+        const hl = highlight[name];
+        out.push({
+          bg: hl ? (isLight ? '#CFE3FA' : '#6FAEE0') : (isLight ? lightSq : darkSq),
+          glyph: ch ? glyphs[ch.toLowerCase()] + '︎' : '',
+          fg: white ? '#FFFFFF' : '#0A0A0A',
+          shadow: white ? '0 0 1px #0A0A0A, 0 0 1px #0A0A0A, 0 0 1px #0A0A0A, 0 0 1px #0A0A0A' : '0 0 1px #FFFFFF, 0 0 1px #FFFFFF',
+          coordFg: isLight ? '#0B2F8F' : '#0A0A0A',
+          rank: f === 0 ? String(8 - r) : '',
+          file: r === 7 ? files[f] : ''
+        });
+        f++;
+      };
+      for (const ch of row) {
+        if (/\d/.test(ch)) { for (let i = 0; i < Number(ch); i++) push(null); } else { push(ch); }
+      }
+    });
+    return out;
+  }
+}
+</script>
+</body>
+</html>

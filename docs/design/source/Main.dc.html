@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CoChess — Games</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B2F8F}a:hover{color:#1846C7}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: {{t.fg}}; background: {{t.bg}}; min-height: 1180px">
+
+  <header style="background: #0A0A0A; color: #FFFFFF; border-bottom: 1px solid {{t.headerBorder}}">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 24px">
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #FFFFFF">
+        <span style="width: 34px; height: 34px; border-radius: 8px; background: #A9D6F5; display: flex; align-items: center; justify-content: center; color: #0A0A0A; font-size: 22px; line-height: 1">♞︎</span>
+        <span style="font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 20px; letter-spacing: -0.01em">CoChess</span>
+      </a>
+      <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto">
+        <a href="Main.dc.html" aria-current="page" style="color: #0A0A0A; background: #A9D6F5; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 600; font-size: 14px">Games</a>
+        <a href="Analysis.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Analysis</a>
+        <a href="Moment.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Critical moments</a>
+        <a href="Onboarding.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Assessment</a>
+        <a href="Profile.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Profile</a>
+      </nav>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <span style="font-size: 14px; color: #CFE6F8">[Player name]</span>
+        <button type="button" onClick="{{toggleDark}}" aria-label="{{themeLabel}}" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #2F3A48; background: #0A0A0A; cursor: pointer; display: flex; align-items: center; justify-content: center">
+          <sc-if value="{{dark}}" hint-placeholder-val="{{ false }}">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A9D6F5" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          </sc-if>
+          <sc-if value="{{light}}" hint-placeholder-val="{{ true }}">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A9D6F5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+          </sc-if>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width: 1200px; margin: 0 auto; padding: 40px 24px 64px; display: flex; flex-direction: column; gap: 32px">
+
+    <section style="display: flex; flex-wrap: wrap; gap: 24px; align-items: stretch">
+      <div style="flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 14px">
+        <p style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: {{t.label}}">Your games</p>
+        <h1 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 44px; line-height: 1.05; letter-spacing: -0.02em">Upload a game. Learn one idea from it.</h1>
+        <p style="margin: 0; font-size: 17px; line-height: 1.55; color: {{t.muted}}; max-width: 520px">Stockfish checks every move in your browser. Your coach explains the turning points in plain language and turns them into short exercises.</p>
+      </div>
+      <form style="flex: 1 1 420px; min-width: 0; background: {{t.tint}}; border: 1px solid {{t.tintBorder}}; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 14px">
+        <label for="pgn" style="font-weight: 600; font-size: 15px">Paste a PGN</label>
+        <textarea id="pgn" rows="6" placeholder="[Event &quot;Rated Rapid game&quot;]&#10;1. e4 e5 2. Nf3 Nc6 ..." style="font-family: ui-monospace, Menlo, monospace; font-size: 13px; padding: 12px; border: 1px solid {{t.fieldBorder}}; border-radius: 10px; background: {{t.field}}; color: {{t.fg}}; resize: vertical"></textarea>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
+          <label for="side" style="font-size: 14px; color: {{t.muted}}">I played</label>
+          <select id="side" style="height: 44px; padding: 0 12px; border: 1px solid {{t.fieldBorder}}; border-radius: 10px; background: {{t.field}}; color: {{t.fg}}; font-size: 14px">
+            <option>White</option>
+            <option>Black</option>
+          </select>
+          <button type="button" style="margin-left: auto; height: 44px; padding: 0 22px; border: 0; border-radius: 10px; background: {{t.primary}}; color: {{t.primaryFg}}; font-weight: 600; font-size: 15px; cursor: pointer">Analyze game</button>
+        </div>
+      </form>
+    </section>
+
+    <section aria-labelledby="tend" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px">
+      <h2 id="tend" style="grid-column: 1 / -1; margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px">What keeps coming up</h2>
+      <div style="background: {{t.feature}}; color: #FFFFFF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 13px; color: #A9D6F5; font-weight: 600">Top tendency</span>
+        <span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px; font-weight: 700">[Theme: hanging pieces]</span>
+        <span style="font-size: 14px; color: {{t.featureMuted}}">Seen in [N] of your last [N] games</span>
+      </div>
+      <div style="border: 1px solid {{t.border}}; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 13px; color: {{t.muted}}; font-weight: 600">Second</span>
+        <span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px; font-weight: 700">[Theme: missed fork]</span>
+        <span style="font-size: 14px; color: {{t.muted}}">Seen in [N] games</span>
+      </div>
+      <div style="border: 1px solid {{t.border}}; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 13px; color: {{t.muted}}; font-weight: 600">Moments to practice</span>
+        <span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px; font-weight: 700">[N] waiting</span>
+        <a href="Moment.dc.html" style="font-size: 14px; font-weight: 600; color: {{t.link}}">Start practicing →</a>
+      </div>
+    </section>
+
+    <section aria-labelledby="list" style="display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
+        <h2 id="list" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px; flex: 1 1 auto">Recent games</h2>
+        <label for="filter" style="font-size: 14px; color: {{t.muted}}">Show</label>
+        <select id="filter" style="height: 44px; padding: 0 12px; border: 1px solid {{t.border}}; border-radius: 10px; background: {{t.field}}; color: {{t.fg}}; font-size: 14px">
+          <option>All time controls</option>
+          <option>Rapid</option>
+          <option>Blitz</option>
+          <option>Classical</option>
+        </select>
+      </div>
+      <div style="overflow-x: auto; border: 1px solid {{t.border}}; border-radius: 14px">
+        <table style="width: 100%; min-width: 680px; border-collapse: collapse; font-size: 14px">
+          <thead>
+            <tr style="background: {{t.tint}}; text-align: left">
+              <th style="padding: 12px 16px; font-weight: 600">Opponent</th>
+              <th style="padding: 12px 16px; font-weight: 600">Color</th>
+              <th style="padding: 12px 16px; font-weight: 600">Result</th>
+              <th style="padding: 12px 16px; font-weight: 600">Time control</th>
+              <th style="padding: 12px 16px; font-weight: 600">Accuracy</th>
+              <th style="padding: 12px 16px; font-weight: 600">Status</th>
+              <th style="padding: 12px 16px"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Open</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{games}}" as="g" hint-placeholder-count="4">
+              <tr style="border-top: 1px solid {{g.rowBorder}}">
+                <td style="padding: 14px 16px; font-weight: 600">{{g.opp}}</td>
+                <td style="padding: 14px 16px">
+                  <span style="display: inline-flex; align-items: center; gap: 8px"><span aria-hidden="true" style="width: 12px; height: 12px; border-radius: 3px; border: 1px solid {{g.swatchBorder}}; background: {{g.swatch}}"></span>{{g.color}}</span>
+                </td>
+                <td style="padding: 14px 16px">{{g.result}}</td>
+                <td style="padding: 14px 16px; color: {{g.muted}}">{{g.tc}}</td>
+                <td style="padding: 14px 16px; font-variant-numeric: tabular-nums">{{g.acc}}</td>
+                <td style="padding: 14px 16px">
+                  <span style="display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: {{g.pillBg}}; color: {{g.pillFg}}">{{g.status}}</span>
+                </td>
+                <td style="padding: 14px 16px; text-align: right"><a href="Analysis.dc.html" style="font-weight: 600; color: {{g.link}}">Open</a></td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":1180}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { dark: null };
+  }
+  theme(dark) {
+    return dark
+      ? { bg: '#0A0A0A', fg: '#FFFFFF', muted: '#B8C2CE', border: '#26303D', rowBorder: '#1C2430', tint: '#0E1A2E', tintBorder: '#1E3A5F', field: '#111821', fieldBorder: '#2F4A6B', feature: '#0B2F8F', featureMuted: '#D6E4F5', primary: '#A9D6F5', primaryFg: '#0A0A0A', link: '#A9D6F5', label: '#A9D6F5', headerBorder: '#26303D', secondaryBg: '#FFFFFF', secondaryFg: '#0A0A0A' }
+      : { bg: '#FFFFFF', fg: '#0A0A0A', muted: '#3F4652', border: '#D5E3F0', rowBorder: '#E6EEF6', tint: '#EAF4FD', tintBorder: '#A9D6F5', field: '#FFFFFF', fieldBorder: '#8EC3EC', feature: '#0A0A0A', featureMuted: '#D6DCE4', primary: '#0B2F8F', primaryFg: '#FFFFFF', link: '#0B2F8F', label: '#0B2F8F', headerBorder: '#0A0A0A', secondaryBg: '#0A0A0A', secondaryFg: '#FFFFFF' };
+  }
+  renderVals() {
+    const dark = this.state.dark ?? (this.props.dark ?? false);
+    const t = this.theme(dark);
+    const done = { status: 'Analyzed', pillBg: '#A9D6F5', pillFg: '#0A0A0A' };
+    const run = { status: 'Analyzing…', pillBg: t.secondaryBg, pillFg: t.secondaryFg };
+    const row = { rowBorder: t.rowBorder, muted: t.muted, link: t.link, swatchBorder: t.fg };
+    const W = { color: 'White', swatch: '#FFFFFF' };
+    const B = { color: 'Black', swatch: '#0A0A0A' };
+    return {
+      t,
+      dark,
+      light: !dark,
+      themeLabel: dark ? 'Switch to light mode' : 'Switch to dark mode',
+      toggleDark: () => this.setState({ dark: !dark }),
+      games: [
+        { opp: '[Opponent A]', ...W, result: 'Win', tc: 'Rapid 10+0', acc: '[84]', ...done, ...row },
+        { opp: '[Opponent B]', ...B, result: 'Loss', tc: 'Blitz 5+3', acc: '[71]', ...done, ...row },
+        { opp: '[Opponent C]', ...W, result: 'Draw', tc: 'Rapid 15+10', acc: '—', ...run, ...row },
+        { opp: '[Opponent D]', ...B, result: 'Win', tc: 'Classical 30+0', acc: '[79]', ...done, ...row }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

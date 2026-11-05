@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CoChess — Assessment</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B2F8F}a:hover{color:#1846C7}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: {{t.fg}}; background: {{t.bg}}; min-height: 1400px">
+
+  <header style="background: #0A0A0A; color: #FFFFFF; border-bottom: 1px solid {{t.headerBorder}}">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 24px">
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #FFFFFF">
+        <span style="width: 34px; height: 34px; border-radius: 8px; background: #A9D6F5; display: flex; align-items: center; justify-content: center; color: #0A0A0A; font-size: 22px; line-height: 1">♞︎</span>
+        <span style="font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 20px; letter-spacing: -0.01em">CoChess</span>
+      </a>
+      <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto">
+        <a href="Main.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Games</a>
+        <a href="Analysis.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Analysis</a>
+        <a href="Moment.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Critical moments</a>
+        <a href="Onboarding.dc.html" aria-current="page" style="color: #0A0A0A; background: #A9D6F5; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 600; font-size: 14px">Assessment</a>
+        <a href="Profile.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 500; font-size: 14px">Profile</a>
+      </nav>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <span style="font-size: 14px; color: #CFE6F8">[Player name]</span>
+        <button type="button" onClick="{{toggleDark}}" aria-label="{{themeLabel}}" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #2F3A48; background: #0A0A0A; cursor: pointer; display: flex; align-items: center; justify-content: center">
+          <sc-if value="{{dark}}" hint-placeholder-val="{{ false }}">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A9D6F5" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          </sc-if>
+          <sc-if value="{{light}}" hint-placeholder-val="{{ true }}">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A9D6F5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+          </sc-if>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width: 1200px; margin: 0 auto; padding: 40px 24px 64px; display: flex; flex-direction: column; gap: 32px">
+
+    <section style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end">
+      <div style="flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+        <p style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: {{t.label}}">Assessment</p>
+        <h1 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 40px; line-height: 1.08; letter-spacing: -0.02em">Twelve games, one honest picture of your play.</h1>
+        <p style="margin: 0; font-size: 16px; line-height: 1.55; color: {{t.muted}}; max-width: 620px">Add 3 wins and 3 losses with each color, all in your main time control ([Rapid]). When all 12 are analyzed, your coach writes a baseline report.</p>
+      </div>
+      <a href="Main.dc.html" style="font-size: 14px; font-weight: 600; color: {{t.link}}">Skip for now</a>
+    </section>
+
+    <section aria-labelledby="slots" style="display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px">
+        <h2 id="slots" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px; flex: 1 1 auto">Your 12 slots</h2>
+        <span style="font-size: 14px; font-weight: 600; color: {{t.muted}}">7 of 12 filled</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px">
+        <sc-for list="{{slots}}" as="s" hint-placeholder-count="4">
+          <div style="border: 1px solid {{s.border}}; background: {{s.bg}}; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; align-items: center; gap: 10px">
+              <span aria-hidden="true" style="width: 14px; height: 14px; border-radius: 4px; border: 2px solid {{s.ring}}; background: {{s.swatch}}"></span>
+              <span style="font-weight: 600; font-size: 15px; flex: 1 1 auto">{{s.label}}</span>
+              <span style="font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums">{{s.count}}</span>
+            </div>
+            <div role="img" aria-label="{{s.aria}}" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+              <sc-for list="{{s.cells}}" as="c" hint-placeholder-count="3">
+                <span style="height: 10px; border-radius: 999px; background: {{c.fill}}; border: 1px solid {{c.ring}}"></span>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section aria-labelledby="paste" style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+      <form style="flex: 1 1 360px; min-width: 0; background: {{t.tint}}; border: 1px solid {{t.tintBorder}}; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 12px">
+        <h2 id="paste" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 20px">Add games</h2>
+        <label for="pgns" style="font-size: 14px; color: {{t.muted}}">Paste one or more PGNs. We split them and check each one.</label>
+        <textarea id="pgns" rows="8" placeholder="[Event &quot;...&quot;]&#10;1. e4 c5 ...&#10;&#10;[Event &quot;...&quot;]&#10;1. d4 Nf6 ..." style="font-family: ui-monospace, Menlo, monospace; font-size: 13px; padding: 12px; border: 1px solid {{t.fieldBorder}}; border-radius: 10px; background: {{t.field}}; color: {{t.fg}}; resize: vertical"></textarea>
+        <button type="button" style="align-self: flex-start; height: 44px; padding: 0 22px; border: 0; border-radius: 10px; background: {{t.primary}}; color: {{t.primaryFg}}; font-weight: 600; font-size: 15px; cursor: pointer">Check games</button>
+      </form>
+
+      <div style="flex: 2 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 600">Checked games</h2>
+        <div style="overflow-x: auto; border: 1px solid {{t.border}}; border-radius: 14px">
+          <table style="width: 100%; min-width: 640px; border-collapse: collapse; font-size: 14px">
+            <thead>
+              <tr style="background: {{t.tint}}; text-align: left">
+                <th style="padding: 12px 14px; font-weight: 600">Players</th>
+                <th style="padding: 12px 14px; font-weight: 600">Result</th>
+                <th style="padding: 12px 14px; font-weight: 600">Date</th>
+                <th style="padding: 12px 14px; font-weight: 600">Time control</th>
+                <th style="padding: 12px 14px; font-weight: 600">I played</th>
+                <th style="padding: 12px 14px; font-weight: 600">Slot</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{rows}}" as="r" hint-placeholder-count="4">
+                <tr style="border-top: 1px solid {{r.rowBorder}}">
+                  <td style="padding: 12px 14px; font-weight: 600">{{r.players}}</td>
+                  <td style="padding: 12px 14px; font-variant-numeric: tabular-nums">{{r.result}}</td>
+                  <td style="padding: 12px 14px; color: {{r.muted}}">{{r.date}}</td>
+                  <td style="padding: 12px 14px; color: {{r.muted}}">{{r.tc}}</td>
+                  <td style="padding: 12px 14px">
+                    <label for="{{r.id}}" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">My color in {{r.players}}</label>
+                    <select id="{{r.id}}" style="height: 40px; padding: 0 10px; border: 1px solid {{r.fieldBorder}}; border-radius: 8px; background: {{r.field}}; color: {{r.fg}}; font-size: 14px">
+                      <option>{{r.color}}</option>
+                      <option>{{r.other}}</option>
+                    </select>
+                  </td>
+                  <td style="padding: 12px 14px">
+                    <span style="display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: {{r.pillBg}}; color: {{r.pillFg}}; border: 1px solid {{r.pillBorder}}">{{r.slot}}</span>
+                  </td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
+          <span style="font-size: 14px; color: {{t.muted}}; flex: 1 1 auto">3 games can be added · 2 can't be used</span>
+          <button type="button" style="height: 44px; padding: 0 20px; border: 0; border-radius: 10px; background: {{t.secondaryBg}}; color: {{t.secondaryFg}}; font-weight: 600; font-size: 14px; cursor: pointer">Add 3 games</button>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="prog" style="border: 1px solid {{t.border}}; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline">
+        <h2 id="prog" style="margin: 0; font-size: 16px; font-weight: 600; flex: 1 1 auto">Analyzing in your browser</h2>
+        <span style="font-size: 14px; color: {{t.muted}}; font-variant-numeric: tabular-nums">Game 8 of 12 — move 14 of 38</span>
+      </div>
+      <div role="progressbar" aria-label="Assessment analysis progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="62" style="height: 12px; border-radius: 999px; background: {{t.track}}; overflow: hidden">
+        <div style="width: 62%; height: 100%; background: {{t.primary}}; border-radius: 999px"></div>
+      </div>
+      <p style="margin: 0; font-size: 14px; color: {{t.muted}}">About [N] minutes left. You can close this tab — analysis picks up where it stopped.</p>
+    </section>
+
+    <section aria-labelledby="report" style="background: {{t.feature}}; color: #FFFFFF; border-radius: 18px; padding: 28px; display: flex; flex-wrap: wrap; gap: 24px; align-items: center">
+      <div style="flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 13px; font-weight: 600; color: #A9D6F5; letter-spacing: 0.08em; text-transform: uppercase">Baseline report</span>
+        <h2 id="report" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 26px">Unlocks when all 12 games are analyzed</h2>
+        <p style="margin: 0; font-size: 15px; line-height: 1.55; color: {{t.featureMuted}}">Your strengths, the top three things to work on with examples from your games, how your openings are going, and a 2–4 week focus plan.</p>
+      </div>
+      <button type="button" disabled aria-disabled="true" style="height: 48px; padding: 0 24px; border-radius: 10px; border: 1px solid #5B6676; background: transparent; color: #B8C2CE; font-weight: 600; font-size: 15px; cursor: not-allowed">Generate report · 7/12</button>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":1400}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { dark: null };
+  }
+  theme(dark) {
+    return dark
+      ? { bg: '#0A0A0A', fg: '#FFFFFF', muted: '#B8C2CE', border: '#26303D', rowBorder: '#1C2430', tint: '#0E1A2E', tintBorder: '#1E3A5F', field: '#111821', fieldBorder: '#2F4A6B', feature: '#0B2F8F', featureMuted: '#D6E4F5', primary: '#A9D6F5', primaryFg: '#0A0A0A', link: '#A9D6F5', label: '#A9D6F5', headerBorder: '#26303D', secondaryBg: '#FFFFFF', secondaryFg: '#0A0A0A', track: '#1C2430', full: '#0E1A2E' }
+      : { bg: '#FFFFFF', fg: '#0A0A0A', muted: '#3F4652', border: '#D5E3F0', rowBorder: '#E6EEF6', tint: '#EAF4FD', tintBorder: '#A9D6F5', field: '#FFFFFF', fieldBorder: '#8EC3EC', feature: '#0A0A0A', featureMuted: '#E3E8EE', primary: '#0B2F8F', primaryFg: '#FFFFFF', link: '#0B2F8F', label: '#0B2F8F', headerBorder: '#0A0A0A', secondaryBg: '#0A0A0A', secondaryFg: '#FFFFFF', track: '#EAF4FD', full: '#EAF4FD' };
+  }
+  renderVals() {
+    const dark = this.state.dark ?? (this.props.dark ?? false);
+    const t = this.theme(dark);
+    const slot = (label, color, filled) => ({
+      label,
+      count: filled + '/3',
+      aria: label + ': ' + filled + ' of 3 filled',
+      swatch: color === 'w' ? '#FFFFFF' : '#0A0A0A',
+      ring: t.fg,
+      bg: filled === 3 ? t.full : 'transparent',
+      border: filled === 3 ? t.tintBorder : t.border,
+      cells: [0, 1, 2].map((i) => ({ fill: i < filled ? t.primary : 'transparent', ring: i < filled ? t.primary : t.fieldBorder }))
+    });
+    const base = { rowBorder: t.rowBorder, muted: t.muted, field: t.field, fieldBorder: t.fieldBorder, fg: t.fg };
+    const ok = { pillBg: '#A9D6F5', pillFg: '#0A0A0A', pillBorder: '#A9D6F5' };
+    const no = { pillBg: 'transparent', pillFg: t.muted, pillBorder: t.border };
+    return {
+      t, dark, light: !dark,
+      themeLabel: dark ? 'Switch to light mode' : 'Switch to dark mode',
+      toggleDark: () => this.setState({ dark: !dark }),
+      slots: [slot('White wins', 'w', 3), slot('White losses', 'w', 2), slot('Black wins', 'b', 1), slot('Black losses', 'b', 1)],
+      rows: [
+        { id: 'c1', players: 'You – [Opponent E]', result: '1–0', date: '[Date]', tc: 'Rapid 10+0', color: 'White', other: 'Black', slot: 'White wins already full', ...base, ...no },
+        { id: 'c2', players: '[Opponent F] – You', result: '1–0', date: '[Date]', tc: 'Rapid 15+10', color: 'Black', other: 'White', slot: 'Black losses', ...base, ...ok },
+        { id: 'c3', players: 'You – [Opponent G]', result: '½–½', date: '[Date]', tc: 'Rapid 10+5', color: 'White', other: 'Black', slot: 'Draw — doesn’t fill a slot', ...base, ...no },
+        { id: 'c4', players: '[Opponent H] – You', result: '0–1', date: '[Date]', tc: 'Rapid 10+0', color: 'Black', other: 'White', slot: 'Black wins', ...base, ...ok },
+        { id: 'c5', players: 'You – [Opponent I]', result: '0–1', date: '[Date]', tc: 'Rapid 10+0', color: 'White', other: 'Black', slot: 'White losses', ...base, ...ok }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
