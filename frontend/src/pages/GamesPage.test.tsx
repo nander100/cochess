@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import type { GameListItem } from '../api/types'
+import { ApiError } from '../api/client'
 import { EMPTY_TENDENCIES, fakeDeps } from '../test/fakes'
+import { ToastProvider } from '../ui'
 import { GamesPage } from './GamesPage'
 
 function game(id: string, overrides: Partial<GameListItem> = {}): GameListItem {
@@ -37,10 +39,20 @@ function renderPage(games: GameListItem[], tendencies = TENDENCIES) {
   const deps = fakeDeps({ listGames: vi.fn(async () => games), tendencies: vi.fn(async () => tendencies) })
   render(
     <MemoryRouter>
-      <GamesPage deps={deps} onLoggedOut={vi.fn()} />
+      <ToastProvider>
+        <GamesPage deps={deps} onLoggedOut={vi.fn()} />
+      </ToastProvider>
     </MemoryRouter>,
   )
   return deps
+}
+
+async function upload(deps: ReturnType<typeof fakeDeps>, error: Error) {
+  vi.mocked(deps.api.createGame).mockRejectedValue(error)
+  fireEvent.click(screen.getByLabelText('I played White'))
+  fireEvent.change(screen.getByLabelText(/your game/i), { target: { value: '1. e4 e5 *' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Analyze game' }))
+  return screen.findByRole('alert')
 }
 
 test('the upload form sits in the hero, with the color first', async () => {
@@ -82,4 +94,22 @@ test('each row shows the color with a swatch and the status as a pill', async ()
   expect(within(row).getByText('Black')).toBeInTheDocument()
   expect(within(row).getByText('Analyzing…')).toHaveClass('ui-pill-busy')
   expect(within(row).getByRole('link', { name: 'Open the game vs Rival a' })).toHaveAttribute('href', '/games/a')
+})
+
+test('a problem with the pasted game is shown by the form', async () => {
+  const deps = renderPage([])
+
+  const alert = await upload(deps, new ApiError(422, 'Move 2 (White): Ke3 is not a legal move.'))
+
+  expect(alert).toHaveClass('form-error')
+  expect(alert).toHaveTextContent('Ke3 is not a legal move')
+})
+
+test('a server or connection failure is shown as a toast', async () => {
+  const deps = renderPage([])
+
+  const alert = await upload(deps, new ApiError(0, "Couldn't reach the CoChess server. Check your connection and try again."))
+
+  expect(alert.closest('.ui-toast')).not.toBeNull()
+  expect(alert).toHaveTextContent("Couldn't reach the CoChess server")
 })

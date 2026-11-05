@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { type ChatDeps, type ChatProgress, askCoach, explainPosition } from '../analysis/chat'
 import { BeforeSearches, type MomentDeps, fenAfter } from '../analysis/moments'
 import { type AnalysisRun, type AnalysisStatus, type PipelineDeps, resumeGame, statusLabel } from '../analysis/pipeline'
@@ -25,7 +25,6 @@ import {
 import { useArrowKeys } from '../board/useArrowKeys'
 import { ChatPanel } from '../components/ChatPanel'
 import { EngineStats } from '../components/EngineStats'
-import { ProgressBar } from '../components/ProgressBar'
 import { isUnsolved } from '../moments/moment'
 import { MomentStepper } from '../moments/MomentStepper'
 import { CoachSummaryHeading, Synopsis, type SynopsisState } from '../components/Synopsis'
@@ -35,7 +34,7 @@ import { BoardNav, GameHeading, MovesPanel } from './AnalysisParts'
 import { GameOptions } from './GameOptions'
 import Markdown from 'react-markdown'
 import { useSettings } from '../settings/settingsContext'
-import { Button, ColorSwatch, FeatureCard, Tabs } from '../ui'
+import { Button, ColorSwatch, EmptyState, ErrorState, FeatureCard, ProgressBar, Skeleton, Tabs } from '../ui'
 import './GamePage.css'
 import { errorText } from './util'
 
@@ -49,7 +48,11 @@ export interface FreshAnalysis {
   run: AnalysisRun
 }
 
-type Load = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'ready'; detail: GameDetail }
+type Load =
+  | { kind: 'loading' }
+  | { kind: 'missing' }
+  | { kind: 'error'; message: string }
+  | { kind: 'ready'; detail: GameDetail }
 
 /** One game on the analysis board, loaded from the database (SPEC_V2 §5.1). */
 export function GamePage({ deps, onLoggedOut }: GamePageProps) {
@@ -74,21 +77,23 @@ export function GamePage({ deps, onLoggedOut }: GamePageProps) {
       (detail) => setLoad({ kind: 'ready', detail }),
       (error: unknown) => {
         if (isLoggedOut(error)) onLoggedOut()
-        else if (error instanceof ApiError && error.status === 404) {
-          setLoad({ kind: 'error', message: "That game doesn't exist, or it isn't yours." })
-        } else setLoad({ kind: 'error', message: errorText(error) })
+        else if (error instanceof ApiError && error.status === 404) setLoad({ kind: 'missing' })
+        else setLoad({ kind: 'error', message: errorText(error) })
       },
     )
   }, [deps, gameId, onLoggedOut])
 
   useEffect(reload, [reload])
 
-  if (load.kind === 'loading') return <p className="coach-writing">Loading the game…</p>
-  if (load.kind === 'error') {
+  if (load.kind === 'loading') return <Skeleton lines={6} label="Loading the game…" />
+  if (load.kind === 'error') return <ErrorState message={`The game couldn't be loaded. ${load.message}`} onRetry={reload} />
+  if (load.kind === 'missing') {
     return (
-      <p className="run-error" role="alert">
-        {load.message}
-      </p>
+      <div role="alert">
+        <EmptyState title="That game doesn't exist, or it isn't yours." action={<Link to="/games">Go to your games</Link>}>
+          <p>Check the link, or open the game from your list.</p>
+        </EmptyState>
+      </div>
     )
   }
   return (
@@ -434,16 +439,10 @@ function ResumeAnalysis({ detail, deps, autoStart, onLoggedOut, onDone }: {
       ) : (
         <>
           <p>The engine hasn't finished analyzing this game.</p>
-          <button type="button" onClick={() => void resume()}>
-            Resume analysis
-          </button>
+          <Button onClick={() => void resume()}>Resume analysis</Button>
         </>
       )}
-      {error && (
-        <p className="run-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <ErrorState message={`The analysis stopped: ${error}`} onRetry={() => void resume()} />}
     </div>
   )
 }

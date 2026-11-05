@@ -1,8 +1,8 @@
 import { type FormEvent, useId, useState } from 'react'
-import { type ApiClient, isLoggedOut } from '../api/client'
+import { ApiError, type ApiClient, isLoggedOut } from '../api/client'
 import type { Color, GameChoice, ParseResponse, ParsedRow, SubmitGame, TimeControl } from '../api/types'
 import { errorText } from '../pages/util'
-import { Button, Pill, Table } from '../ui'
+import { Button, Pill, Table, useToast } from '../ui'
 import { CATEGORY_LABEL, PICKABLE, SLOT_LABEL, reasonText } from './labels'
 import './Onboarding.css'
 
@@ -23,6 +23,7 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
   const [choices, setChoices] = useState<(GameChoice | null)[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { show } = useToast()
 
   async function run<T>(work: () => Promise<T>): Promise<T | null> {
     setBusy(true)
@@ -31,7 +32,8 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
       return await work()
     } catch (caught) {
       if (isLoggedOut(caught)) onLoggedOut()
-      else setError(errorText(caught))
+      else if (caught instanceof ApiError && caught.status === 422) setError(errorText(caught))
+      else show(errorText(caught), 'error')
       return null
     } finally {
       setBusy(false)

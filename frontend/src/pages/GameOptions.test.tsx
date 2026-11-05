@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { ApiError } from '../api/client'
 import { DETAIL, fakeApi } from '../test/fakes'
+import { ToastProvider } from '../ui'
 import { GameOptions } from './GameOptions'
 
 function setup(api = fakeApi()) {
@@ -8,13 +9,15 @@ function setup(api = fakeApi()) {
   const onDeleted = vi.fn()
   const onLoggedOut = vi.fn()
   render(
-    <GameOptions
-      detail={DETAIL}
-      api={api}
-      onColorChanged={onColorChanged}
-      onDeleted={onDeleted}
-      onLoggedOut={onLoggedOut}
-    />,
+    <ToastProvider>
+      <GameOptions
+        detail={DETAIL}
+        api={api}
+        onColorChanged={onColorChanged}
+        onDeleted={onDeleted}
+        onLoggedOut={onLoggedOut}
+      />
+    </ToastProvider>,
   )
   return { api, onColorChanged, onDeleted, onLoggedOut }
 }
@@ -54,7 +57,7 @@ test('deleting asks first, then leaves the page', async () => {
   expect(api.deleteGame).toHaveBeenCalledWith('game-1')
 })
 
-test('a server refusal is shown in plain language', async () => {
+test('a server refusal is shown in plain language, as a toast', async () => {
   const api = fakeApi({
     changeColor: vi.fn(async () => {
       throw new ApiError(409, 'That would make four games in one assessment slot.')

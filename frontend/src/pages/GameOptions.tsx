@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { type ApiClient, isLoggedOut } from '../api/client'
 import type { Color, GameDetail } from '../api/types'
-import { Button } from '../ui'
+import { Button, useToast } from '../ui'
 import './GameOptions.css'
 import { errorText } from './util'
 
@@ -23,18 +23,17 @@ const NAME: Record<Color, string> = { white: 'White', black: 'Black' }
 export function GameOptions({ detail, api, onColorChanged, onDeleted, onLoggedOut }: GameOptionsProps) {
   const [confirm, setConfirm] = useState<Confirm>(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { show } = useToast()
   const other: Color = detail.user_color === 'white' ? 'black' : 'white'
 
   async function run(action: () => Promise<void>) {
     setBusy(true)
-    setError(null)
     try {
       await action()
       setConfirm(null)
     } catch (caught) {
       if (isLoggedOut(caught)) onLoggedOut()
-      else setError(errorText(caught))
+      else show(errorText(caught), 'error')
     } finally {
       setBusy(false)
     }
@@ -83,11 +82,6 @@ export function GameOptions({ detail, api, onColorChanged, onDeleted, onLoggedOu
             Cancel
           </Button>
         </div>
-      )}
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
       )}
     </div>
   )

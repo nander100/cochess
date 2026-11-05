@@ -15,7 +15,7 @@ import { SettingsProvider } from './settings/SettingsProvider'
 import { useSettings } from './settings/settingsContext'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { useTheme } from './theme/themeContext'
-import { ErrorState, Header, type NavItem, Skeleton, ToastProvider } from './ui'
+import { EmptyState, ErrorState, Header, type NavItem, Skeleton, ToastProvider } from './ui'
 
 type Session =
   | { kind: 'loading' }
@@ -105,9 +105,11 @@ function Shell({ deps }: AppProps) {
       {session.kind === 'loading' && <Skeleton label="Connecting…" />}
       {session.kind === 'error' && <ErrorState message={session.message} onRetry={loadProfile} />}
       {session.kind === 'logged-out' && (
-        <p className="logged-out" role="alert">
-          You're not logged in. Ask the owner for a login link, then open it in this browser.
-        </p>
+        <div role="alert" className="logged-out">
+          <EmptyState title="You're not logged in">
+            <p>Ask the owner for a login link, then open it in this browser.</p>
+          </EmptyState>
+        </div>
       )}
       {session.kind === 'in' && (
         <Routes>

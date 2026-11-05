@@ -9,7 +9,7 @@ import type { OnboardingStatus } from '../api/types'
 import { CATEGORY_LABEL, SLOT_LABEL } from '../onboarding/labels'
 import { PasteGames } from '../onboarding/PasteGames'
 import { SlotChecklist } from '../onboarding/SlotChecklist'
-import { Button, Card, ErrorState, Eyebrow, FeatureCard, Pill, ProgressBar, Skeleton, TypingIndicator } from '../ui'
+import { Button, Card, ErrorState, Eyebrow, FeatureCard, Pill, ProgressBar, Skeleton, TypingIndicator, useToast } from '../ui'
 import './OnboardingPage.css'
 import { errorText, gameDate } from './util'
 
@@ -30,12 +30,20 @@ export function OnboardingPage({ deps, onLoggedOut }: OnboardingPageProps) {
   const [removing, setRemoving] = useState<string | null>(null) // asking before removing this game
   const running = useRef(false)
 
+  const { show } = useToast()
+  // Before the page has loaded, an error replaces it (with a retry); after, actions that fail
+  // report as toasts (SPEC_V3 §4.2). A ref, so `fail` (and the load effect) stay stable.
+  const loaded = useRef(false)
+  useEffect(() => {
+    loaded.current = status !== null
+  })
   const fail = useCallback(
     (caught: unknown) => {
       if (isLoggedOut(caught)) onLoggedOut()
+      else if (loaded.current) show(errorText(caught), 'error')
       else setError(errorText(caught))
     },
-    [onLoggedOut],
+    [onLoggedOut, show],
   )
 
   // Analyze whatever is still waiting. The server keeps each game's status, so this picks up where

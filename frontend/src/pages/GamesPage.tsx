@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { type AnalysisStatus, type PipelineDeps, runAnalysis, statusLabel } from '../analysis/pipeline'
-import { isLoggedOut } from '../api/client'
+import { ApiError, isLoggedOut } from '../api/client'
 import type { CreateGameRequest, GameListItem, GameStatus, TendencyReport, UserResult } from '../api/types'
 import { GameInput } from '../components/GameInput'
 import {
@@ -17,6 +17,7 @@ import {
   Skeleton,
   Table,
   TintedPanel,
+  useToast,
 } from '../ui'
 import type { FreshAnalysis } from './GamePage'
 import './GamesPage.css'
@@ -93,6 +94,7 @@ export function GamesPage({ deps, onLoggedOut }: GamesPageProps) {
 /** Paste a game, run the engine on it, then open it on the analysis board. */
 function Upload({ deps, onLoggedOut }: GamesPageProps) {
   const navigate = useNavigate()
+  const { show } = useToast()
   const [status, setStatus] = useState<AnalysisStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -105,7 +107,8 @@ function Upload({ deps, onLoggedOut }: GamesPageProps) {
       navigate(`/games/${run.game.game_id}`, { state })
     } catch (caught) {
       if (isLoggedOut(caught)) onLoggedOut()
-      else setError(errorText(caught))
+      else if (aboutTheGame(caught)) setError(errorText(caught))
+      else show(errorText(caught), 'error')
       setStatus(null)
     }
   }
@@ -123,6 +126,11 @@ function Upload({ deps, onLoggedOut }: GamesPageProps) {
       )}
     </TintedPanel>
   )
+}
+
+/** A refusal about the pasted game (bad PGN, a duplicate): shown by the form, not as a toast. */
+function aboutTheGame(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 422 || error.status === 409)
 }
 
 function ComingUp({ games, report }: { games: GameListItem[]; report: TendencyReport | null }) {
