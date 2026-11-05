@@ -3,6 +3,7 @@ import type { ApiClient } from '../api/client'
 import type { CoachEvent } from '../api/sse'
 import { Chess } from 'chess.js'
 import type {
+  Color,
   CreateGameResponse,
   EngineConfig,
   EngineResult,
@@ -186,6 +187,8 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     createGame: vi.fn(async () => GAME),
     listGames: vi.fn(async () => []),
     getGame: vi.fn(async () => DETAIL),
+    changeColor: vi.fn(async (_gameId: string, color: Color) => ({ ...DETAIL, user_color: color })),
+    deleteGame: vi.fn(async () => {}),
     engineConfig: vi.fn(async () => ENGINE_CONFIG),
     submitScan: vi.fn(async () => ({ verify_fens: ['fen-1 b', 'fen-2 w'] })),
     submitVerify: vi.fn(async () => ({ summary_ready: false, counts: null, accuracy: null })),

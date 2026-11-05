@@ -153,6 +153,23 @@ describe('adding games', () => {
 })
 
 describe('analysis', () => {
+  test('a game can be removed from the assessment after confirming, freeing its slot', async () => {
+    const before = { ...EMPTY_ONBOARDING, games: [game('g1', 'analyzed'), game('g2', 'analyzed')], analyzed: 2 }
+    const after = { ...EMPTY_ONBOARDING, games: [game('g2', 'analyzed')], analyzed: 1 }
+    const statuses = [before, after]
+    const deps = fakeDeps({ onboardingStatus: vi.fn(async () => statuses.shift() ?? after) })
+    renderAt(deps, '/onboarding')
+
+    const removeButtons = await screen.findAllByRole('button', { name: 'Remove the game vs Opponent 0' })
+    fireEvent.click(removeButtons[0])
+    expect(deps.api.deleteGame).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+
+    expect(await screen.findByText('Removed the game. Its slot is open again.')).toBeInTheDocument()
+    expect(deps.api.deleteGame).toHaveBeenCalledWith('g1')
+    expect(screen.getAllByRole('button', { name: 'Remove the game vs Opponent 0' })).toHaveLength(1)
+  })
+
   test('waiting games are analyzed when the page opens, with progress, resuming from the server', async () => {
     const statuses = [
       { ...EMPTY_ONBOARDING, games: [game('g1', 'uploaded')], analyzed: 0 },

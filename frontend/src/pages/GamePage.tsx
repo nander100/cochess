@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { type ChatDeps, type ChatProgress, askCoach, explainPosition } from '../analysis/chat'
 import { BeforeSearches, type MomentDeps, fenAfter } from '../analysis/moments'
 import { type AnalysisRun, type AnalysisStatus, type PipelineDeps, resumeGame, statusLabel } from '../analysis/pipeline'
@@ -31,6 +31,7 @@ import { MomentStepper } from '../moments/MomentStepper'
 import { Synopsis, type SynopsisState } from '../components/Synopsis'
 import { type LiveLine, isGameOver } from '../engine/live'
 import { analyzeAll } from '../engine/runner'
+import { GameOptions } from './GameOptions'
 import { errorText, gameDate } from './util'
 
 interface GamePageProps {
@@ -50,6 +51,9 @@ export function GamePage({ deps, onLoggedOut }: GamePageProps) {
   const { gameId = '' } = useParams()
   const fresh = (useLocation().state as FreshAnalysis | null)?.run ?? null
   const [load, setLoad] = useState<Load>({ kind: 'loading' })
+  // After a color change that needs a few positions verified, the analysis resumes on its own.
+  const [autoResume, setAutoResume] = useState(false)
+  const goTo = useNavigate()
 
   const reload = useCallback(() => {
     deps.api.getGame(gameId).then(
@@ -75,12 +79,18 @@ export function GamePage({ deps, onLoggedOut }: GamePageProps) {
   }
   return (
     <AnalysisBoard
-      key={`${load.detail.id}-${load.detail.status}`}
+      key={`${load.detail.id}-${load.detail.status}-${load.detail.user_color}`}
       detail={load.detail}
       deps={deps}
       fresh={fresh}
       onLoggedOut={onLoggedOut}
       onAnalyzed={reload}
+      autoResume={autoResume}
+      onColorChanged={(changed) => {
+        setAutoResume(changed.status === 'scanned')
+        setLoad({ kind: 'ready', detail: changed })
+      }}
+      onDeleted={() => void goTo('/games')}
     />
   )
 }
@@ -91,11 +101,16 @@ interface AnalysisBoardProps {
   fresh: AnalysisRun | null
   onLoggedOut: () => void
   onAnalyzed: () => void
+  autoResume: boolean
+  onColorChanged: (detail: GameDetail) => void
+  onDeleted: () => void
 }
 
 type Tab = 'coach' | 'moments'
 
-function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: AnalysisBoardProps) {
+function AnalysisBoard({
+  detail, deps, fresh, onLoggedOut, onAnalyzed, autoResume, onColorChanged, onDeleted,
+}: AnalysisBoardProps) {
   const [tree, setTree] = useState<GameTree>(() =>
     detail.moments.filter((m) => !isUnsolved(m)).reduce(withMomentLines, fromMoves(detail.moves, detail.final_fen)),
   )
@@ -208,8 +223,21 @@ function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: Analysi
   return (
     <section className="analysis" aria-label="Analysis board">
       <GameHeading detail={detail} />
+      <GameOptions
+        detail={detail}
+        api={deps.api}
+        onColorChanged={onColorChanged}
+        onDeleted={onDeleted}
+        onLoggedOut={onLoggedOut}
+      />
       {detail.status !== 'analyzed' && (
-        <ResumeAnalysis detail={detail} deps={deps} onLoggedOut={onLoggedOut} onDone={onAnalyzed} />
+        <ResumeAnalysis
+          detail={detail}
+          deps={deps}
+          autoStart={autoResume}
+          onLoggedOut={onLoggedOut}
+          onDone={onAnalyzed}
+        />
       )}
       <div className="analysis-grid">
         <div className="board-column">
@@ -324,14 +352,17 @@ function GameHeading({ detail }: { detail: GameDetail }) {
 }
 
 /** An analysis that didn't finish (the tab was closed): pick it up from where the server says. */
-function ResumeAnalysis({ detail, deps, onLoggedOut, onDone }: {
+function ResumeAnalysis({ detail, deps, autoStart, onLoggedOut, onDone }: {
   detail: GameDetail
   deps: PipelineDeps
+  /** Start without waiting for the button (after a color change). */
+  autoStart: boolean
   onLoggedOut: () => void
   onDone: () => void
 }) {
   const [status, setStatus] = useState<AnalysisStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const started = useRef(false)
 
   async function resume() {
     setError(null)
@@ -346,6 +377,14 @@ function ResumeAnalysis({ detail, deps, onLoggedOut, onDone }: {
       setStatus(null)
     }
   }
+
+  // StrictMode-safe: start once.
+  useEffect(() => {
+    if (autoStart && !started.current) {
+      started.current = true
+      void resume()
+    }
+  })
 
   return (
     <div className="resume" role="region" aria-label="Unfinished analysis">

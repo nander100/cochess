@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 
+from app.analysis.engine import EngineResult
 from app.analysis.evals import Color, Evaluation, for_color, winning_chances
 from app.analysis.pgn import ParsedGame
 from app.config import Thresholds
@@ -46,6 +47,14 @@ def verify_fens(game: ParsedGame, plies: Sequence[int]) -> list[str]:
             if fen not in fens and not (fen == game.final_fen and game.final_is_terminal):
                 fens.append(fen)
     return fens
+
+
+def still_to_verify(fens: Sequence[str], results: Sequence[EngineResult]) -> list[str]:
+    """The verify positions that have no verify (or deeper) result yet. Normally that's all of
+    them; after a color change, positions already verified for the other side are reused and only
+    the rest are searched (PLAN_V3 decision log)."""
+    done = {result.fen for result in results if result.tier != "scan"}
+    return [fen for fen in fens if fen not in done]
 
 
 def scan_fens(game: ParsedGame) -> list[str]:

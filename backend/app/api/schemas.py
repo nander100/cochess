@@ -27,6 +27,12 @@ class CreateGameRequest(BaseModel):
     user_color: Color
 
 
+class ChangeColorRequest(BaseModel):
+    """Fix a game analyzed from the wrong side (PLAN_V3 M1). No default, as on upload."""
+
+    user_color: Color
+
+
 class Profile(BaseModel):
     name: str
     elo: int | None

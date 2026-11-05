@@ -880,6 +880,25 @@ button.secondary {
   box-shadow: inset 0 0 0 1px var(--color-accent);
 }
 
+button.danger {
+  background: var(--color-danger);
+  color: var(--color-accent-ink);
+}
+
+/* Change color / delete game (PLAN_V3 M1); restyled with the design tokens later in M1. */
+.game-options,
+.game-options-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.game-options-confirm p {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 /* Onboarding (SPEC_V2 §10) */
 .onboarding {
   display: grid;

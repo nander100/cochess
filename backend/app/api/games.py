@@ -14,6 +14,7 @@ from app.api.deps import get_app_settings, get_session
 from app.api.game_detail import build_detail
 from app.api.profile import is_complete
 from app.api.schemas import (
+    ChangeColorRequest,
     CreateGameRequest,
     CreateGameResponse,
     GameDetail,
@@ -26,6 +27,7 @@ from app.api.schemas import (
 from app.api.scoping import OwnedGame
 from app.auth.deps import CurrentUser
 from app.config import Settings
+from app.db.game_changes import SlotFullError, change_color, delete_game
 from app.db.games import find_duplicate, game_fingerprint, list_games, new_game
 from app.db.models import Game
 
@@ -36,6 +38,7 @@ SettingsDep = Annotated[Settings, Depends(get_app_settings)]
 
 PROFILE_FIRST = "Fill in your profile (rating and time control) before analyzing a game."
 DUPLICATE = "You've already uploaded this game. Open it from My games."
+SLOT_FULL = "That would make four games in one assessment slot. Remove a game from that slot first."
 
 
 @router.post(
@@ -107,6 +110,27 @@ def my_games(user: CurrentUser, session: SessionDep) -> list[GameListItem]:
 def game_detail(game: OwnedGame, session: SessionDep, settings: SettingsDep) -> GameDetail:
     """Everything the analysis board needs, from the database (SPEC_V2 §5.1)."""
     return build_detail(session, game, settings)
+
+
+@router.patch("/{game_id}")
+def change_game_color(
+    game: OwnedGame, body: ChangeColorRequest, session: SessionDep, settings: SettingsDep
+) -> GameDetail:
+    """Switch the side the player played (PLAN_V3 M1). The coach's messages and moment progress
+    are cleared; the analysis is rebuilt from stored results, or the game goes back to "scanned"
+    if the new side needs positions verified (the returned `verify_fens`)."""
+    try:
+        change_color(session, settings, game, body.user_color)
+    except SlotFullError as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=SLOT_FULL) from error
+    return build_detail(session, game, settings)
+
+
+@router.delete("/{game_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_game(game: OwnedGame, session: SessionDep, settings: SettingsDep) -> None:
+    """Delete the game and everything stored for it (PLAN_V3 M1). Also removes an onboarding
+    game, freeing its slot."""
+    delete_game(session, settings, game)
 
 
 def _check_daily_cap(session: Session, user_id: str, settings: Settings) -> None:

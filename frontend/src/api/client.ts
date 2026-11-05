@@ -2,6 +2,7 @@ import { type CoachEvent, readCoachEvents } from './sse'
 import type {
   AttemptRequest,
   BaselineReport,
+  Color,
   CreateGameRequest,
   CreateGameResponse,
   EngineConfig,
@@ -46,6 +47,11 @@ export interface ApiClient {
   createGame(body: CreateGameRequest): Promise<CreateGameResponse>
   listGames(): Promise<GameListItem[]>
   getGame(gameId: string): Promise<GameDetail>
+  /** Fix the side the player played (PLAN_V3 M1): returns the game as it is now, possibly back
+   * at "scanned" with a few positions to verify. */
+  changeColor(gameId: string, color: Color): Promise<GameDetail>
+  /** Delete a game and everything stored for it (also removes an onboarding game). */
+  deleteGame(gameId: string): Promise<void>
   engineConfig(): Promise<EngineConfig>
   submitScan(gameId: string, results: EngineResult[]): Promise<ScanResponse>
   submitVerify(gameId: string, results: EngineResult[]): Promise<VerifyResponse>
@@ -140,6 +146,14 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
     createGame: (body) => post('/api/games', body),
     listGames: () => request('/api/games'),
     getGame: (gameId) => request(`/api/games/${encodeURIComponent(gameId)}`),
+    changeColor: (gameId, color) =>
+      request(`/api/games/${encodeURIComponent(gameId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ user_color: color }),
+      }),
+    deleteGame: async (gameId) => {
+      await send(`/api/games/${encodeURIComponent(gameId)}`, { method: 'DELETE' })
+    },
     engineConfig: () => request('/api/engine-config'),
     submitScan: (gameId, results) => post(`/api/games/${gameId}/engine/scan`, { results }),
     submitVerify: (gameId, results) => post(`/api/games/${gameId}/engine/verify`, { results }),

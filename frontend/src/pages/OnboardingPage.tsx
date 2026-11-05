@@ -26,6 +26,7 @@ export function OnboardingPage({ deps, onLoggedOut }: OnboardingPageProps) {
   const [report, setReport] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<string | null>(null) // asking before removing this game
   const running = useRef(false)
 
   const fail = useCallback(
@@ -65,6 +66,19 @@ export function OnboardingPage({ deps, onLoggedOut }: OnboardingPageProps) {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  /** Take a game out of the assessment, freeing its slot (PLAN_V3 M1). */
+  async function remove(gameId: string) {
+    setError(null)
+    try {
+      await api.deleteGame(gameId)
+      setRemoving(null)
+      setNotice('Removed the game. Its slot is open again.')
+      setStatus(await api.onboardingStatus())
+    } catch (caught) {
+      fail(caught)
+    }
+  }
 
   async function writeReport() {
     setError(null)
@@ -141,7 +155,28 @@ export function OnboardingPage({ deps, onLoggedOut }: OnboardingPageProps) {
                 <span className="slot-tag">{SLOT_LABEL[game.slot]}</span> vs {game.opponent},{' '}
                 {gameDate(game.played_at)}
                 {game.opening ? ` · ${game.opening}` : ''} ·{' '}
-                {game.status === 'analyzed' ? <Link to={`/games/${game.id}`}>Open</Link> : 'waiting for analysis'}
+                {game.status === 'analyzed' ? <Link to={`/games/${game.id}`}>Open</Link> : 'waiting for analysis'}{' '}
+                {removing === game.id ? (
+                  <span role="group" aria-label={`Remove the game vs ${game.opponent}?`}>
+                    Remove this game?{' '}
+                    <button type="button" className="danger" onClick={() => void remove(game.id)}>
+                      Remove
+                    </button>{' '}
+                    <button type="button" className="secondary" onClick={() => setRemoving(null)}>
+                      Keep
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="link-button"
+                    disabled={progress !== null}
+                    aria-label={`Remove the game vs ${game.opponent}`}
+                    onClick={() => setRemoving(game.id)}
+                  >
+                    Remove
+                  </button>
+                )}
               </li>
             ))}
           </ol>

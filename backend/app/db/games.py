@@ -6,9 +6,11 @@ from typing import Any, cast
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from app.analysis.engine import EngineResult, best_by_fen, position_evaluations
 from app.analysis.evals import Color
 from app.analysis.game_info import fingerprint, played_at, user_result
 from app.analysis.pgn import ParsedGame, parse_pgn
+from app.analysis.selection import select_verify_plies, still_to_verify, verify_fens
 from app.analysis.summary import build_summary
 from app.analysis.summary_models import GameSummary, UserInfo
 from app.config import Settings
@@ -119,6 +121,21 @@ def _user_accuracy(summary: dict[str, Any] | None) -> float | None:
     accuracy = (summary or {}).get("accuracy") or {}
     value = accuracy.get("user")
     return float(value) if isinstance(value, int | float) else None
+
+
+def pending_verify_fens(
+    session: Session,
+    parsed: ParsedGame,
+    game: Game,
+    scan_results: list[EngineResult],
+    settings: Settings,
+) -> list[str]:
+    """The positions the verify step still needs: chosen from the scan for the player's color,
+    minus any already verified (after a color change, PLAN_V3 decision log)."""
+    evals = position_evaluations(parsed, best_by_fen(scan_results))
+    user_color = cast(Color, game.user_color)  # validated on upload
+    chosen = verify_fens(parsed, select_verify_plies(evals, user_color, settings.thresholds))
+    return still_to_verify(chosen, load_results(session, game.id, ["verify", "deep"]))
 
 
 def record_analysis(session: Session, settings: Settings, game: Game, summary: GameSummary) -> None:

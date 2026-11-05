@@ -1,7 +1,9 @@
+from app.analysis.engine import EngineResult
 from app.analysis.evals import Evaluation, winning_chances
 from app.analysis.pgn import ParsedGame, parse_pgn
-from app.analysis.selection import scan_fens, select_verify_plies, verify_fens
+from app.analysis.selection import scan_fens, select_verify_plies, still_to_verify, verify_fens
 from app.config import Thresholds
+from tests.engine_fakes import fake_result
 
 NO_SWINGS = Thresholds(verify_top_swings=0)
 
@@ -73,3 +75,22 @@ class TestFens:
         game = parse("1. f3 e5 2. g4 Qh4# 0-1")
 
         assert scan_fens(game) == [p.fen_before for p in game.positions]
+
+
+class TestStillToVerify:
+    START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    E4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
+
+    def result(self, fen: str, tier: str) -> EngineResult:
+        return EngineResult.model_validate(fake_result(fen, tier))
+
+    def test_every_position_when_nothing_is_verified(self) -> None:
+        results = [self.result(self.START, "scan"), self.result(self.E4, "scan")]
+
+        assert still_to_verify([self.START, self.E4], results) == [self.START, self.E4]
+
+    def test_verified_or_deeper_positions_are_reused(self) -> None:
+        results = [self.result(self.START, "verify"), self.result(self.E4, "scan")]
+
+        assert still_to_verify([self.START, self.E4], results) == [self.E4]
+        assert still_to_verify([self.E4], [self.result(self.E4, "deep")]) == []

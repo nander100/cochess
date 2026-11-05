@@ -92,3 +92,8 @@ v2 is merged and tagged; branch `v3` is clean. SPEC_V3 §12 M0 asks for: `docs/v
 | 2026-11-04 | Fonts self-hosted (OFL woff2 from fontsource builds, no npm dependency); pieces: cburnett default + California alternative, licenses checked before adding. | Claude (plan accepted) |
 
 Add decisions made while building below this line, as in PLAN_V2 §7.
+
+| Date | Decision (while building) | By |
+|---|---|---|
+| 2026-11-04 | Deleting a game keeps its `llm_usage` rows (game_id set to NULL) so the daily token budget still counts them. A deleted single game no longer counts toward the daily upload cap; acceptable while the cap is a testing limit. | Claude |
+| 2026-11-04 | Changing an onboarding game's color moves it to the matching slot; if that slot already has 3 games, the change is refused (409) and the player removes a game first. | Claude |

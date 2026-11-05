@@ -9,13 +9,11 @@ from app.analysis.engine import (
     EngineResult,
     EngineResultError,
     Tier,
-    best_by_fen,
     check_batch,
-    position_evaluations,
 )
 from app.analysis.evals import Color
 from app.analysis.pgn import ParsedGame, parse_pgn
-from app.analysis.selection import scan_fens, select_verify_plies, verify_fens
+from app.analysis.selection import scan_fens
 from app.analysis.summary import build_summary
 from app.analysis.summary_models import UserInfo
 from app.api.deps import get_app_settings, get_session
@@ -24,7 +22,7 @@ from app.api.scoping import OwnedGame
 from app.auth.deps import CurrentUser
 from app.config import EngineSettings, Settings
 from app.db.engine_results import load_results, save_results
-from app.db.games import record_analysis
+from app.db.games import pending_verify_fens, record_analysis
 from app.db.models import Game
 
 router = APIRouter(prefix="/api", tags=["engine"])
@@ -48,7 +46,7 @@ def submit_scan(
     if game.status == "uploaded":
         game.status = "scanned"
         session.commit()
-    return ScanResponse(verify_fens=_verify_fens(parsed, game, results, settings))
+    return ScanResponse(verify_fens=pending_verify_fens(session, parsed, game, results, settings))
 
 
 @router.post("/games/{game_id}/engine/verify")
@@ -59,7 +57,7 @@ def submit_verify(
     scan_results = load_results(session, game.id, ["scan"])
     if not scan_results:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Submit the scan results first.")
-    expected = _verify_fens(parsed, game, scan_results, settings)
+    expected = pending_verify_fens(session, parsed, game, scan_results, settings)
     results = _check(body.results, "verify", settings, expected)
     save_results(session, game.id, results)
 
@@ -90,11 +88,3 @@ def _check(
         )
     except EngineResultError as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=error.message) from error
-
-
-def _verify_fens(
-    parsed: ParsedGame, game: Game, scan_results: list[EngineResult], settings: Settings
-) -> list[str]:
-    evals = position_evaluations(parsed, best_by_fen(scan_results))
-    user_color = cast(Color, game.user_color)  # validated on upload
-    return verify_fens(parsed, select_verify_plies(evals, user_color, settings.thresholds))

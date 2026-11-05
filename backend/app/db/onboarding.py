@@ -30,7 +30,11 @@ def onboarding_games(session: Session, user_id: str) -> list[Game]:
 
 def slot_of(game: Game) -> Slot:
     """An onboarding game's slot. Only games that filled a slot are stored as onboarding games."""
-    return _SLOT_OF[(game.user_color, game.user_result)]
+    return slot_for(game.user_color, game.user_result)
+
+
+def slot_for(color: str, result: str | None) -> Slot:
+    return _SLOT_OF[(color, result)]
 
 
 def filled_slots(games: Sequence[Game]) -> Counter[Slot]:

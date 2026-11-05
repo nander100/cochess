@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.analysis.engine import EngineResult, best_by_fen, position_evaluations, uci_line_to_san
 from app.analysis.evals import Color, Evaluation, format_eval, win_percent
 from app.analysis.pgn import ParsedGame, parse_pgn
-from app.analysis.selection import select_verify_plies, verify_fens
+from app.analysis.selection import select_verify_plies, still_to_verify, verify_fens
 from app.analysis.summary import game_info
 from app.analysis.summary_models import GameSummary
 from app.api.schemas import (
@@ -155,7 +155,8 @@ def _pending_verify(
     evals = _evaluations(parsed, best_by_fen([r for r in results if r.tier == "scan"]))
     if evals is None:
         return []
-    return verify_fens(parsed, select_verify_plies(evals, user_color, settings.thresholds))
+    chosen = verify_fens(parsed, select_verify_plies(evals, user_color, settings.thresholds))
+    return still_to_verify(chosen, results)
 
 
 def _stored(result: EngineResult) -> StoredEngineResult:
