@@ -1,4 +1,4 @@
-import { type FormEvent, useId, useState } from 'react'
+import { type FormEvent, useEffect, useId, useState } from 'react'
 import Markdown from 'react-markdown'
 import type { ChatProgress } from '../analysis/chat'
 import { Button, ChatBubble, TintedPanel, TypingIndicator } from '../ui'
@@ -22,6 +22,8 @@ interface ChatPanelProps {
   where?: string
   /** The conversation so far, when reopening a game. */
   initial?: readonly ChatMessage[]
+  /** Told the current Explain action (null when it can't run now), for the X shortcut. */
+  onExplainReady?: (explain: (() => void) | null) => void
 }
 
 const PROGRESS_LABEL: Record<ChatProgress, string> = {
@@ -31,7 +33,7 @@ const PROGRESS_LABEL: Record<ChatProgress, string> = {
 }
 
 /** Questions about the position on the board, and the Explain button (SPEC_V2 §6). */
-export function ChatPanel({ ask, explain, where, initial = [] }: ChatPanelProps) {
+export function ChatPanel({ ask, explain, where, initial = [], onExplainReady }: ChatPanelProps) {
   const id = useId()
   const [messages, setMessages] = useState<ChatMessage[]>(() => [...initial])
   const [draft, setDraft] = useState('')
@@ -51,6 +53,13 @@ export function ChatPanel({ ask, explain, where, initial = [] }: ChatPanelProps)
       setProgress(null)
     }
   }
+
+  // X: Explain the position, when the button would work.
+  useEffect(() => {
+    if (!onExplainReady) return undefined
+    onExplainReady(explain && !busy ? () => void send(EXPLAIN_TEXT, explain) : null)
+    return () => onExplainReady(null)
+  })
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -99,6 +108,7 @@ export function ChatPanel({ ask, explain, where, initial = [] }: ChatPanelProps)
         <textarea
           id={`${id}-message`}
           className="ui-input ui-textarea chat-input"
+          data-shortcut="chat"
           rows={1}
           maxLength={MAX_MESSAGE_CHARS}
           placeholder="Ask about this position…"

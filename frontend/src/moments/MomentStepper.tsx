@@ -317,6 +317,7 @@ export function MomentStepper(props: MomentStepperProps) {
           <input
             id={`${id}-ask`}
             className="ui-input"
+            data-shortcut="chat"
             value={question}
             maxLength={MAX_TEXT_CHARS}
             placeholder="Ask the coach about this position…"

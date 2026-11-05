@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 import type { Theme } from '../theme/theme'
 import { IconButton } from './Button'
-import { MoonIcon, SunIcon } from './icons'
+import { KeyboardIcon, MoonIcon, SunIcon } from './icons'
 import './Header.css'
 
 export interface NavItem {
@@ -20,10 +20,12 @@ interface HeaderProps {
   onToggleTheme: () => void
   /** Shown next to the player's name when logged in. */
   onLogOut?: () => void
+  /** Opens the keyboard shortcut list (also ?). */
+  onShowShortcuts?: () => void
 }
 
 /** The black bar on every page: logo, main nav, player name, theme toggle (docs/design/tokens.md). */
-export function Header({ nav, pathname, playerName, theme, onToggleTheme, onLogOut }: HeaderProps) {
+export function Header({ nav, pathname, playerName, theme, onToggleTheme, onLogOut, onShowShortcuts }: HeaderProps) {
   return (
     <header className="ui-header">
       <div className="ui-header-inner">
@@ -54,6 +56,9 @@ export function Header({ nav, pathname, playerName, theme, onToggleTheme, onLogO
             <button type="button" className="ui-header-logout" onClick={onLogOut}>
               Log out
             </button>
+          )}
+          {onShowShortcuts && (
+            <IconButton variant="header" label="Keyboard shortcuts (?)" icon={<KeyboardIcon />} onClick={onShowShortcuts} />
           )}
           <IconButton
             variant="header"

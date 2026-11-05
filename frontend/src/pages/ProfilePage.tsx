@@ -3,6 +3,7 @@ import { type ApiClient, isLoggedOut } from '../api/client'
 import type { BoardScheme, PieceSet, Profile, TendencyReport, TimeControl } from '../api/types'
 import { BaselineReportPanel } from '../onboarding/BaselineReportPanel'
 import { useSettings } from '../settings/settingsContext'
+import { ShortcutList } from '../shortcuts/ShortcutHelp'
 import type { ThemePreference } from '../theme/theme'
 import { Button, Card, Input, SegmentedToggle, Skeleton, Switch, Textarea, type ToggleOption } from '../ui'
 import './ProfilePage.css'
@@ -236,6 +237,12 @@ function SettingsSection() {
           onChange={(engine_panel) => update({ engine_panel })}
         />
       </div>
+      <section aria-labelledby="profile-shortcuts" className="profile-shortcuts">
+        <h3 id="profile-shortcuts" className="profile-subtitle">
+          Keyboard shortcuts
+        </h3>
+        <ShortcutList />
+      </section>
     </Card>
   )
 }

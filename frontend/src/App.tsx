@@ -12,6 +12,8 @@ import { ProfilePage } from './pages/ProfilePage'
 import { RedeemPage } from './pages/RedeemPage'
 import { errorText, tokenFromHash } from './pages/util'
 import { SettingsProvider } from './settings/SettingsProvider'
+import { ShortcutHelp } from './shortcuts/ShortcutHelp'
+import { useShortcuts } from './shortcuts/useShortcuts'
 import { useSettings } from './settings/settingsContext'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { useTheme } from './theme/themeContext'
@@ -168,14 +170,24 @@ function AppHeader({ session, onLogOut }: AppHeaderProps) {
   const { theme } = useTheme()
   const { update } = useSettings()
   const signedIn = session?.kind === 'in'
+  const [help, setHelp] = useState(false)
+  // Shortcuts that work on every page (SPEC_V3 §4.4); the game page adds the board's own.
+  useShortcuts({
+    help: signedIn ? () => setHelp(true) : null,
+    focusChat: () => document.querySelector<HTMLElement>('[data-shortcut="chat"]')?.focus(),
+  })
   return (
-    <Header
+    <>
+      <Header
       nav={signedIn ? mainNav(search) : []}
       pathname={pathname}
       playerName={signedIn ? session.profile.name : null}
       theme={theme}
       onToggleTheme={() => update({ theme: theme === 'dark' ? 'light' : 'dark' })}
       onLogOut={signedIn ? onLogOut : undefined}
-    />
+      onShowShortcuts={signedIn ? () => setHelp(true) : undefined}
+      />
+      <ShortcutHelp open={help} onClose={() => setHelp(false)} />
+    </>
   )
 }

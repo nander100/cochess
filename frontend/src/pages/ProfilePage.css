@@ -173,3 +173,18 @@
   flex-direction: column;
   gap: var(--space-1);
 }
+
+.profile-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.profile-subtitle {
+  margin: 0;
+  font: var(--text-small-heading);
+  font-family: var(--font-body);
+  letter-spacing: normal;
+}

@@ -382,6 +382,65 @@ test('a new player fills in the profile first, then sees the assessment (which t
   })
 })
 
+describe('keyboard shortcuts', () => {
+  const key = (k: string) => fireEvent.keyDown(window, { key: k })
+
+  test('Home, End, ← and → move through the game; F flips the board', async () => {
+    renderApp(fakeDeps(), '/games/game-1')
+    await screen.findByText('White to move · move 1')
+
+    key('End')
+    expect(screen.getByText('White to move · move 4')).toBeInTheDocument()
+    key('ArrowLeft')
+    expect(screen.getByText('Black to move · move 3')).toBeInTheDocument()
+    key('Home')
+    expect(screen.getByText('White to move · move 1')).toBeInTheDocument()
+    key('f')
+    expect(screen.getByRole('meter', { name: 'Evaluation' })).toHaveClass('flipped')
+  })
+
+  test('E turns the engine panel on; X explains the position', async () => {
+    const deps = fakeDeps()
+    renderApp(deps, '/games/game-1')
+    await screen.findByText('White to move · move 1')
+
+    key('e')
+    expect(screen.getByLabelText('Engine')).toBeChecked()
+    key('x')
+    expect(await screen.findByText('Here is the position.')).toBeInTheDocument()
+    expect(deps.api.explain).toHaveBeenCalled()
+  })
+
+  test('E and X do nothing during an unsolved moment; N opens the next moment', async () => {
+    const intro = { role: 'coach' as const, text: 'What would you play instead?', kind: 'intro' }
+    const open = { ...MOMENT, state: 'intro' as const, messages: [intro] }
+    const deps = fakeDeps({ getGame: vi.fn(async () => ({ ...DETAIL, moments: [open] })) })
+    renderApp(deps, '/games/game-1')
+    await screen.findByText('White to move · move 1')
+
+    key('n')
+    expect(await screen.findByRole('heading', { name: 'Find a better move' })).toBeInTheDocument()
+    key('e')
+    key('x')
+    expect(screen.queryByLabelText('Engine')).not.toBeInTheDocument() // the engine is off here
+    expect(deps.api.explain).not.toHaveBeenCalled()
+  })
+
+  test('? lists the shortcuts and / puts the cursor in the question box', async () => {
+    renderApp(fakeDeps(), '/games/game-1')
+    await screen.findByText('White to move · move 1')
+
+    key('?')
+    const dialog = screen.getByRole('dialog', { name: 'Keyboard shortcuts' })
+    expect(within(dialog).getByText('Flip the board')).toBeInTheDocument()
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    key('/')
+    expect(screen.getByLabelText('Your question')).toHaveFocus()
+  })
+})
+
 describe('chat and Explain are about the position on the board', () => {
   async function askHere(deps: ReturnType<typeof fakeDeps>, message: string) {
     fireEvent.change(await screen.findByLabelText('Your question'), { target: { value: message } })
@@ -530,7 +589,9 @@ describe('critical moments', () => {
   })
 
   test('leaving the tab pauses the moment and unlocks the board', async () => {
-    const deps = fakeDeps({ getGame: vi.fn(async () => withMoment({ state: 'intro', messages: [INTRO] })) })
+    const intro = { role: 'coach' as const, text: 'What would you play instead?', kind: 'intro' }
+    const open = { ...MOMENT, state: 'intro' as const, messages: [intro] }
+    const deps = fakeDeps({ getGame: vi.fn(async () => ({ ...DETAIL, moments: [open] })) })
     renderApp(deps, '/games/game-1')
     await openMoments()
 

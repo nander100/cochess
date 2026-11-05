@@ -22,7 +22,7 @@ import {
   positionLabel,
   previous,
 } from '../board/tree'
-import { useArrowKeys } from '../board/useArrowKeys'
+import { useShortcuts } from '../shortcuts/useShortcuts'
 import { ChatPanel } from '../components/ChatPanel'
 import { EngineStats } from '../components/EngineStats'
 import { isUnsolved } from '../moments/moment'
@@ -211,7 +211,30 @@ function AnalysisBoard({
   }, [locked])
   const back = useCallback(() => navigate(previous(tree, current)), [navigate, tree, current])
   const forward = useCallback(() => navigate(next(tree, current)), [navigate, tree, current])
-  useArrowKeys(back, forward)
+  // Explain is triggered inside the chat panel, which registers it here.
+  const explainAction = useRef<(() => void) | null>(null)
+  const registerExplain = useCallback((explain: (() => void) | null) => {
+    explainAction.current = explain
+  }, [])
+  useShortcuts({
+    prev: back,
+    next: forward,
+    start: () => navigate(ROOT),
+    end: () => navigate(endOfLine(tree, current)),
+    flip: () => setFlipped((value) => !value),
+    // E and X wait while a moment is unsolved (SPEC_V3 §4.4).
+    engine: locked ? null : () => setEngineOn(!engineOn),
+    explain: locked || tab !== 'coach' ? null : () => explainAction.current?.(),
+    nextMoment: moments.length > 0 ? goToNextMoment : null,
+  })
+
+  /** N: the next unfinished critical moment after the one shown (or the first). */
+  function goToNextMoment() {
+    const after = moments.filter((m) => m.index > momentIndex)
+    const target = after.find(isUnsolved) ?? moments.find(isUnsolved) ?? after[0] ?? moments[0]
+    if (tab !== 'moments') openTab('moments')
+    showMoment(target.index)
+  }
 
   function showMoment(index: number) {
     setMomentIndex(index)
@@ -368,6 +391,7 @@ function AnalysisBoard({
               spoiler={moments.some(isUnsolved)}
               practice={moments.some(isUnsolved) ? () => openTab('moments') : null}
               unsolved={moments.filter(isUnsolved).length}
+              onExplainReady={registerExplain}
               moves={
                 <MovesPanel count={detail.moves.length}>
                   <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} />
@@ -449,7 +473,8 @@ function ResumeAnalysis({ detail, deps, autoStart, onLoggedOut, onDone }: {
 
 /** The synopsis and the chat, for an analyzed game. */
 function Coach({
-  detail, deps, board, ensureAnalyzed, loadEngine, autoSynopsis, spoiler, practice, unsolved, moves, onLoggedOut,
+  detail, deps, board, ensureAnalyzed, loadEngine, autoSynopsis, spoiler, practice, unsolved, moves, onExplainReady,
+  onLoggedOut,
 }: {
   detail: GameDetail
   deps: PipelineDeps
@@ -465,6 +490,8 @@ function Coach({
   unsolved: number
   /** The move list, between the summary and the chat (Analysis.dc.html). */
   moves: ReactNode
+  /** The chat panel registers Explain here, for the X shortcut. */
+  onExplainReady: (explain: (() => void) | null) => void
   onLoggedOut: () => void
 }) {
   const [synopsis, setSynopsis] = useState<SynopsisState | null>(
@@ -542,6 +569,7 @@ function Coach({
       )}
       {moves}
       <ChatPanel
+        onExplainReady={onExplainReady}
         initial={detail.chat}
         where={positionLabel(board)}
         ask={async (message, onProgress) => {
