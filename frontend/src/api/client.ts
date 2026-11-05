@@ -18,6 +18,7 @@ import type {
   ProfileUpdate,
   ScanResponse,
   TendencyReport,
+  UserSettings,
   SubmitGame,
   SubmitResponse,
   VerifyResponse,
@@ -55,6 +56,9 @@ export interface ApiClient {
   deleteGame(gameId: string): Promise<void>
   /** The player's tendencies across analyzed games (recent games count more). */
   tendencies(): Promise<TendencyReport>
+  settings(): Promise<UserSettings>
+  /** Change some settings; returns all of them. */
+  updateSettings(change: Partial<UserSettings>): Promise<UserSettings>
   engineConfig(): Promise<EngineConfig>
   submitScan(gameId: string, results: EngineResult[]): Promise<ScanResponse>
   submitVerify(gameId: string, results: EngineResult[]): Promise<VerifyResponse>
@@ -158,6 +162,8 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
       await send(`/api/games/${encodeURIComponent(gameId)}`, { method: 'DELETE' })
     },
     tendencies: () => request('/api/tendencies'),
+    settings: () => request('/api/settings'),
+    updateSettings: (change) => request('/api/settings', { method: 'PATCH', body: JSON.stringify(change) }),
     engineConfig: () => request('/api/engine-config'),
     submitScan: (gameId, results) => post(`/api/games/${gameId}/engine/scan`, { results }),
     submitVerify: (gameId, results) => post(`/api/games/${gameId}/engine/verify`, { results }),

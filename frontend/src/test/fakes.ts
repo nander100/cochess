@@ -13,6 +13,7 @@ import type {
   OnboardingStatus,
   Profile,
   SlotCount,
+  UserSettings,
 } from '../api/types'
 import type { EngineHandle } from '../engine/StockfishEngine'
 
@@ -179,6 +180,14 @@ export function fakeEngine(): EngineHandle {
   }
 }
 
+export const DEFAULT_SETTINGS: UserSettings = {
+  theme: 'light',
+  board_scheme: 'blue',
+  piece_set: 'cburnett',
+  sounds: false,
+  engine_panel: false,
+}
+
 export const EMPTY_TENDENCIES = {
   games_analyzed: 0,
   provisional: true,
@@ -198,6 +207,8 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     changeColor: vi.fn(async (_gameId: string, color: Color) => ({ ...DETAIL, user_color: color })),
     deleteGame: vi.fn(async () => {}),
     tendencies: vi.fn(async () => EMPTY_TENDENCIES),
+    settings: vi.fn(async () => DEFAULT_SETTINGS),
+    updateSettings: vi.fn(async (change: Partial<UserSettings>) => ({ ...DEFAULT_SETTINGS, ...change })),
     engineConfig: vi.fn(async () => ENGINE_CONFIG),
     submitScan: vi.fn(async () => ({ verify_fens: ['fen-1 b', 'fen-2 w'] })),
     submitVerify: vi.fn(async () => ({ summary_ready: false, counts: null, accuracy: null })),

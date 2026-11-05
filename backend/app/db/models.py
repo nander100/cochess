@@ -263,3 +263,18 @@ class BaselineReportRow(Base):
     invalid_moves_removed: Mapped[list[str]] = mapped_column(JSON)
     game_ids: Mapped[list[str]] = mapped_column(JSON)  # the onboarding games it covers
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+
+
+class UserSettingsRow(Base):
+    """Per-player settings (SPEC_V3 §4.3). A player without a row has the defaults. Coach detail
+    level and playback speed are added in M5."""
+
+    __tablename__ = "user_settings"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    theme: Mapped[str] = mapped_column(String(6))  # light | dark | system
+    board_scheme: Mapped[str] = mapped_column(String(8))  # blue | pale | soft
+    piece_set: Mapped[str] = mapped_column(String(16))  # cburnett | merida
+    sounds: Mapped[bool] = mapped_column(Boolean)
+    engine_panel: Mapped[bool] = mapped_column(Boolean)  # show the live engine by default
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)

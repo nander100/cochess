@@ -1,0 +1,69 @@
+.ui-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-height);
+  font: var(--text-ui-strong);
+  cursor: pointer;
+}
+
+.ui-switch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ui-switch-track {
+  position: relative;
+  flex: none;
+  width: var(--switch-width);
+  height: var(--switch-height);
+  border: var(--border-width) solid var(--color-field-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-track);
+  transition: background-color var(--duration-fast) var(--ease);
+}
+
+.ui-switch-track::after {
+  content: '';
+  position: absolute;
+  top: var(--switch-inset);
+  left: var(--switch-inset);
+  width: calc(var(--switch-height) - 2 * var(--switch-inset) - 2 * var(--border-width));
+  height: calc(var(--switch-height) - 2 * var(--switch-inset) - 2 * var(--border-width));
+  border-radius: var(--radius-pill);
+  background: var(--color-fg);
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+.ui-switch input:checked + .ui-switch-track {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.ui-switch input:checked + .ui-switch-track::after {
+  background: var(--color-primary-fg);
+  transform: translateX(calc(var(--switch-width) - var(--switch-height)));
+}
+
+.ui-switch input:focus-visible + .ui-switch-track {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.ui-switch input:disabled + .ui-switch-track {
+  opacity: 0.45;
+}
+
+.ui-switch-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-switch-help {
+  color: var(--color-muted);
+  font: var(--text-small);
+}

@@ -1,8 +1,9 @@
-import './EnginePanel.css'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { EngineConfig } from '../api/types'
 import { type LiveLine, isGameOver, toLiveLines } from '../engine/live'
 import type { EngineHandle } from '../engine/StockfishEngine'
+import { Switch } from '../ui'
+import './EnginePanel.css'
 
 export interface LiveEngine {
   engine: EngineHandle
@@ -31,7 +32,6 @@ type Status = { kind: 'idle' | 'loading' | 'game-over' } | Search
  * (top 3 lines), restarting when the position changes and stopping after the tier's cap.
  */
 export function EnginePanel({ fen, enabled, onToggle, load, onBest }: EnginePanelProps) {
-  const id = useId()
   const [search, setSearch] = useState<Search | null>(null)
   const report = useRef(onBest)
   useEffect(() => {
@@ -77,16 +77,7 @@ export function EnginePanel({ fen, enabled, onToggle, load, onBest }: EnginePane
   const lines = status.kind === 'running' || status.kind === 'stopped' ? status.lines : []
   return (
     <section className="engine-panel ui-card" aria-label="Live engine">
-      <label htmlFor={`${id}-toggle`} className="engine-toggle">
-        <input
-          id={`${id}-toggle`}
-          type="checkbox"
-          checked={enabled}
-          onChange={(event) => onToggle(event.target.checked)}
-        />
-        <span className="engine-switch" aria-hidden="true" />
-        Engine
-      </label>
+      <Switch label="Engine" checked={enabled} onChange={onToggle} />
       <EngineStatus status={status} />
       {lines.length > 0 && (
         <ol className="engine-lines" aria-label="Engine lines">

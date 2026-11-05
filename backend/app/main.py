@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.api import coach as coach_routes
 from app.api import engine as engine_routes
-from app.api import games, profile, validation
+from app.api import games, profile, settings_routes, validation
 from app.api import moments as moment_routes
 from app.api import onboarding as onboarding_routes
 from app.api import tendencies as tendency_routes
@@ -63,4 +63,5 @@ def create_app(
     app.include_router(moment_routes.router)
     app.include_router(tendency_routes.router)
     app.include_router(onboarding_routes.router)
+    app.include_router(settings_routes.router)
     return app

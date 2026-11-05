@@ -11,6 +11,8 @@ import { OnboardingPage } from './pages/OnboardingPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { RedeemPage } from './pages/RedeemPage'
 import { errorText, tokenFromHash } from './pages/util'
+import { SettingsProvider } from './settings/SettingsProvider'
+import { useSettings } from './settings/settingsContext'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { useTheme } from './theme/themeContext'
 import { ErrorState, Header, type NavItem, Skeleton, ToastProvider } from './ui'
@@ -97,7 +99,7 @@ function Shell({ deps }: AppProps) {
   if (onRedeemPage) return <RedeemPage api={pipeline.api} token={redeemToken} onRedeemed={redeemed} />
 
   return (
-    <>
+    <SettingsProvider api={pipeline.api} enabled={session.kind === 'in'}>
       <AppHeader session={session} onLogOut={() => void logOut()} />
       <main className="page">
       {session.kind === 'loading' && <Skeleton label="Connecting…" />}
@@ -148,7 +150,7 @@ function Shell({ deps }: AppProps) {
         </Routes>
       )}
       </main>
-    </>
+    </SettingsProvider>
   )
 }
 
@@ -161,7 +163,8 @@ interface AppHeaderProps {
  * sits with the name (the design has no place for it). */
 function AppHeader({ session, onLogOut }: AppHeaderProps) {
   const { pathname, search } = useLocation()
-  const { theme, toggle } = useTheme()
+  const { theme } = useTheme()
+  const { update } = useSettings()
   const signedIn = session?.kind === 'in'
   return (
     <Header
@@ -169,7 +172,7 @@ function AppHeader({ session, onLogOut }: AppHeaderProps) {
       pathname={pathname}
       playerName={signedIn ? session.profile.name : null}
       theme={theme}
-      onToggleTheme={toggle}
+      onToggleTheme={() => update({ theme: theme === 'dark' ? 'light' : 'dark' })}
       onLogOut={signedIn ? onLogOut : undefined}
     />
   )

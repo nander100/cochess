@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
+import { SettingsProvider } from '../settings/SettingsProvider'
 import { ThemeProvider } from '../theme/ThemeProvider'
-import { EMPTY_TENDENCIES, PROFILE, fakeApi } from '../test/fakes'
+import { ToastProvider } from '../ui'
+import { DEFAULT_SETTINGS, EMPTY_TENDENCIES, PROFILE, fakeApi } from '../test/fakes'
 import { ProfilePage } from './ProfilePage'
 
 function setup(api = fakeApi()) {
@@ -9,7 +11,11 @@ function setup(api = fakeApi()) {
   render(
     <MemoryRouter>
       <ThemeProvider>
-        <ProfilePage api={api} profile={PROFILE} onSaved={onSaved} onLoggedOut={vi.fn()} />
+        <ToastProvider>
+          <SettingsProvider api={api} enabled>
+            <ProfilePage api={api} profile={PROFILE} onSaved={onSaved} onLoggedOut={vi.fn()} />
+          </SettingsProvider>
+        </ToastProvider>
       </ThemeProvider>
     </MemoryRouter>,
   )
@@ -43,8 +49,9 @@ test('tendencies are listed with how many games they appeared in', async () => {
   expect(within(section).getByText('5 games')).toBeInTheDocument()
 })
 
-test('the appearance setting changes the theme at once', () => {
-  setup()
+test('the appearance setting changes the theme at once', async () => {
+  const { api } = setup()
+  await vi.waitFor(() => expect(api.settings).toHaveBeenCalled())
   const appearance = screen.getByRole('group', { name: 'Appearance' })
   expect(within(appearance).getByLabelText('Light')).toBeChecked()
 
@@ -76,4 +83,37 @@ test('the baseline report opens in a dialog', async () => {
   fireEvent.click(within(card).getByRole('button', { name: 'Read the report' }))
 
   expect(screen.getByRole('dialog', { name: 'Your baseline report' })).toHaveTextContent('More detail follows.')
+})
+
+test('settings are saved per player and applied at once', async () => {
+  const { api } = setup()
+  await vi.waitFor(() => expect(api.settings).toHaveBeenCalled())
+
+  fireEvent.click(screen.getByLabelText('Pale blue'))
+  fireEvent.click(screen.getByLabelText('Merida'))
+  fireEvent.click(screen.getByLabelText('Sounds on move'))
+
+  expect(document.documentElement.dataset.board).toBe('pale')
+  expect(document.documentElement.dataset.pieces).toBe('merida')
+  expect(api.updateSettings).toHaveBeenCalledWith({ board_scheme: 'pale' })
+  expect(api.updateSettings).toHaveBeenCalledWith({ piece_set: 'merida' })
+  expect(api.updateSettings).toHaveBeenCalledWith({ sounds: true })
+})
+
+test('the saved theme is applied when settings load', async () => {
+  setup(fakeApi({ settings: vi.fn(async () => ({ ...DEFAULT_SETTINGS, theme: 'dark' as const })) }))
+
+  await vi.waitFor(() => expect(document.documentElement.dataset.theme).toBe('dark'))
+  expect(within(screen.getByRole('group', { name: 'Appearance' })).getByLabelText('Dark')).toBeChecked()
+})
+
+test('a failed save is undone and reported', async () => {
+  const api = fakeApi({ updateSettings: vi.fn(async () => { throw new Error('offline') }) })
+  setup(api)
+  await vi.waitFor(() => expect(api.settings).toHaveBeenCalled())
+
+  fireEvent.click(screen.getByLabelText('Soft blue'))
+
+  expect(await screen.findByRole('alert')).toHaveTextContent("Your setting couldn't be saved")
+  expect(screen.getByLabelText('Baby blue')).toBeChecked()
 })

@@ -34,6 +34,7 @@ import { analyzeAll } from '../engine/runner'
 import { BoardNav, GameHeading, MovesPanel } from './AnalysisParts'
 import { GameOptions } from './GameOptions'
 import Markdown from 'react-markdown'
+import { useSettings } from '../settings/settingsContext'
 import { Button, ColorSwatch, FeatureCard, Tabs } from '../ui'
 import './GamePage.css'
 import { errorText } from './util'
@@ -161,7 +162,10 @@ function AnalysisBoard({
 
   const [flipped, setFlipped] = useState(false)
   const orientation: 'white' | 'black' = flipped ? (detail.user_color === 'white' ? 'black' : 'white') : detail.user_color
-  const [engineOn, setEngineOn] = useState(false)
+  // The live engine starts as the player's setting until they flip it here (SPEC_V3 §4.3).
+  const { settings } = useSettings()
+  const [engineChoice, setEngineOn] = useState<boolean | null>(null)
+  const engineOn = engineChoice ?? settings.engine_panel
   const [live, setLive] = useState<{ fen: string; line: LiveLine } | null>(null)
   const engine = useRef<Promise<LiveEngine> | null>(null)
   // The browser engine and tier settings, loaded once and shared by the live panel and the chat.
@@ -282,6 +286,7 @@ function AnalysisBoard({
               lastMove={boardLastMove}
               movable={!locked || (candidate === null && (moment?.state === 'intro' || moment?.state === 'attempt'))}
               onMove={play}
+              sound={settings.sounds}
             />
           </div>
           <BoardNav

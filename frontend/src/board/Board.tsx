@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'react'
 import type { Color } from '../api/types'
 import './board.css'
 import { boardConfig, isPromotion } from './rules'
+import { playMoveSound } from './sound'
 
 export interface BoardMove {
   from: string
@@ -21,10 +22,12 @@ interface BoardProps {
   /** When false, pieces can't be moved. */
   movable: boolean
   onMove: (move: BoardMove) => void
+  /** Play a short sound when a move appears on the board (Settings: sounds on move). */
+  sound?: boolean
 }
 
 /** The chessground board. chess.js supplies the legal moves; chessground only draws and drags. */
-export function Board({ fen, orientation, lastMove, movable, onMove }: BoardProps) {
+export function Board({ fen, orientation, lastMove, movable, onMove, sound = false }: BoardProps) {
   const element = useRef<HTMLDivElement>(null)
   const api = useRef<Api | null>(null)
   // The latest callback, so chessground's handler (bound once per position) is never stale.
@@ -49,6 +52,13 @@ export function Board({ fen, orientation, lastMove, movable, onMove }: BoardProp
       }),
     )
   }, [fen, orientation, lastMove, movable])
+
+  // A sound for each new move shown (not on first render, nor when only the orientation changes).
+  const shownMove = useRef(lastMove)
+  useEffect(() => {
+    if (lastMove && lastMove !== shownMove.current && sound) playMoveSound()
+    shownMove.current = lastMove
+  }, [lastMove, sound])
 
   // The frame wraps chessground's element: chessground sizes the board from its own element's box,
   // so the border can't sit on that element.

@@ -348,3 +348,15 @@ export interface TendencyReport {
     by_phase: Record<string, number | null>
   }
 }
+
+/** GET / PATCH /api/settings (SPEC_V3 §4.3). */
+export type BoardScheme = 'blue' | 'pale' | 'soft'
+export type PieceSet = 'cburnett' | 'merida'
+
+export interface UserSettings {
+  theme: 'light' | 'dark' | 'system'
+  board_scheme: BoardScheme
+  piece_set: PieceSet
+  sounds: boolean
+  engine_panel: boolean
+}

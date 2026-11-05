@@ -1,10 +1,10 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { type ApiClient, isLoggedOut } from '../api/client'
-import type { Profile, TendencyReport, TimeControl } from '../api/types'
+import type { BoardScheme, PieceSet, Profile, TendencyReport, TimeControl } from '../api/types'
 import { BaselineReportPanel } from '../onboarding/BaselineReportPanel'
+import { useSettings } from '../settings/settingsContext'
 import type { ThemePreference } from '../theme/theme'
-import { useTheme } from '../theme/themeContext'
-import { Button, Card, Input, SegmentedToggle, Skeleton, Textarea, type ToggleOption } from '../ui'
+import { Button, Card, Input, SegmentedToggle, Skeleton, Switch, Textarea, type ToggleOption } from '../ui'
 import './ProfilePage.css'
 import { errorText } from './util'
 
@@ -25,6 +25,17 @@ const THEMES: readonly ToggleOption<ThemePreference>[] = [
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
   { value: 'system', label: 'Match system' },
+]
+
+const BOARD_SCHEMES: readonly ToggleOption<BoardScheme>[] = [
+  { value: 'blue', label: 'Baby blue' },
+  { value: 'pale', label: 'Pale blue' },
+  { value: 'soft', label: 'Soft blue' },
+]
+
+const PIECE_SETS: readonly ToggleOption<PieceSet>[] = [
+  { value: 'cburnett', label: 'Classic' },
+  { value: 'merida', label: 'Merida' },
 ]
 
 const TIME_CONTROL_NAME: Record<TimeControl, string> = { bullet: 'Bullet', blitz: 'Blitz', rapid: 'Rapid', classical: 'Classical' }
@@ -199,15 +210,32 @@ function AboutYou({ api, profile, onSaved, onLoggedOut }: AboutYouProps) {
 }
 
 /** Settings (SPEC_V3 §4.3) as a section of the profile, styled like the design's Appearance block.
- * Changes apply at once; there's nothing to save. */
+ * Changes apply at once and are saved for the player; there's nothing to submit. Coach detail
+ * level and playback speed arrive in M5. */
 function SettingsSection() {
-  const { preference, setPreference } = useTheme()
+  const { settings, update } = useSettings()
   return (
     <Card as="section" className="profile-card" aria-labelledby="profile-settings">
       <h2 id="profile-settings" className="profile-card-title">
         Settings
       </h2>
-      <SegmentedToggle legend="Appearance" options={THEMES} value={preference} onChange={setPreference} />
+      <SegmentedToggle legend="Appearance" options={THEMES} value={settings.theme} onChange={(theme) => update({ theme })} />
+      <SegmentedToggle
+        legend="Board colors"
+        options={BOARD_SCHEMES}
+        value={settings.board_scheme}
+        onChange={(board_scheme) => update({ board_scheme })}
+      />
+      <SegmentedToggle legend="Pieces" options={PIECE_SETS} value={settings.piece_set} onChange={(piece_set) => update({ piece_set })} />
+      <div className="profile-switches">
+        <Switch label="Sounds on move" checked={settings.sounds} onChange={(sounds) => update({ sounds })} />
+        <Switch
+          label="Show the engine panel by default"
+          help="The live engine stays off during an unsolved critical moment."
+          checked={settings.engine_panel}
+          onChange={(engine_panel) => update({ engine_panel })}
+        />
+      </div>
     </Card>
   )
 }

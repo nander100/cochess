@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import App from './App'
 import type { PipelineDeps } from './analysis/pipeline'
@@ -6,7 +6,7 @@ import { ApiError } from './api/client'
 import type { CoachEvent } from './api/sse'
 import type { BoardMove } from './board/Board'
 import type { GameDetail, MomentInfo } from './api/types'
-import { DETAIL, MOMENT, PROFILE, fakeDeps } from './test/fakes'
+import { DEFAULT_SETTINGS, DETAIL, MOMENT, PROFILE, fakeDeps } from './test/fakes'
 
 // chessground needs real layout; the analysis board is tested with a stand-in that shows the
 // position and can play a move.
@@ -225,6 +225,12 @@ test('the side to move and the move number are shown above the board', async () 
   await openMoves()
   fireEvent.click(screen.getByRole('button', { name: '2. Nf3, mistake' }))
   expect(screen.getByText('Black to move · move 2')).toBeInTheDocument()
+})
+
+test("the engine panel starts on when the player's setting says so", async () => {
+  renderApp(fakeDeps({ settings: vi.fn(async () => ({ ...DEFAULT_SETTINGS, engine_panel: true })) }), '/games/game-1')
+
+  await waitFor(() => expect(screen.getByLabelText('Engine')).toBeChecked())
 })
 
 test('the eval bar follows the position', async () => {
