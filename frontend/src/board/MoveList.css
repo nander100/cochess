@@ -1,0 +1,60 @@
+/* The move list (Analysis.dc.html "Moves"): the current move in primary, the player's marked
+ * moves in baby blue with their glyph, explored variations indented. */
+.move-list {
+  max-height: var(--move-list-max);
+  overflow-y: auto;
+  line-height: 2.2;
+}
+
+.move-number {
+  margin: 0 var(--space-1) 0 var(--space-2);
+  color: var(--color-muted);
+  font: var(--text-small);
+  font-variant-numeric: tabular-nums;
+}
+
+button.move {
+  min-height: var(--move-button-height);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-nav);
+  background: none;
+  color: var(--color-fg);
+  font: var(--text-ui);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+button.move:hover {
+  background: var(--color-tint);
+}
+
+button.move.inaccuracy,
+button.move.mistake,
+button.move.blunder,
+button.move.missed_mate {
+  background: var(--brand-baby-blue);
+  color: var(--brand-black);
+}
+
+button.move[aria-current='step'],
+button.move[aria-current='step']:hover {
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+}
+
+button.move.explored {
+  font-weight: 400;
+}
+
+.glyph {
+  margin-left: var(--space-1);
+  font-weight: 700;
+}
+
+.variation {
+  margin: var(--space-1) 0 var(--space-1) var(--space-4);
+  padding-left: var(--space-2);
+  border-left: var(--board-frame-width) solid var(--color-border);
+  color: var(--color-muted);
+}

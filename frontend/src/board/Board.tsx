@@ -38,7 +38,9 @@ export function Board({ fen, orientation, lastMove, movable, onMove, sound = fal
 
   useEffect(() => {
     if (!element.current) return
-    api.current = Chessground(element.current, { coordinates: true, animation: { duration: 150 } })
+    // Reduced motion (SPEC_V3 §4.5): pieces jump instead of sliding.
+    const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    api.current = Chessground(element.current, { coordinates: true, animation: { enabled: !reduce, duration: 150 } })
     return () => {
       api.current?.destroy()
       api.current = null

@@ -9,7 +9,7 @@ const sources = import.meta.glob(['../**/*.{css,ts,tsx}', '!../**/*.test.{ts,tsx
 
 const ALLOWED = new Set(['./tokens.css', './fonts.css'])
 const RAW_COLOR = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/
-const RAW_FONT = /font-family:\s*(?!var\(|inherit)/
+const RAW_FONT = /font-family:(?!\s*(var\(|inherit))/
 
 function offenders(pattern: RegExp): string[] {
   return Object.entries(sources)
@@ -31,10 +31,9 @@ test('no raw colors outside the tokens', () => {
   expect(offenders(RAW_COLOR)).toEqual([])
 })
 
-// Sizes: the shared components and page stylesheets use the spacing, type and size tokens. (The
-// legacy src/styles.css is being replaced page by page in M1 and is not checked.)
+// Sizes: every stylesheet uses the spacing, type and size tokens.
 const RAW_SIZE = /(?<![\w-])\d*\.?\d+(px|rem|em)\b/
-const SIZED = (path: string) => path.endsWith('.css') && path !== '../styles.css' && !ALLOWED.has(path)
+const SIZED = (path: string) => path.endsWith('.css') && !ALLOWED.has(path)
 
 test('no raw sizes in component and page stylesheets', () => {
   const found = Object.entries(sources)

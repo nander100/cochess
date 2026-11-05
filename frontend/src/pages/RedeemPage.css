@@ -6,7 +6,7 @@
 
 .redeem-brand {
   display: flex;
-  flex: 1 1 420px;
+  flex: 1 1 var(--hero-column);
   flex-direction: column;
   justify-content: space-between;
   gap: var(--space-8);
@@ -67,7 +67,7 @@
 
 .redeem-main {
   display: flex;
-  flex: 1 1 480px;
+  flex: 1 1 var(--redeem-main);
   align-items: center;
   justify-content: center;
   box-sizing: border-box;

@@ -161,8 +161,8 @@
 
 .onboarding-locked.ui-button {
   min-height: var(--control-height-large);
-  border-color: var(--color-eval-border);
+  border-color: var(--feature-control-border);
   background: transparent;
-  color: var(--color-feature-muted);
+  color: var(--feature-control-fg);
   opacity: 1;
 }

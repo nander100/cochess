@@ -21,6 +21,8 @@ export function SettingsProvider({ api, enabled, children }: SettingsProviderPro
   const { setPreference } = useTheme()
   const { show } = useToast()
   const latest = useRef(settings)
+  // What the player changed before their saved settings arrived: it wins over the saved values.
+  const early = useRef<Partial<UserSettings>>({})
 
   useEffect(() => {
     latest.current = settings
@@ -32,9 +34,10 @@ export function SettingsProvider({ api, enabled, children }: SettingsProviderPro
     api.settings().then(
       (saved) => {
         if (!live) return
-        setSettings(saved)
+        const merged = { ...saved, ...early.current }
+        setSettings(merged)
         setLoaded(true)
-        setPreference(saved.theme)
+        setPreference(merged.theme)
       },
       () => undefined, // keep the defaults; the page still works
     )
@@ -54,6 +57,7 @@ export function SettingsProvider({ api, enabled, children }: SettingsProviderPro
     (change: Partial<UserSettings>) => {
       const before = latest.current
       const next = { ...before, ...change }
+      early.current = { ...early.current, ...change }
       setSettings(next)
       if (change.theme) setPreference(change.theme)
       if (!enabled) return

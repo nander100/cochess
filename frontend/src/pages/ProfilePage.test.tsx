@@ -117,3 +117,15 @@ test('a failed save is undone and reported', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent("Your setting couldn't be saved")
   expect(screen.getByLabelText('Baby blue')).toBeChecked()
 })
+
+test("a change made before the saved settings arrive isn't undone by them", async () => {
+  let arrive: (value: typeof DEFAULT_SETTINGS) => void = () => {}
+  const api = fakeApi({ settings: vi.fn(() => new Promise<typeof DEFAULT_SETTINGS>((resolve) => { arrive = resolve })) })
+  setup(api)
+
+  fireEvent.click(within(screen.getByRole('group', { name: 'Appearance' })).getByLabelText('Dark'))
+  arrive({ ...DEFAULT_SETTINGS, theme: 'light', piece_set: 'merida' })
+
+  await vi.waitFor(() => expect(document.documentElement.dataset.pieces).toBe('merida'))
+  expect(document.documentElement.dataset.theme).toBe('dark')
+})

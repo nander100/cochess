@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useRef } from 'react'
 import type { Color, MoveLabel } from '../api/types'
+import './MoveList.css'
 import { type GameTree, ROOT, type TreeNode, lineFrom } from './tree'
 
 const GLYPH: Record<MoveLabel, string> = {

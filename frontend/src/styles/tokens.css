@@ -22,6 +22,9 @@
   --header-control-border: #2f3a48;
   --header-accent: var(--brand-baby-blue);
   --header-accent-fg: var(--brand-black);
+  /* Outlined controls on feature cards (dark in both themes) */
+  --feature-control-border: #5b6676;
+  --feature-control-fg: #b8c2ce;
 
   /* Board (tokens.md "Board"); the scheme is a setting, see data-board below */
   --board-light: var(--brand-white);
@@ -106,6 +109,7 @@
   --profile-aside: 340px;
   --field-min: 220px;
   --hero-column: 420px;
+  --redeem-main: 480px;
   --lead-width: 520px;
   --lead-width-wide: 620px;
   --paste-form: 360px;
@@ -113,6 +117,8 @@
   --paste-table-min: 640px;
   --slot-cell-height: 10px;
   --chat-log-max: 420px;
+  --move-list-max: 352px;
+  --move-button-height: 36px;
   --table-min: 680px;
   --text-avatar-size: 26px;
   --brand-art: 320px;

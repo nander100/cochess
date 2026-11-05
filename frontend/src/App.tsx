@@ -107,7 +107,7 @@ function Shell({ deps }: AppProps) {
       {session.kind === 'loading' && <Skeleton label="Connecting…" />}
       {session.kind === 'error' && <ErrorState message={session.message} onRetry={loadProfile} />}
       {session.kind === 'logged-out' && (
-        <div role="alert" className="logged-out">
+        <div role="alert">
           <EmptyState title="You're not logged in">
             <p>Ask the owner for a login link, then open it in this browser.</p>
           </EmptyState>

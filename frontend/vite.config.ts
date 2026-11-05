@@ -36,5 +36,7 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}'],
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
+    // Process CSS so `?raw` imports get the real text: the token guard and contrast tests read it.
+    css: { include: [/.+/] },
   },
 })

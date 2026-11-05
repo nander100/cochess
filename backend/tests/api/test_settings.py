@@ -35,7 +35,12 @@ def test_only_the_fields_sent_change_and_they_are_kept(client: TestClient) -> No
 
 @pytest.mark.parametrize(
     "body",
-    [{"theme": "sepia"}, {"board_scheme": "brown"}, {"piece_set": "california"}, {"sounds": "loud"}],
+    [
+        {"theme": "sepia"},
+        {"board_scheme": "brown"},
+        {"piece_set": "california"},
+        {"sounds": "loud"},
+    ],
     ids=["theme", "scheme", "pieces", "sounds"],
 )
 def test_unknown_values_are_rejected(client: TestClient, body: dict[str, Any]) -> None:
