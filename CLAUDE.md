@@ -3,7 +3,7 @@
 CoChess is a web app that coaches intermediate chess players (roughly 1000–1800 Elo) to improve. Users upload games, a chess engine analyzes them, and an LLM coach (Claude API) explains the engine's findings in plain, encouraging language, teaches move by move, and tracks the player's tendencies over time.
 
 - **Current work: v3.** The spec is `SPEC_V3.md`; the plan and decision log are `docs/PLAN_V3.md`.
-- `SPEC.md` (v1) and `SPEC_V2.md` (v2) are kept for reference. `docs/v1-as-built.md` and `docs/v2-as-built.md` record what each version actually became; `docs/v2-handoff.md` records v2's deviations, feedback, known issues and gotchas.
+- `SPEC.md` (v1) and `SPEC_V2.md` (v2) are kept for reference. `docs/v1-as-built.md`, `docs/v2-as-built.md` and `docs/v3-as-built.md` record what each version actually became (v3's also has the done-condition review and known issues); `docs/v2-handoff.md` records v2's deviations, feedback, known issues and gotchas.
 - Where files disagree: `SPEC_V3.md` wins over older specs, `docs/PLAN_V3.md` decisions approved at a checkpoint win over the spec, and the code as built wins over all specs until a checkpoint decides otherwise.
 - v4 is listed in `SPEC_V3.md` §13 so v3's design doesn't block it. Do not implement it.
 
@@ -194,6 +194,8 @@ Also stop and ask before: adding a dependency not listed here, changing an appro
 - The branch and tag are both named `v2`; use `refs/tags/v2` when it matters.
 - The owner's local Docker app (compose project `cochcess`, port 8080) runs a pre-v2-M5 build with duplicate games. Ask before touching it.
 - Playwright strict mode: text like "3. Ng5" appears in several places; scope locators.
+- A dev server with `--reload` applies a migration the moment its file is written: write each migration once, complete (0016 repairs a dev database that ran an early 0014).
+- The production CSP (`frontend/security-headers.conf`) blocks inline scripts and inline style attributes: no inline `<script>` in `index.html` (`public/theme-init.js` sets the theme); React `style={{}}` is fine (set through the CSSOM). Smoke-test the Docker build under another compose project (`docker compose -p cochess-v3check`, another port) so the owner's `cochcess` stack is untouched.
 - Deploy: see `docs/DEPLOY.md` and `docs/v2-handoff.md` (Caddy validate before reload, `COCHESS_PORT=127.0.0.1:8080`, exact `PUBLIC_BASE_URL`).
 
 ## Don't

@@ -6,15 +6,16 @@ An AI chess coach for intermediate players (roughly 1000–1800 Elo). Paste a ga
 
 ## How it works
 
-1. **Log in** with a one-time link from the owner, then fill in your profile: rating, the time control you play most, and (optionally) your style.
-2. **Onboarding assessment (optional).** Paste 12 games in your main time control: 3 wins and 3 losses with each color. CoChess checks which slot each fills, analyzes them one by one in your browser (about 10 minutes; closing the tab and coming back picks up where it stopped), and your coach writes a **baseline report**: your strengths, the top 3 things to work on with examples from your games, how your openings are going, and a 2–4 week plan. It's kept on your profile.
-3. **Analyze any game.** Paste a PGN. Stockfish (WASM, multi-threaded where the browser allows) **scans** every position, then **verifies** the moments that matter with a deeper 4-line search. The backend classifies every move (Lichess winning-chances model), computes Lichess-style accuracy, and runs nine theme detectors (hung piece, allowed tactic, missed tactic, missed capture/check, king safety, pawn structure, endgame technique, slow development, time trouble).
-4. **The analysis board.** Step through the game with the arrow keys, see the eval graph and a live engine panel, and play your own variations on the board.
-5. **Your coach** (Claude) writes a short synopsis, answers questions about whatever position is on the board, including your own variations, and explains a position on request. When a question needs analysis the game doesn't have, the coach asks your browser's engine for a deeper look first.
-6. **Critical moments.** Your biggest mistakes become exercises: find a better move yourself, get graded by the engine, get hints if you're stuck, then see the engine's move. The coach never sees the answer before you've found it or asked for it.
-7. **Tendencies.** Your mistake themes are tracked across games, recent games counting most, so the coach can say "this is the third game where a loose knight cost you material".
+1. **Log in** with a one-time link from the owner, then fill in your profile: rating, the time control you play most, and (optionally) your style. Add your **Chess.com or Lichess username** and CoChess fills in the color you played in every game you paste or import.
+2. **Bring in your games.** Paste a PGN (choose your color, or let your username decide), or **import your recent games** from Chess.com or Lichess: review them, tick the ones you want, and they're added and analyzed one after another. Games you already have are marked and skipped.
+3. **Onboarding assessment (optional).** Paste or import 12 games in your main time control: 3 wins and 3 losses with each color. CoChess checks which slot each fills, analyzes them in your browser (closing the tab and coming back picks up where it stopped), and your coach writes a **baseline report**: strengths, the top 3 things to work on with examples, your openings, and a 2–4 week plan.
+4. **Analysis.** Stockfish (WASM, multi-threaded where the browser allows) **scans** every position, then **verifies** the moments that matter with a deeper 4-line search. The backend classifies every move (Lichess winning-chances model), computes Lichess-style accuracy, and runs nine theme detectors (hung piece, allowed tactic, missed tactic, missed capture/check, king safety, pawn structure, endgame technique, slow development, time trouble).
+5. **The analysis board.** Step through the game, see the eval graph and a live engine panel, and play your own variations: they're **saved**, and **Export PGN** downloads the game with your variations, the engine's evaluations, your mistakes marked and the coach's notes.
+6. **Your coach** (Claude) writes a short synopsis, answers questions about the position on the board, and explains it on request, in **plain language** at the detail level you choose (Plain, Standard, Technical). It never writes out a line of moves: it links to one, and the board **plays the line** for you, stopping where the difference shows. It **draws on the board** (arrows and highlights), each one checked before it's shown, and can **walk you through** any line move by move.
+7. **Critical moments.** Your biggest mistakes become exercises: find a better move yourself, get graded by the engine, get hints, then see the engine's move. The coach never sees the answer before you've found it or asked for it.
+8. **Your progress.** The Games page is your dashboard: your top focus areas with an example from your games and matching **Lichess puzzle themes**, games with moments left to practice, how your mistake types and accuracy change over time, and recent games. Filter by time control, color and range.
 
-Specs: [`SPEC_V2.md`](SPEC_V2.md) (current) and [`SPEC.md`](SPEC.md) (v1). Implementation plans and every design decision: [`docs/PLAN_V2.md`](docs/PLAN_V2.md) and [`docs/PLAN.md`](docs/PLAN.md). Conventions and commands for contributors: [`CLAUDE.md`](CLAUDE.md).
+Specs: [`SPEC_V3.md`](SPEC_V3.md) (current), [`SPEC_V2.md`](SPEC_V2.md) and [`SPEC.md`](SPEC.md). Plans and every design decision: [`docs/PLAN_V3.md`](docs/PLAN_V3.md) (and the earlier `docs/PLAN_V2.md`, `docs/PLAN.md`). What each version actually became: [`docs/v3-as-built.md`](docs/v3-as-built.md), [`docs/v2-as-built.md`](docs/v2-as-built.md). Conventions and commands for contributors: [`CLAUDE.md`](CLAUDE.md).
 
 ## Quick start (Docker)
 
@@ -86,7 +87,7 @@ npm run build
 
 ### End-to-end tests
 
-`npm run e2e` (from `frontend/`) drives the real backend and frontend in your installed Chrome, with a **scripted engine** (real chess rules, material-only evaluation) and a **scripted coach**: free, the same every run, about 40 seconds. It covers login → upload → board → synopsis, chat and Explain → a critical moment; onboarding through the baseline report (with a reload mid-analysis); and the error states (used login link, illegal or non-standard PGN, duplicate upload, another player's game).
+`npm run e2e` (from `frontend/`) drives the real backend and frontend in your installed Chrome, with a **scripted engine** (real chess rules, material-only evaluation) and a **scripted coach**: free, the same every run, about two minutes. Chess.com and Lichess are faked too. It covers login → upload → board → synopsis, chat and Explain → a critical moment; color selection (none pre-selected; detection from a username); changing a game's color and deleting it; coach drawings, line walkthroughs and line playback; saved variations, PGN export and re-import; the dashboard; importing from Chess.com and Lichess; onboarding through the baseline report (with a reload mid-analysis); the error states (used login link, illegal or non-standard PGN, duplicate upload, another player's game); and screenshots of every page in both themes.
 
 `npm run e2e:real` runs the original test instead: real Stockfish on one of the owner's games (40–90 seconds), with the coach off unless you ask for it, because it calls the paid API.
 
@@ -103,6 +104,7 @@ Outputs go to `frontend/test-results/`. `npm run e2e:real` also rewrites `backen
 Owner scripts for tuning analysis on real games (from `backend/`):
 
 ```bash
+uv run python -m scripts.seed_owner_games --db /tmp/demo.db # owner games, analyzed, on a scratch database (prints a login link)
 uv run python -m scripts.print_summary game1w --compact   # the summary the coach sees
 uv run python -m scripts.synopsis game5b --elo 1400       # a real synopsis (calls the API)
 uv run python -m scripts.print_tendencies --user "Alex"   # tendencies with the math shown
@@ -110,7 +112,7 @@ uv run python -m scripts.print_tendencies --user "Alex"   # tendencies with the 
 
 ## Cost
 
-With the default models, a game costs about **$0.02**: the synopsis (Claude Sonnet 5.5 at low effort, about 4.7k input / 0.7k output tokens) plus well under a cent per chat question or critical-moment step (Claude Haiku 5.5). The baseline report is one Sonnet call over all 12 games (about 13k input / 1.2k output tokens), a few cents, written once. The coach only sees a compact view of the analysis, and the system prompt and game context are prompt-cached. Every call's token usage is logged in the `llm_usage` table, per player and task, and `USER_DAILY_TOKEN_LIMIT` caps it per player if you need to.
+With the default models, a game costs about **$0.02**: the synopsis (Claude Sonnet 5.5 at low effort, about 4.7k input / 0.7k output tokens) plus well under a cent per chat question or critical-moment step (Claude Haiku 5.5). The baseline report is one Sonnet call over all 12 games (about 13k input / 1.2k output tokens), a few cents, written once. A line walkthrough is one Haiku call (about 3k input / 0.9k output tokens) and is cached per player and line, so walking the same line again is free; at most 30 new walkthroughs per game. A reply that fails the move or drawing checks is regenerated once, which can double that reply's cost. The coach only sees a compact view of the analysis, and the system prompt and game context are prompt-cached. Every call's token usage is logged in the `llm_usage` table, per player and task, and `USER_DAILY_TOKEN_LIMIT` caps it per player if you need to.
 
 ## Licensing
 
