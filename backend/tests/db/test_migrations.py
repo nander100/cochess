@@ -109,3 +109,19 @@ def test_every_migration_downgrades_back_to_an_empty_database() -> None:
         command.upgrade(config, "head")
 
     assert _differences(engine) == []
+
+
+def test_a_database_that_ran_an_early_0014_gets_the_baseline_moves_column() -> None:
+    # A dev database migrated while 0014 was being written recorded 0014 without
+    # baseline_reports.moves; 0016 adds it where it's missing.
+    engine = make_engine("sqlite://")
+    config = alembic_config()
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.upgrade(config, "0015")
+        connection.execute(text("ALTER TABLE baseline_reports DROP COLUMN moves"))
+
+    upgrade(engine)
+
+    assert "moves" in {c["name"] for c in inspect(engine).get_columns("baseline_reports")}
+    assert _differences(engine) == []
