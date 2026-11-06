@@ -138,3 +138,30 @@ test('the solution appears only once the moment is finished', () => {
   expect(screen.getByText('Solution')).toBeInTheDocument()
   expect(screen.getByText(/The engine's move:/)).toHaveTextContent('2. d4')
 })
+
+test("a coach message's board tag can be hovered to show it on the moment's position", () => {
+  const tag = { tag_index: 0, char_offset: 11, arrows: [{ orig: 'g1', dest: 'f3', color: 'red' as const }], squares: [] }
+  const intro = { ...INTRO, text: 'You played [board](cc:board/0). What else?', annotations: [tag] }
+  const onShowTag = vi.fn()
+  render(
+    <MomentStepper
+      gameId="game-1"
+      moments={[{ ...MOMENT, state: 'intro', messages: [intro] }]}
+      current={MOMENT.index}
+      onSelect={vi.fn()}
+      fen={FEN}
+      candidate={null}
+      onTakeBack={vi.fn()}
+      deps={{ api: fakeApi(), analyzeDeep: vi.fn() }}
+      searches={new BeforeSearches()}
+      onUpdated={vi.fn()}
+      onLoggedOut={vi.fn()}
+      onShowTag={onShowTag}
+    />,
+  )
+
+  fireEvent.mouseEnter(screen.getByRole('button', { name: 'Show this on the board' }))
+
+  expect(onShowTag).toHaveBeenCalledWith(tag, 'hover')
+  expect(screen.getByText(/What else\?/)).toBeInTheDocument()
+})

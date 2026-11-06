@@ -1,0 +1,23 @@
+/* A board tag in a coach message (SPEC_V3 §6.3): a small icon in the line of text. */
+.coach-board-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 var(--space-1);
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-nav);
+  background: var(--color-tint);
+  color: var(--chess-plan);
+  vertical-align: middle;
+}
+
+button.coach-board-tag {
+  cursor: pointer;
+}
+
+button.coach-board-tag:hover,
+button.coach-board-tag:focus-visible {
+  background: var(--color-border);
+  color: var(--color-fg);
+}

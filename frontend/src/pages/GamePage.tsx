@@ -4,8 +4,10 @@ import { type ChatDeps, type ChatProgress, askCoach, explainPosition } from '../
 import { BeforeSearches, type MomentDeps, fenAfter } from '../analysis/moments'
 import { type AnalysisRun, type AnalysisStatus, type PipelineDeps, resumeGame, statusLabel } from '../analysis/pipeline'
 import { ApiError, isLoggedOut } from '../api/client'
-import type { EngineResult, GameDetail, MomentInfo } from '../api/types'
+import type { Annotation, EngineResult, GameDetail, MomentInfo } from '../api/types'
 import { Board, type BoardMove } from '../board/Board'
+import { latestByPath } from '../board/coachShapes'
+import { useCoachDrawings } from '../board/useCoachDrawings'
 import { EnginePanel, type LiveEngine } from '../board/EnginePanel'
 import { EvalBar } from '../board/EvalBar'
 import { EvalGraph, type GraphPoint } from '../board/EvalGraph'
@@ -25,7 +27,8 @@ import {
   previous,
 } from '../board/tree'
 import { useShortcuts } from '../shortcuts/useShortcuts'
-import { ChatPanel } from '../components/ChatPanel'
+import { ChatPanel, type ShowChatTag } from '../components/ChatPanel'
+import { chatMessages } from '../components/chatMessages'
 import { EngineStats } from '../components/EngineStats'
 import { isUnsolved } from '../moments/moment'
 import { MomentStepper } from '../moments/MomentStepper'
@@ -143,6 +146,8 @@ function AnalysisBoard({
   // The player's variations save themselves (SPEC_V3 §5.1); every change to the tree goes
   // through changeTree.
   const saver = useVariationSaver(deps.api, detail.id, detail.variations, onLoggedOut)
+  // The coach's arrows and highlights (SPEC_V3 §6.3), per board position.
+  const drawings = useCoachDrawings(detail.chat)
   function changeTree(updated: GameTree) {
     setTree(updated)
     saver.schedule(updated)
@@ -287,6 +292,25 @@ function AnalysisBoard({
   const promoteLine = (startId: string) => changeTree(promoteVariation(tree, startId))
 
   const momentFen = momentNodeId !== null ? tree.nodes[momentNodeId].fen : null
+  // A moment's messages are all about its position; the latest one's tags are drawn there.
+  const momentDrawings = useMemo(
+    () =>
+      latestByPath(
+        (moment?.messages ?? []).map((m) => ({ role: m.role, path: momentNodeId, annotations: m.annotations })),
+      ),
+    [moment, momentNodeId],
+  )
+  // The position the board shows, as a node id (null: a moment attempt not yet in the tree).
+  const boardPath = locked ? (candidate ? null : momentNodeId) : current
+  const coachShapes = drawings.shown(boardPath, tab === 'moments' ? momentDrawings : undefined)
+
+  function showChatTag(path: string, annotation: Annotation | null, how: 'hover' | 'click') {
+    if (how === 'click' && path !== current && tree.nodes[path] !== undefined) navigate(path)
+    drawings.focus(path, annotation)
+  }
+  function showMomentTag(annotation: Annotation | null) {
+    if (momentNodeId !== null) drawings.focus(momentNodeId, annotation)
+  }
   const boardFen = locked && momentFen ? ((candidate && fenAfter(momentFen, candidate)) ?? momentFen) : node.fen
   const boardLastMove = locked && momentNodeId !== null ? (candidate ?? tree.nodes[momentNodeId].uci) : node.uci
   const evaluation = locked
@@ -330,6 +354,7 @@ function AnalysisBoard({
               movable={!locked || (candidate === null && (moment?.state === 'intro' || moment?.state === 'attempt'))}
               onMove={play}
               sound={settings.sounds}
+              annotations={coachShapes}
             />
           </div>
           <BoardNav
@@ -393,6 +418,7 @@ function AnalysisBoard({
               onUpdated={momentsUpdated}
               onLoggedOut={onLoggedOut}
               onBack={() => openTab('coach')}
+              onShowTag={showMomentTag}
             />
           )}
           {detail.status === 'analyzed' && tab === 'coach' && (
@@ -407,6 +433,8 @@ function AnalysisBoard({
               practice={moments.some(isUnsolved) ? () => openTab('moments') : null}
               unsolved={moments.filter(isUnsolved).length}
               onExplainReady={registerExplain}
+              onReply={drawings.record}
+              onShowTag={showChatTag}
               moves={
                 <MovesPanel count={detail.moves.length}>
                   <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} onDelete={deleteLine} onPromote={promoteLine} />
@@ -489,7 +517,7 @@ function ResumeAnalysis({ detail, deps, autoStart, onLoggedOut, onDone }: {
 /** The synopsis and the chat, for an analyzed game. */
 function Coach({
   detail, deps, board, ensureAnalyzed, loadEngine, autoSynopsis, spoiler, practice, unsolved, moves, onExplainReady,
-  onLoggedOut,
+  onReply, onShowTag, onLoggedOut,
 }: {
   detail: GameDetail
   deps: PipelineDeps
@@ -507,6 +535,9 @@ function Coach({
   moves: ReactNode
   /** The chat panel registers Explain here, for the X shortcut. */
   onExplainReady: (explain: (() => void) | null) => void
+  /** A coach answer and its board tags, for the board (SPEC_V3 §6.3). */
+  onReply: (path: string, annotations: readonly Annotation[]) => void
+  onShowTag: ShowChatTag
   onLoggedOut: () => void
 }) {
   const [synopsis, setSynopsis] = useState<SynopsisState | null>(
@@ -585,8 +616,11 @@ function Coach({
       {moves}
       <ChatPanel
         onExplainReady={onExplainReady}
-        initial={detail.chat}
+        initial={chatMessages(detail.chat)}
         where={positionLabel(board)}
+        path={board.id}
+        onReply={onReply}
+        onShowTag={onShowTag}
         ask={async (message, onProgress) => {
           const position = await positionRequest(board, ensureAnalyzed, onProgress)
           return askCoach(chatDeps, detail.id, { message, ...position }, onProgress)

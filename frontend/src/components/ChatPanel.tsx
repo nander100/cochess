@@ -1,25 +1,29 @@
 import { type FormEvent, useEffect, useId, useState } from 'react'
-import Markdown from 'react-markdown'
 import type { ChatProgress } from '../analysis/chat'
+import type { Annotation, CoachReply } from '../api/types'
 import { Button, ChatBubble, TintedPanel, TypingIndicator } from '../ui'
 import './ChatPanel.css'
+import type { ChatMessage } from './chatMessages'
+import { CoachText } from './CoachText'
 
 const MAX_MESSAGE_CHARS = 2000 // mirrors backend CoachSettings.chat_max_message_chars
 const EXPLAIN_TEXT = 'Explain this position'
 
-export interface ChatMessage {
-  role: 'player' | 'coach'
-  text: string
-  /** Where on the board a player's message was sent from ("after 14. Nf3"). */
-  where?: string | null
-}
+/** A board tag was hovered (annotation, or null when the hover ends) or clicked, in a message
+ * about the position `path`. */
+export type ShowChatTag = (path: string, annotation: Annotation | null, how: 'hover' | 'click') => void
 
 interface ChatPanelProps {
-  ask: (message: string, onProgress: (progress: ChatProgress) => void) => Promise<string>
+  ask: (message: string, onProgress: (progress: ChatProgress) => void) => Promise<CoachReply>
   /** Explain the position on the board (SPEC_V2 §6.3); the answer appears in the chat. */
-  explain?: (onProgress: (progress: ChatProgress) => void) => Promise<string>
+  explain?: (onProgress: (progress: ChatProgress) => void) => Promise<CoachReply>
   /** The position on the board, as messages sent now are labelled ("after 14. Nf3"). */
   where?: string
+  /** The position on the board, as a node id: what messages sent now are about. */
+  path?: string
+  /** A coach answer arrived for the position `path`, with these board tags. */
+  onReply?: (path: string, annotations: Annotation[]) => void
+  onShowTag?: ShowChatTag
   /** The conversation so far, when reopening a game. */
   initial?: readonly ChatMessage[]
   /** Told the current Explain action (null when it can't run now), for the X shortcut. */
@@ -33,7 +37,9 @@ const PROGRESS_LABEL: Record<ChatProgress, string> = {
 }
 
 /** Questions about the position on the board, and the Explain button (SPEC_V2 §6). */
-export function ChatPanel({ ask, explain, where, initial = [], onExplainReady }: ChatPanelProps) {
+export function ChatPanel({
+  ask, explain, where, path, initial = [], onExplainReady, onReply, onShowTag,
+}: ChatPanelProps) {
   const id = useId()
   const [messages, setMessages] = useState<ChatMessage[]>(() => [...initial])
   const [draft, setDraft] = useState('')
@@ -41,12 +47,17 @@ export function ChatPanel({ ask, explain, where, initial = [], onExplainReady }:
   const [error, setError] = useState<string | null>(null)
   const busy = progress !== null
 
-  async function send(text: string, run: (onProgress: (p: ChatProgress) => void) => Promise<string>) {
+  async function send(text: string, run: (onProgress: (p: ChatProgress) => void) => Promise<CoachReply>) {
     setError(null)
-    setMessages((previous) => [...previous, { role: 'player', text, where }])
+    const sentFrom = path ?? null
+    setMessages((previous) => [...previous, { role: 'player', text, where, path: sentFrom }])
     try {
       const reply = await run(setProgress)
-      setMessages((previous) => [...previous, { role: 'coach', text: reply }])
+      setMessages((previous) => [
+        ...previous,
+        { role: 'coach', text: reply.text, path: sentFrom, annotations: reply.annotations },
+      ])
+      if (sentFrom !== null) onReply?.(sentFrom, reply.annotations)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Something went wrong.')
     } finally {
@@ -86,14 +97,25 @@ export function ChatPanel({ ask, explain, where, initial = [], onExplainReady }:
             Move to any position and ask about it, or try an idea on the board: “What if I take on e5?”
           </li>
         )}
-        {messages.map((message, index) => (
+        {messages.map((message, index) => {
+          const about = message.path
+          const showTag =
+            onShowTag && about != null
+              ? (annotation: Annotation | null, how: 'hover' | 'click') => onShowTag(about, annotation, how)
+              : undefined
+          return (
           <li key={index}>
             <ChatBubble from={message.role}>
               {message.where && <span className="chat-where">{message.where}</span>}
-              {message.role === 'coach' ? <Markdown>{message.text}</Markdown> : <p>{message.text}</p>}
+              {message.role === 'coach' ? (
+                <CoachText text={message.text} annotations={message.annotations} onShowTag={showTag} />
+              ) : (
+                <p>{message.text}</p>
+              )}
             </ChatBubble>
           </li>
-        ))}
+          )
+        })}
       </ol>
       {progress && <TypingIndicator label={PROGRESS_LABEL[progress]} />}
       {error && (

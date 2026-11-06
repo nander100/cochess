@@ -281,6 +281,7 @@ class TestPositions:
             "text": "Is Bb5 good here?",
             "where": "after 3. Bb5, in your line",
             "annotations": [],
+            "path_uci": VARIATION,
         }
         assert any(r["fen"] == VARIATION_FEN for r in detail["engine_results"])
 
@@ -399,12 +400,14 @@ class TestExplain:
                 "text": "Explain this position",
                 "where": "the start",
                 "annotations": [],
+                "path_uci": [],
             },
             {
                 "role": "coach",
                 "text": "### What has happened\nA calm start.",
                 "where": None,
                 "annotations": [],
+                "path_uci": [],
             },
         ]
         with app.state.session_factory() as session:

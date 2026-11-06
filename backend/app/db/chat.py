@@ -68,6 +68,8 @@ class ChatEntry(BaseModel):
     role: Literal["player", "coach"]
     text: str
     where: str | None = None  # the board position a player's message was sent from
+    # That position's path (UCI); a coach answer has its question's path. None for v1 chats.
+    path_uci: list[str] | None = None
     annotations: list[Annotation] = []  # a coach answer's board tags (SPEC_V3 §6)
 
 
@@ -78,6 +80,7 @@ def chat_history(session: Session, game_id: str) -> list[ChatEntry]:
     stored inside the rendered payload (an instruction line, then JSON with `user_prompt`).
     """
     entries: list[ChatEntry] = []
+    path: list[str] | None = None  # of the latest player message: what the answer is about
     for row in _chat_rows(session, game_id):
         blocks = row.content["blocks"]
         texts = [str(b.get("text", "")) for b in blocks if b.get("type") == "text"]
@@ -88,11 +91,14 @@ def chat_history(session: Session, game_id: str) -> list[ChatEntry]:
             prompt = row.content.get("display") or _player_prompt(texts[0])
             if prompt is not None:
                 where = row.content.get("where")
-                entries.append(ChatEntry(role="player", text=prompt, where=where))
+                path = row.path_uci
+                entries.append(ChatEntry(role="player", text=prompt, where=where, path_uci=path))
         elif not any(b.get("type") == "tool_use" for b in blocks):
             text = row.content.get("display") or "".join(texts)
             annotations = [Annotation.model_validate(a) for a in row.content.get("annotations", [])]
-            entries.append(ChatEntry(role="coach", text=text, annotations=annotations))
+            entries.append(
+                ChatEntry(role="coach", text=text, annotations=annotations, path_uci=path)
+            )
     return entries
 
 

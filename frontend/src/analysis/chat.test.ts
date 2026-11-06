@@ -22,7 +22,7 @@ test('a plain question returns the coach text', async () => {
 
   const reply = await askCoach(deps, 'g1', ASK, (p) => progress.push(p))
 
-  expect(reply).toBe('Good question.')
+  expect(reply).toEqual({ text: 'Good question.', annotations: [] })
   expect(deps.api.sendChat).toHaveBeenCalledWith('g1', ASK, expect.any(Function))
   expect(deps.analyzeDeep).not.toHaveBeenCalled()
   expect(progress).toEqual(['writing'])
@@ -46,7 +46,7 @@ test('an engine request runs the deep dive and sends the results back', async ()
 
   const reply = await askCoach({ api, analyzeDeep }, 'g1', ASK, (p) => progress.push(p))
 
-  expect(reply).toBe('With 14. Nxe5 you win a pawn.')
+  expect(reply).toEqual({ text: 'With 14. Nxe5 you win a pawn.', annotations: [] })
   expect(analyzeDeep).toHaveBeenCalledWith(POSITIONS)
   expect(api.submitEngineResult).toHaveBeenCalledWith(
     'g1',
@@ -83,6 +83,26 @@ test('explain sends the board position and returns the coach text', async () => 
 
   const reply = await explainPosition(deps, 'g1', position, () => {})
 
-  expect(reply).toBe('Here is the position.')
+  expect(reply).toEqual({ text: 'Here is the position.', annotations: [] })
   expect(deps.api.explain).toHaveBeenCalledWith('g1', position, expect.any(Function))
+})
+
+test('board tags arrive as annotation events and come back with the text', async () => {
+  const annotation = {
+    tag_index: 0,
+    char_offset: 4,
+    arrows: [{ orig: 'e2', dest: 'e4', color: 'green' as const }],
+    squares: [],
+  }
+  const api = fakeApi({
+    sendChat: vi.fn(async (_id: string, _request: unknown, emit: Emit) => {
+      emit({ type: 'text', text: 'See [board](cc:board/0).' })
+      emit({ type: 'annotation', annotation })
+      emit({ type: 'done', invalid_moves_removed: [] })
+    }),
+  })
+
+  const reply = await askCoach({ api, analyzeDeep: vi.fn() }, 'g1', ASK, () => {})
+
+  expect(reply).toEqual({ text: 'See [board](cc:board/0).', annotations: [annotation] })
 })

@@ -200,12 +200,19 @@ class TestGameDetail:
             "invalid_moves_removed": ["Nf9"],
         }
         assert detail["chat"] == [  # a v1 conversation: no board positions were recorded
-            {"role": "player", "text": "What if I take on e5?", "where": None, "annotations": []},
+            {
+                "role": "player",
+                "text": "What if I take on e5?",
+                "where": None,
+                "annotations": [],
+                "path_uci": None,
+            },
             {
                 "role": "coach",
                 "text": "The engine says it loses a pawn.",
                 "where": None,
                 "annotations": [],
+                "path_uci": None,
             },
         ]
 

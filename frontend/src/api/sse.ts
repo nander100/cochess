@@ -1,5 +1,7 @@
 // Server-sent events over fetch (EventSource can't POST). Coach endpoints always stream SSE.
 
+import type { Annotation, AnnotationColor } from './types'
+
 export type CoachEvent =
   | { type: 'status'; message: string }
   | { type: 'text'; text: string }
@@ -8,6 +10,8 @@ export type CoachEvent =
   | { type: 'engine_request'; request_id: string; positions: EnginePositionRequest[] }
   /** A critical-moment attempt's grade and the moment's new state, before the coach's text. */
   | { type: 'moment'; grade: string | null; state: string }
+  /** One checked board tag of the reply (SPEC_V3 §11.1), sent after the text. */
+  | { type: 'annotation'; annotation: Annotation }
 
 /** A position the coach wants the deep-dive engine tier to analyze (SPEC §8.3). */
 export interface EnginePositionRequest {
@@ -78,9 +82,36 @@ function toCoachEvent(name: string, payload: unknown): CoachEvent | null {
       return typeof record.state === 'string'
         ? { type: 'moment', grade: typeof record.grade === 'string' ? record.grade : null, state: record.state }
         : null
+    case 'annotation': {
+      const annotation = toAnnotation(record)
+      return annotation ? { type: 'annotation', annotation } : null
+    }
     default:
       return null
   }
+}
+
+const SQUARE = /^[a-h][1-8]$/
+const COLORS: readonly string[] = ['green', 'red', 'yellow', 'blue']
+
+function isColor(value: unknown): value is AnnotationColor {
+  return typeof value === 'string' && COLORS.includes(value)
+}
+
+/** The backend has checked every shape; this only keeps out anything malformed. */
+function toAnnotation(record: Record<string, unknown>): Annotation | null {
+  const { tag_index, char_offset, arrows, squares } = record
+  if (typeof tag_index !== 'number' || typeof char_offset !== 'number') return null
+  if (!Array.isArray(arrows) || !Array.isArray(squares)) return null
+  const okArrows = arrows.filter((a): a is Annotation['arrows'][number] => {
+    const { orig, dest, color } = (a ?? {}) as Record<string, unknown>
+    return typeof orig === 'string' && SQUARE.test(orig) && typeof dest === 'string' && SQUARE.test(dest) && isColor(color)
+  })
+  const okSquares = squares.filter((s): s is Annotation['squares'][number] => {
+    const { square, color } = (s ?? {}) as Record<string, unknown>
+    return typeof square === 'string' && SQUARE.test(square) && isColor(color)
+  })
+  return { tag_index, char_offset, arrows: okArrows, squares: okSquares }
 }
 
 function isPosition(value: unknown): value is EnginePositionRequest {

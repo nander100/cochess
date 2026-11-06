@@ -18,7 +18,8 @@ TASKS: tuple[Task, ...] = (
 )  # fmt: skip
 ANSWERS: dict[Task, str] = {
     "synopsis": "### Overall\nE2E synopsis: a fighting game.",
-    "chat": "E2E chat answer: look at the loose pieces.",
+    # A square highlight is valid on any position, so the board tag is always drawn (SPEC_V3 §6).
+    "chat": 'E2E chat answer: look at the loose pieces. <board squares="d5:blue"/>',
     "explain": "E2E explanation: both sides are developing.",
     "moment_intro": "E2E moment: what would you play here instead?",
     "moment_feedback": "E2E feedback: let's compare your move with the engine's.",

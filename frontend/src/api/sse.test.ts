@@ -55,3 +55,32 @@ test('ignores unknown events and malformed data', async () => {
 
   expect(events).toEqual([])
 })
+
+test('an annotation event keeps only well-formed shapes', async () => {
+  const data = {
+    tag_index: 0,
+    char_offset: 8,
+    arrows: [
+      { orig: 'b1', dest: 'c3', color: 'green' },
+      { orig: 'z9', dest: 'c3', color: 'green' },
+      { orig: 'b1', dest: 'c3', color: 'purple' },
+    ],
+    squares: [{ square: 'e4', color: 'blue' }, { square: 'e4' }],
+  }
+  const events = await collect(
+    `event: annotation\ndata: ${JSON.stringify(data)}\n\n`,
+    'event: annotation\ndata: {"tag_index": "0", "arrows": [], "squares": []}\n\n',
+  )
+
+  expect(events).toEqual([
+    {
+      type: 'annotation',
+      annotation: {
+        tag_index: 0,
+        char_offset: 8,
+        arrows: [{ orig: 'b1', dest: 'c3', color: 'green' }],
+        squares: [{ square: 'e4', color: 'blue' }],
+      },
+    },
+  ])
+})

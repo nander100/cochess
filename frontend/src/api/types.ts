@@ -166,6 +166,28 @@ export interface ChatEntry {
   text: string
   /** Where on the board a player's message was sent from ("after 14. Nf3"); null for v1 chats. */
   where: string | null
+  /** That position's UCI path; a coach answer has its question's path. Null for v1 chats. */
+  path_uci?: string[] | null
+  /** A coach answer's board tags (SPEC_V3 §6). */
+  annotations?: Annotation[]
+}
+
+/** The coach's colors for arrows and highlights (SPEC_V3 §6.1). */
+export type AnnotationColor = 'green' | 'red' | 'yellow' | 'blue'
+
+/** One checked board tag from a coach message: drawn on the position the message is about. Its
+ * placeholder link `cc:board/{tag_index}` starts at `char_offset` in the message's text. */
+export interface Annotation {
+  tag_index: number
+  char_offset: number
+  arrows: { orig: string; dest: string; color: AnnotationColor }[]
+  squares: { square: string; color: AnnotationColor }[]
+}
+
+/** A coach answer: its text (board tags as `cc:board/N` placeholder links) and their shapes. */
+export interface CoachReply {
+  text: string
+  annotations: Annotation[]
 }
 
 /** A chat message or Explain request: the board position as UCI moves from the start
@@ -187,6 +209,8 @@ export interface MomentMessage {
   role: 'player' | 'coach'
   text: string
   kind: string
+  /** A coach message's board tags, on the moment's position (SPEC_V3 §6). */
+  annotations?: Annotation[]
 }
 
 /** A critical moment and the player's progress on it. The best move is only there once the

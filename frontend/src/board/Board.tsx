@@ -1,10 +1,13 @@
 import { Chessground } from '@lichess-org/chessground'
 import type { Api } from '@lichess-org/chessground/api'
+import type { DrawBrushes } from '@lichess-org/chessground/draw'
 import '@lichess-org/chessground/assets/chessground.base.css'
 import '@lichess-org/chessground/assets/chessground.cburnett.css'
 import { useEffect, useRef } from 'react'
-import type { Color } from '../api/types'
+import type { Annotation, Color } from '../api/types'
+import { useTheme } from '../theme/themeContext'
 import './board.css'
+import { coachBrushes, toShapes } from './coachShapes'
 import { boardConfig, isPromotion } from './rules'
 import { playMoveSound } from './sound'
 
@@ -24,10 +27,17 @@ interface BoardProps {
   onMove: (move: BoardMove) => void
   /** Play a short sound when a move appears on the board (Settings: sounds on move). */
   sound?: boolean
+  /** The coach's checked arrows and highlights for this position (SPEC_V3 §6.3). Drawn as
+   * chessground auto-shapes, so the player's own right-click drawings stay separate. */
+  annotations?: readonly Annotation[]
 }
 
+const NO_ANNOTATIONS: readonly Annotation[] = []
+
 /** The chessground board. chess.js supplies the legal moves; chessground only draws and drags. */
-export function Board({ fen, orientation, lastMove, movable, onMove, sound = false }: BoardProps) {
+export function Board({
+  fen, orientation, lastMove, movable, onMove, sound = false, annotations = NO_ANNOTATIONS,
+}: BoardProps) {
   const element = useRef<HTMLDivElement>(null)
   const api = useRef<Api | null>(null)
   // The latest callback, so chessground's handler (bound once per position) is never stale.
@@ -54,6 +64,14 @@ export function Board({ fen, orientation, lastMove, movable, onMove, sound = fal
       }),
     )
   }, [fen, orientation, lastMove, movable])
+
+  // The coach's shapes, in the current theme's chess-meaning colors.
+  const { theme } = useTheme()
+  useEffect(() => {
+    // chessground deep-merges config, so this adds the coach brushes to its own four.
+    api.current?.set({ drawable: { brushes: coachBrushes() as unknown as DrawBrushes } })
+    api.current?.setAutoShapes(toShapes(annotations))
+  }, [annotations, theme, fen])
 
   // A sound for each new move shown (not on first render, nor when only the orientation changes).
   const shownMove = useRef(lastMove)

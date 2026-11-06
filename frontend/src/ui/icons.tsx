@@ -98,3 +98,11 @@ export const MoreIcon = (p: IconProps) => (
     <path d="M5 12h.01M12 12h.01M19 12h.01" />
   </Icon>
 )
+
+/** A small board with an arrow: where a coach message draws on the board (SPEC_V3 §6.3). */
+export const BoardArrowIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M8 16l8-8M11 8h5v5" />
+  </Icon>
+)

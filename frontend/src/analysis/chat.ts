@@ -1,6 +1,6 @@
 import type { ApiClient } from '../api/client'
 import type { CoachEvent, EnginePositionRequest } from '../api/sse'
-import type { ChatRequest, EngineResult, PositionRequest } from '../api/types'
+import type { Annotation, ChatRequest, CoachReply, EngineResult, PositionRequest } from '../api/types'
 
 /** looking: the engine analyzes the board position first; writing: the coach is answering;
  * thinking: the coach asked the engine for a deeper look (a deep-dive). */
@@ -22,7 +22,7 @@ export async function askCoach(
   gameId: string,
   request: ChatRequest,
   onProgress: (progress: ChatProgress) => void,
-): Promise<string> {
+): Promise<CoachReply> {
   onProgress('writing')
   let outcome = await collect((onEvent) => deps.api.sendChat(gameId, request, onEvent))
   while (outcome.kind === 'engine') {
@@ -34,7 +34,7 @@ export async function askCoach(
       deps.api.submitEngineResult(gameId, requestId, results, onEvent),
     )
   }
-  return outcome.text
+  return outcome.reply
 }
 
 /** Explain the position on the board (SPEC_V2 §6.3). No engine round trip: the position's lines
@@ -44,28 +44,30 @@ export async function explainPosition(
   gameId: string,
   request: PositionRequest,
   onProgress: (progress: ChatProgress) => void,
-): Promise<string> {
+): Promise<CoachReply> {
   onProgress('writing')
   const outcome = await collect((onEvent) => deps.api.explain(gameId, request, onEvent))
   if (outcome.kind !== 'text') throw new Error('The coach asked for an engine analysis while explaining.')
-  return outcome.text
+  return outcome.reply
 }
 
 type Outcome =
-  | { kind: 'text'; text: string }
+  | { kind: 'text'; reply: CoachReply }
   | { kind: 'engine'; requestId: string; positions: EnginePositionRequest[] }
 
 async function collect(
   run: (onEvent: (event: CoachEvent) => void) => Promise<void>,
 ): Promise<Outcome> {
-  const state: { text: string; outcome: Outcome | null; error: string | null } = {
+  const state: { text: string; annotations: Annotation[]; outcome: Outcome | null; error: string | null } = {
     text: '',
+    annotations: [],
     outcome: null,
     error: null,
   }
   await run((event) => {
     if (event.type === 'text') state.text += event.text
-    else if (event.type === 'done') state.outcome = { kind: 'text', text: state.text }
+    else if (event.type === 'annotation') state.annotations.push(event.annotation)
+    else if (event.type === 'done') state.outcome = { kind: 'text', reply: { text: state.text, annotations: state.annotations } }
     else if (event.type === 'error') state.error = event.message
     else if (event.type === 'engine_request') {
       state.outcome = { kind: 'engine', requestId: event.request_id, positions: event.positions }

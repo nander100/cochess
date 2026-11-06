@@ -1,7 +1,7 @@
 import { Chess } from 'chess.js'
 import type { ApiClient } from '../api/client'
 import type { CoachEvent } from '../api/sse'
-import type { EngineResult, MomentGrade, MomentState } from '../api/types'
+import type { Annotation, EngineResult, MomentGrade, MomentState } from '../api/types'
 import { isGameOver } from '../engine/live'
 
 /** checking: the engine is analyzing the move; writing: the coach is answering. */
@@ -15,6 +15,8 @@ export interface MomentDeps {
 
 export interface MomentReply {
   text: string
+  /** Board tags on the moment's position (SPEC_V3 §6). */
+  annotations: Annotation[]
   /** Set after an attempt: how the engine graded it, and the moment's new state. */
   grade: MomentGrade | null
   state: MomentState | null
@@ -108,8 +110,16 @@ export async function coachStep(
 }
 
 async function collect(run: (onEvent: (event: CoachEvent) => void) => Promise<void>): Promise<MomentReply> {
-  const reply: { text: string; done: boolean; error: string | null; grade: MomentGrade | null; state: MomentState | null } = {
+  const reply: {
+    text: string
+    annotations: Annotation[]
+    done: boolean
+    error: string | null
+    grade: MomentGrade | null
+    state: MomentState | null
+  } = {
     text: '',
+    annotations: [],
     done: false,
     error: null,
     grade: null,
@@ -117,6 +127,7 @@ async function collect(run: (onEvent: (event: CoachEvent) => void) => Promise<vo
   }
   await run((event) => {
     if (event.type === 'text') reply.text += event.text
+    else if (event.type === 'annotation') reply.annotations.push(event.annotation)
     else if (event.type === 'done') reply.done = true
     else if (event.type === 'error') reply.error = event.message
     else if (event.type === 'moment') {
@@ -126,5 +137,5 @@ async function collect(run: (onEvent: (event: CoachEvent) => void) => Promise<vo
   })
   if (reply.error !== null) throw new Error(reply.error)
   if (!reply.done) throw new Error('The connection to the coach was lost.')
-  return { text: reply.text, grade: reply.grade, state: reply.state }
+  return { text: reply.text, annotations: reply.annotations, grade: reply.grade, state: reply.state }
 }
