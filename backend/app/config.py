@@ -116,6 +116,19 @@ class CoachSettings(BaseModel):
     keepalive_s: float = 10
 
 
+class PlaybackSettings(BaseModel):
+    """Where line playback stops (SPEC_V3 §9.6) and how its caption words the result."""
+
+    settle_win_pct: float = 10  # win% points moved since the start of the line
+    settle_material: int = 2  # material points changed since the start of the line
+    settle_min_plies: int = 2  # so the reply is always shown
+    settle_min_plies_after_try: int = 3  # refutation/candidate: two plies after the player's move
+    # Caption words for the side ahead, by its win%: winning, clearly better, slightly better.
+    winning_pct: float = 85
+    clearly_better_pct: float = 70
+    slightly_better_pct: float = 58
+
+
 class MomentSettings(BaseModel):
     """Critical moments (SPEC_V2 §8): which moves become exercises, and how they're graded."""
 
@@ -205,6 +218,7 @@ class Settings(BaseSettings):
     coach: CoachSettings = CoachSettings()
     limits: Limits = Limits()
     moments: MomentSettings = MomentSettings()
+    playback: PlaybackSettings = PlaybackSettings()
     tendencies: TendencySettings = TendencySettings()
     onboarding: OnboardingSettings = OnboardingSettings()
 
