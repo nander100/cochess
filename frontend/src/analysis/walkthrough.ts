@@ -6,21 +6,22 @@ import { isGameOver } from '../engine/live'
 
 /** The most moves a walkthrough covers (mirrors backend CoachSettings.walkthrough_max_plies). */
 export const WALK_MAX_PLIES = 10
-const NEEDS_SCAN = 428 // the backend has no walkthrough of this line yet: scan it first
+const NEEDS_SCAN = 428 // the backend has no walkthrough of this line yet: analyze it first
 
 /** scanning: the engine checks each position of the line; writing: the coach is answering. */
 export type WalkthroughProgress = { kind: 'scanning'; done: number; total: number } | { kind: 'writing' }
 
 export interface WalkthroughDeps {
   api: ApiClient
-  /** The scan tier on one position (SPEC_V3 §7.2 step 2). */
-  scan(fen: string): Promise<EngineResult>
+  /** The verify tier on one position: SPEC_V3 §7.2 step 2 says scan, but its shallow evals
+   * misled the coach (owner decision at M4, PLAN_V3). */
+  search(fen: string): Promise<EngineResult>
 }
 
 /**
  * Walk through `line` from `startPath` (SPEC_V3 §7.2). A line walked before comes straight from
- * the backend's cache; otherwise every position along it that can be searched is scanned here,
- * with progress, and sent with the request.
+ * the backend's cache; otherwise every position along it that can be searched is analyzed here
+ * (verify tier), with progress, and sent with the request.
  */
 export async function walkThrough(
   deps: WalkthroughDeps,
@@ -40,7 +41,7 @@ export async function walkThrough(
   const results: EngineResult[] = []
   for (const [done, fen] of fens.entries()) {
     onProgress({ kind: 'scanning', done, total: fens.length })
-    results.push(await deps.scan(fen))
+    results.push(await deps.search(fen))
   }
   onProgress({ kind: 'writing' })
   return request(deps.api, gameId, { ...body, step_results: results })

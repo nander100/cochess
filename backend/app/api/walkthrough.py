@@ -153,11 +153,9 @@ def _checked_results(
 ) -> dict[str, EngineResult]:
     """One checked search per position that can be searched (checkmate and stalemate are
     scored from the board), keyed by the replayed FEN."""
-    tiers: dict[Tier, EngineTier] = {
-        "scan": settings.engine.scan,
-        "verify": settings.engine.verify,
-        "deep": settings.engine.deep,
-    }
+    # Verify or deeper: SPEC_V3 §7.2 says scan, but scan evals were too shallow to explain a line
+    # (owner decision at M4).
+    tiers: dict[Tier, EngineTier] = {"verify": settings.engine.verify, "deep": settings.engine.deep}
     by_key = {position_key(r.fen): r for r in results}
     checked: dict[str, EngineResult] = {}
     for fen in fens:

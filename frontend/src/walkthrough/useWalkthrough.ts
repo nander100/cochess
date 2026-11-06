@@ -41,9 +41,9 @@ export function useWalkthrough(
   const [walk, setWalk] = useState<WalkState | null>(null)
   const deps: WalkthroughDeps = {
     api,
-    async scan(fen) {
+    async search(fen) {
       const { engine, config } = await loadEngine()
-      return engine.analyze({ fen, ply: null }, 'scan', config.scan)
+      return engine.analyze({ fen, ply: null }, 'verify', config.verify)
     },
   }
   // Each request has a number, so a late answer to one that was closed or replaced is ignored.

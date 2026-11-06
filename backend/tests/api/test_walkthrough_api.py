@@ -38,7 +38,7 @@ def fens(start: list[str], line: list[str]) -> list[str]:
 
 
 def scans(start: list[str] = START, line: list[str] = LINE) -> list[dict[str, Any]]:
-    return [fake_result(fen, "scan", plies=1) for fen in fens(start, line)]
+    return [fake_result(fen, "verify", lines=4, plies=10) for fen in fens(start, line)]
 
 
 def tool(steps: list[dict[str, Any]], intro: str = "A calm developing line.") -> ToolCall:
@@ -168,6 +168,8 @@ def test_bad_requests_are_refused_before_the_coach_is_called() -> None:
     assert ask(client, game_id, step_results=scans()[:2]).status_code == 428  # not all scanned
     deep = [fake_result(fen, "deep", plies=1, lines=9) for fen in fens(START, LINE)]
     assert ask(client, game_id, step_results=deep).status_code == 422  # more lines than allowed
+    shallow = [fake_result(fen, "scan", plies=1) for fen in fens(START, LINE)]
+    assert ask(client, game_id, step_results=shallow).status_code == 422  # verify or deeper
     assert fake.requests == []
 
 

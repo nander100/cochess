@@ -8,14 +8,14 @@ const START = ['e2e4', 'e7e5']
 const LINE = ['g1f3', 'b8c6']
 
 function scanOf(fen: string): EngineResult {
-  return { ply: null, fen, tier: 'scan', depth: 12, time_ms: 250, lines: [] }
+  return { ply: null, fen, tier: 'verify', depth: 18, time_ms: 1500, lines: [] }
 }
 
 test('a line walked before comes from the cache, with no engine work', async () => {
   const api = fakeApi()
   const scan = vi.fn()
 
-  const walk = await walkThrough({ api, scan }, 'g1', START, LINE, () => {})
+  const walk = await walkThrough({ api, search: scan }, 'g1', START, LINE, () => {})
 
   expect(walk.steps.map((s) => s.san)).toEqual(['Nf3', 'Nc6'])
   expect(scan).not.toHaveBeenCalled()
@@ -39,7 +39,7 @@ test('a new line is scanned position by position, with progress, then sent', asy
   const scan = vi.fn(async (fen: string) => scanOf(fen))
   const progress: WalkthroughProgress[] = []
 
-  await walkThrough({ api, scan }, 'g1', START, LINE, (p) => progress.push(p))
+  await walkThrough({ api, search: scan }, 'g1', START, LINE, (p) => progress.push(p))
 
   const fens = positionsAlong(START, LINE)
   expect(scan.mock.calls.map(([fen]) => fen)).toEqual(fens)
@@ -63,7 +63,7 @@ test('checkmate and stalemate positions are not scanned', async () => {
   })
   const scan = vi.fn(async (fen: string) => scanOf(fen))
   // Fool's mate: 1. f3 e5 2. g4 Qh4#.
-  await walkThrough({ api, scan }, 'g1', ['f2f3', 'e7e5', 'g2g4'], ['d8h4'], () => {})
+  await walkThrough({ api, search: scan }, 'g1', ['f2f3', 'e7e5', 'g2g4'], ['d8h4'], () => {})
 
   expect(scan).toHaveBeenCalledTimes(1)
 })
@@ -74,13 +74,13 @@ test('a coach error or any other refusal is thrown as a readable message', async
       emit({ type: 'error', message: "The coach couldn't put this walkthrough together. Please try again." })
     }),
   })
-  await expect(walkThrough({ api: failing, scan: vi.fn() }, 'g1', START, LINE, () => {})).rejects.toThrow(
+  await expect(walkThrough({ api: failing, search: vi.fn() }, 'g1', START, LINE, () => {})).rejects.toThrow(
     "couldn't put this walkthrough together",
   )
 
   const withheld = fakeApi({ walkthrough: vi.fn(async () => { throw new ApiError(409, 'Solve or reveal this critical moment first.') }) })
-  await expect(walkThrough({ api: withheld, scan: vi.fn() }, 'g1', START, LINE, () => {})).rejects.toThrow('Solve or reveal')
+  await expect(walkThrough({ api: withheld, search: vi.fn() }, 'g1', START, LINE, () => {})).rejects.toThrow('Solve or reveal')
 
   const silent = fakeApi({ walkthrough: vi.fn(async () => {}) })
-  await expect(walkThrough({ api: silent, scan: vi.fn() }, 'g1', START, LINE, () => {})).rejects.toThrow('connection')
+  await expect(walkThrough({ api: silent, search: vi.fn() }, 'g1', START, LINE, () => {})).rejects.toThrow('connection')
 })
