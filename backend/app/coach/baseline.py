@@ -156,7 +156,8 @@ async def generate_baseline(
     )
 
     # The report covers several games, not one board position: no board tags or line links.
-    rules = Rules(allowed=frozenset(allowed), limits=settings.coach)
+    plain = payload.player.detail_level == "plain"
+    rules = Rules(allowed=frozenset(allowed), limits=settings.coach, words_only_evals=plain)
     reply = await _call(client, request, sessions, user_id)
     done = process(reply.text, rules)
     if done.problems.any:

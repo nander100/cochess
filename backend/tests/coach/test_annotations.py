@@ -304,3 +304,7 @@ def test_listed_shapes_follow_the_same_rules_and_a_square_in_the_arrows_list_is_
         ("step 2", "b7b6:green", "not_in_data")
     ]
     assert check_shapes([], [], FACTS, LIMITS, label="step 1") == (None, [])
+
+
+def test_shapes_separated_by_spaces_are_read_too() -> None:
+    assert check("c4f7:red f3e5:red") == ["c4f7:red", "f3e5:red"]

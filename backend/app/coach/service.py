@@ -79,7 +79,10 @@ async def generate_synopsis(
 
     # The synopsis is about the whole game, not one board position: no board tags. Its line
     # links name the key moments (km<N>).
-    rules = Rules(allowed=frozenset(allowed), limits=settings.coach, lines=lines)
+    rules = Rules(
+        allowed=frozenset(allowed), limits=settings.coach, lines=lines,
+        words_only_evals=player.detail_level == "plain",
+    )  # fmt: skip
     reply = await _call(client, request, sessions, game_id)
     done = process(reply.text, rules)
     if done.problems.any:

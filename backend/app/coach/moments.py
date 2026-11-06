@@ -413,6 +413,7 @@ async def answer(
 
 def _rules(call: MomentCall, settings: Settings) -> Rules:
     return Rules(
+        words_only_evals=call.payload.player.detail_level == "plain",
         allowed=call.allowed,
         limits=settings.coach,
         banned=frozenset(normalize(move) for move in call.banned),

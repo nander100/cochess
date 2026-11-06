@@ -254,7 +254,10 @@ def _check(
 def _process(output: _ToolOutput, call: WalkthroughCall, settings: Settings) -> list[Processed]:
     """The intro, each step's text and the summary, through the markup checks (SPEC_V3 §9.4):
     move tags only, from the data, with the right numbers, one at a time."""
-    rules = Rules(allowed=call.allowed, limits=settings.coach, numbering=call.numbering)
+    rules = Rules(
+        allowed=call.allowed, limits=settings.coach, numbering=call.numbering,
+        words_only_evals=call.payload.player.detail_level == "plain",
+    )  # fmt: skip
     texts = [output.intro, *(step.text for step in output.steps), output.summary]
     return [process(text, rules) for text in texts]
 

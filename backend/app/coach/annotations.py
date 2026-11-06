@@ -275,7 +275,8 @@ def _check_tokens(
 
 
 def _tokens(value: str) -> list[str]:
-    return [token.strip() for token in value.split(",") if token.strip()]
+    """Shapes separated by commas (the format) or spaces (a common slip)."""
+    return [token for token in re.split(r"[,\s]+", value) if token]
 
 
 def _parse_arrow(token: str) -> Arrow | None:

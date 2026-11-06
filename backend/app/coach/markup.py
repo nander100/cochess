@@ -102,6 +102,8 @@ class Rules:
     lines: Mapping[str, ResolvedLine] = field(default_factory=dict)
     withheld: frozenset[str] = frozenset()
     max_links: int = 3
+    # Plain detail level (SPEC_V3 §9.3): evaluations only in words, so a number is a problem.
+    words_only_evals: bool = False
 
 
 @dataclass
@@ -113,6 +115,7 @@ class Problems:
     misnumbered: list[str] = field(default_factory=list)
     line_leaks: list[str] = field(default_factory=list)  # line links that would reveal
     annotation_leak: bool = False
+    evals: list[str] = field(default_factory=list)  # numbers where only words belong (Plain)
 
     @property
     def leaked(self) -> bool:
@@ -120,7 +123,9 @@ class Problems:
 
     @property
     def any(self) -> bool:
-        return bool(self.invalid or self.bare or self.runs or self.misnumbered or self.leaked)
+        return bool(
+            self.invalid or self.bare or self.runs or self.misnumbered or self.leaked or self.evals
+        )
 
 
 @dataclass(frozen=True)
@@ -176,12 +181,17 @@ def process(text: str, rules: Rules) -> Processed:
             _line(line, out)
         elif BOARD_TAG.fullmatch(tag):
             _board(tag, text[match.end() : match.end() + 1], out)
+        elif tag.startswith("`") and (inner := MOVE_TAG.search(tag)) is not None:
+            # A tag put in code formatting ("`{{move:a4}}`"): the tag counts, the backticks go.
+            _move(_with_number(inner["body"], out), match.start(), match.end(), out)
         elif tag.startswith("`"):
             _code(tag, match.start(), match.end(), out)
         else:
             out.dropped.append(Dropped(tag=tag, reason="malformed"))  # an unknown {{...}} tag
         last = match.end()
     _plain(last, len(text), out)
+    if rules.words_only_evals:
+        _words_only(out)
     return Processed(
         text="".join(out.text),
         raw="".join(out.raw),
@@ -212,6 +222,25 @@ def _plain(start: int, end: int, out: _Out) -> None:
         _move(body, start + token_start, start + token_end, out)
         cursor = token_end
     out.plain(segment[cursor:])
+
+
+_EVAL = re.compile(
+    r"\s?\((?:about |roughly )?[+-]?(?:\d+\.\d|M\d+)\)|(?<![\w.])[+-](?:\d+\.\d|M\d+)\b"
+)
+
+
+def _words_only(out: _Out) -> None:
+    """Plain level: evaluation numbers are a problem; in parentheses they're taken out."""
+    for i, piece in enumerate(out.text):
+        if "(cc:" in piece:
+            continue  # a placeholder, not prose
+        found = _EVAL.findall(piece)
+        if not found:
+            continue
+        out.problems.evals += [f.strip() for f in found if f.strip() not in out.problems.evals]
+        cleaned = re.sub(r"\s?\((?:about |roughly )?[+-]?(?:\d+\.\d|M\d+)\)", "", piece)
+        out.text[i] = cleaned
+        out.raw[i] = cleaned
 
 
 def _code(span: str, start: int, end: int, out: _Out) -> None:
@@ -381,6 +410,11 @@ def note(problems: Problems) -> str:
             # The example names no real move: any real one could be the answer to a moment.
             "Write every move as a move tag, {{move:SAN}} with the move as the data writes it, "
             f"never as plain notation in the text{wrote}."
+        )
+    if problems.evals:
+        parts.append(
+            "The player's detail level is plain: describe evaluations only in words, never as "
+            f"numbers (you wrote: {', '.join(problems.evals)})."
         )
     if problems.runs:
         parts.append(

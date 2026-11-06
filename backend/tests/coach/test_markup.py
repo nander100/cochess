@@ -195,3 +195,20 @@ def test_a_move_that_begins_a_sentence_is_marked() -> None:
     )
 
     assert [m.sentence_start for m in done.moves] == [True, False, True, True]
+
+
+def test_a_move_tag_in_code_formatting_still_counts() -> None:
+    done = process("The best move is `{{move:Nf3}}`, not `{{move:Qh5}}`.", RULES)
+
+    assert done.text == f"The best move is [knight to f3](cc:move/0), not {REMOVED}."
+    assert done.problems.invalid == ["Qh5"] and done.problems.bare == []
+
+
+def test_at_the_plain_level_evaluation_numbers_are_a_problem_and_bracketed_ones_go() -> None:
+    plain = Rules(ALLOWED, LIMITS, words_only_evals=True)
+    done = process("You were slightly better (+0.6), then -1.1 after {{move:Nf3}}.", plain)
+
+    assert done.problems.evals == ["(+0.6)", "-1.1"]
+    assert done.text.startswith("You were slightly better, then -1.1 after")
+    assert "plain" in note(done.problems)
+    assert not process("You were slightly better (+0.6).", RULES).problems.any  # other levels

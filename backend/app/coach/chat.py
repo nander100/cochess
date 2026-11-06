@@ -73,6 +73,7 @@ from app.db.coach import load_synopsis, record_usage
 from app.db.engine_results import load_position_result, load_summary, save_results
 from app.db.line_links import save_line_links
 from app.db.models import Game, PendingToolCallRow
+from app.db.user_settings import effective_detail_level
 
 logger = logging.getLogger(__name__)
 
@@ -383,6 +384,7 @@ def _rules(session: Session, settings: Settings, context: _Context, board: Resol
         after = load_position_result(session, context.game_id, fen_after)
     plies = settings.coach.line_link_max_plies
     return Rules(
+        words_only_evals=effective_detail_level(session, context.user_id) == "plain",
         allowed=frozenset(allowed),
         limits=settings.coach,
         facts=board_facts(session, settings, context, board),
