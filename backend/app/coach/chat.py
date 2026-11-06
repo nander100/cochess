@@ -385,6 +385,7 @@ def _rules(session: Session, settings: Settings, context: _Context, board: Resol
     plies = settings.coach.line_link_max_plies
     return Rules(
         words_only_evals=effective_detail_level(session, context.user_id) == "plain",
+        puzzles=settings.puzzles,
         allowed=frozenset(allowed),
         limits=settings.coach,
         facts=board_facts(session, settings, context, board),

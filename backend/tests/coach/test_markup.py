@@ -155,7 +155,7 @@ def test_a_board_tag_that_leaks_is_a_problem() -> None:
 
 
 def test_unknown_curly_tags_are_dropped() -> None:
-    done = process("A {{puzzle:fork}} idea.", RULES)
+    done = process("A {{quiz:fork}} idea.", RULES)
     assert done.text == "A  idea." and done.dropped[0].reason == "malformed"
 
 
@@ -212,3 +212,18 @@ def test_at_the_plain_level_evaluation_numbers_are_a_problem_and_bracketed_ones_
     assert done.text.startswith("You were slightly better, then -1.1 after")
     assert "plain" in note(done.problems)
     assert not process("You were slightly better (+0.6).", RULES).problems.any  # other levels
+
+
+def test_a_puzzle_tag_becomes_a_chip_for_an_allowed_theme_only() -> None:
+    done = process(
+        "Practice {{puzzle:fork}} and {{puzzle:DiscoveredAttack}}, not {{puzzle:magic}}.", RULES
+    )
+
+    assert [(p.theme, p.label, p.url) for p in done.puzzles] == [
+        ("fork", "Fork", "https://lichess.org/training/fork"),
+        ("discoveredAttack", "Discovered attack", "https://lichess.org/training/discoveredAttack"),
+    ]
+    assert done.text == "Practice [Fork](cc:puzzle/0) and [Discovered attack](cc:puzzle/1), not."
+    assert [d.reason for d in done.dropped] == ["unknown_puzzle"]
+    assert done.raw == "Practice {{puzzle:fork}} and {{puzzle:discoveredAttack}}, not."
+    assert not done.problems.any

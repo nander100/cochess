@@ -27,7 +27,7 @@ from app.coach.annotations import (
     trim_before,
 )
 from app.coach.validate import FULL_SAN, NUMBER_BEFORE, REMOVED, move_tokens, normalize
-from app.config import CoachSettings
+from app.config import CoachSettings, PuzzleSettings
 
 LineKind = Literal["engine", "refutation", "candidate", "best", "variation"]
 
@@ -40,6 +40,7 @@ _ANY_TAG = re.compile(r"\{\{[^{}]*\}\}|<\s*/?\s*board\b[^<>]*>|`[^`\n]+`", re.IG
 _CODE_MOVE = re.compile(r"^`\s*((?:\d+\s*(?:\.\.\.|…|\.)\s*)?(\S+?))\s*`$")
 # A move's words begin a sentence after these (and at the start, or a list item).
 _SENTENCE_END = (".", "!", "?", ":", "\n", "-")
+PUZZLE_TAG = re.compile(r"\{\{\s*puzzle\s*:\s*(?P<theme>[^{}|]*?)\s*\}\}", re.IGNORECASE)
 _NUMBERED = re.compile(r"^(?P<number>\d+)\s*(?P<dots>\.\.\.|…|\.)\s*(?P<san>\S+)$")
 _REF = re.compile(r"^(here|km\d+)\.(engine[1-4]|refutation|candidate|best|variation)$")
 # Between two moves "in a row": nothing but spaces, punctuation and move numbers.
@@ -68,6 +69,16 @@ class LineLink(BaseModel):
     moves_uci: list[str]
 
 
+class PuzzleToken(BaseModel):
+    """A recommended puzzle theme (SPEC_V3 §8.2): a chip linking to Lichess's puzzle trainer."""
+
+    index: int
+    char_offset: int
+    theme: str  # the Lichess slug, e.g. "discoveredAttack"
+    label: str  # "Discovered attack"
+    url: str
+
+
 class MessageTokens(BaseModel):
     """A coach message's structured parts, tied to placeholders in its text: stored with the
     message so it shows the same when reloaded (SPEC_V3 §11.2)."""
@@ -75,6 +86,7 @@ class MessageTokens(BaseModel):
     moves: list[MoveToken] = []
     line_links: list[LineLink] = []
     annotations: list[Annotation] = []
+    puzzles: list[PuzzleToken] = []
 
 
 @dataclass(frozen=True)
@@ -104,6 +116,7 @@ class Rules:
     max_links: int = 3
     # Plain detail level (SPEC_V3 §9.3): evaluations only in words, so a number is a problem.
     words_only_evals: bool = False
+    puzzles: PuzzleSettings = field(default_factory=PuzzleSettings)
 
 
 @dataclass
@@ -135,14 +148,18 @@ class Processed:
     moves: list[MoveToken]
     line_links: list[LineLink]
     annotations: list[Annotation]
-    dropped: list[Dropped]  # board-tag shapes and line links that weren't kept
+    puzzles: list[PuzzleToken]
+    dropped: list[Dropped]  # board-tag shapes, line links and puzzle tags that weren't kept
     removed: list[str]  # moves taken out of the text
     problems: Problems
 
     @property
     def tokens(self) -> MessageTokens:
         return MessageTokens(
-            moves=self.moves, line_links=self.line_links, annotations=self.annotations
+            moves=self.moves,
+            line_links=self.line_links,
+            annotations=self.annotations,
+            puzzles=self.puzzles,
         )
 
 
@@ -155,6 +172,7 @@ class _Out:
     moves: list[MoveToken] = field(default_factory=list)
     links: list[LineLink] = field(default_factory=list)
     annotations: list[Annotation] = field(default_factory=list)
+    puzzles: list[PuzzleToken] = field(default_factory=list)
     dropped: list[Dropped] = field(default_factory=list)
     removed: list[str] = field(default_factory=list)
     problems: Problems = field(default_factory=Problems)
@@ -179,6 +197,8 @@ def process(text: str, rules: Rules) -> Processed:
             _move(_with_number(move["body"], out), match.start(), match.end(), out)
         elif (line := LINE_TAG.fullmatch(tag)) is not None:
             _line(line, out)
+        elif (puzzle := PUZZLE_TAG.fullmatch(tag)) is not None:
+            _puzzle(puzzle, text[match.end() : match.end() + 1], out)
         elif BOARD_TAG.fullmatch(tag):
             _board(tag, text[match.end() : match.end() + 1], out)
         elif tag.startswith("`") and (inner := MOVE_TAG.search(tag)) is not None:
@@ -198,6 +218,7 @@ def process(text: str, rules: Rules) -> Processed:
         moves=out.moves,
         line_links=out.links,
         annotations=out.annotations,
+        puzzles=out.puzzles,
         dropped=out.dropped,
         removed=out.removed,
         problems=out.problems,
@@ -371,6 +392,25 @@ def _label(label: str, out: _Out) -> str:
         last = end
     pieces.append(label[last:])
     return " ".join("".join(pieces).split())
+
+
+def _puzzle(match: re.Match[str], after: str, out: _Out) -> None:
+    """Only themes from the allowed list (SPEC_V3 §8.2); anything else is dropped and logged."""
+    wanted = match["theme"].strip()
+    themes = out.rules.puzzles.themes
+    slug = next((s for s in themes if s.lower() == wanted.lower()), None)
+    if slug is None:
+        out.dropped.append(Dropped(tag=match.group(0), reason="unknown_puzzle"))
+        if out.text:
+            out.text[-1] = out.raw[-1] = trim_before(out.text[-1], after)
+        return
+    index = len(out.puzzles)
+    url = out.rules.puzzles.url.format(slug=slug)
+    out.puzzles.append(
+        PuzzleToken(index=index, char_offset=out.offset, theme=slug, label=themes[slug], url=url)
+    )
+    out.text.append(f"[{themes[slug]}](cc:puzzle/{index})")
+    out.raw.append(f"{{{{puzzle:{slug}}}}}")
 
 
 def _board(tag: str, after: str, out: _Out) -> None:

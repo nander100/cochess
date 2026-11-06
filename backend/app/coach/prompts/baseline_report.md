@@ -17,7 +17,7 @@ The top 3, taken from `player.tendencies` (worst first). For each: what it is in
 What they play as White and as Black, and whether it's working: results and opening accuracy only. `baseline.openings` has the counts already: quote its `games`, `wins`, `losses` and `opening_accuracy`, and don't count games yourself. Don't recommend new lines or recite theory that isn't in the data.
 
 ### Your plan for the next 2–4 weeks
-A short weekly plan (2–4 bullet points) built on the three things to work on, with puzzle themes from the allowed list.
+A short weekly plan (2–4 bullet points) built on the three things to work on, with puzzle themes from the allowed list as puzzle tags.
 
 ### Your turn
 One question inviting them to open one of the example games and step through its critical moments.

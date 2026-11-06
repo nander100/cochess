@@ -225,6 +225,7 @@ def text_events(text: str, removed: list[str], tokens: MessageTokens | None = No
         *(sse.event("move", m.model_dump()) for m in parts.moves),
         *(sse.event("line_link", link.model_dump()) for link in parts.line_links),
         *(sse.event("annotation", a.model_dump()) for a in parts.annotations),
+        *(sse.event("puzzle", p.model_dump()) for p in parts.puzzles),
     ]
     return [*pieces, *tags, sse.event("done", {"invalid_moves_removed": removed})]
 

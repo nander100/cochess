@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.analysis.engine import TIER_RANK, EngineLine, EngineResult, Tier
 from app.analysis.paths import position_key
 from app.analysis.summary_models import GameSummary
-from app.db.models import EngineResultRow, Game, GameSummaryRow
+from app.db.models import EngineResultRow, Game, GameStatsRow, GameSummaryRow
 
 
 def save_results(session: Session, game_id: str, results: Sequence[EngineResult]) -> None:
@@ -102,8 +102,25 @@ def save_position_result(session: Session, game_id: str, result: EngineResult) -
 
 
 def save_summary(session: Session, game_id: str, summary: GameSummary) -> None:
+    """Store the summary and, with it, the game's dashboard numbers (they can't drift apart)."""
     session.merge(GameSummaryRow(game_id=game_id, summary=summary.model_dump(mode="json")))
+    game = session.get(Game, game_id)
+    session.merge(stats_row(game_id, game.user_id if game else None, summary))
     session.commit()
+
+
+def stats_row(game_id: str, user_id: str | None, summary: GameSummary) -> GameStatsRow:
+    phases = summary.phase_breakdown
+    phase = {name: (stats.accuracy if stats else None) for name, stats in phases.items()}
+    return GameStatsRow(
+        game_id=game_id,
+        user_id=user_id,
+        accuracy=summary.accuracy.user,
+        accuracy_opening=phase.get("opening"),
+        accuracy_middlegame=phase.get("middlegame"),
+        accuracy_endgame=phase.get("endgame"),
+        moments_total=len(summary.moments),
+    )
 
 
 def load_summary(session: Session, game_id: str) -> GameSummary | None:

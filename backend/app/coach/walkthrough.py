@@ -256,7 +256,7 @@ def _process(output: _ToolOutput, call: WalkthroughCall, settings: Settings) -> 
     move tags only, from the data, with the right numbers, one at a time."""
     rules = Rules(
         allowed=call.allowed, limits=settings.coach, numbering=call.numbering,
-        words_only_evals=call.payload.player.detail_level == "plain",
+        words_only_evals=call.payload.player.detail_level == "plain", puzzles=settings.puzzles,
     )  # fmt: skip
     texts = [output.intro, *(step.text for step in output.steps), output.summary]
     return [process(text, rules) for text in texts]

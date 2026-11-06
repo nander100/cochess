@@ -129,6 +129,38 @@ class PlaybackSettings(BaseModel):
     slightly_better_pct: float = 58
 
 
+class PuzzleSettings(BaseModel):
+    """Puzzle-theme links (SPEC_V3 §8.2): the Lichess puzzle themes the coach may recommend
+    (slugs checked against lichess.org/training/themes on 2026-11-05), and which ones fit each
+    CoChess theme on the dashboard. Themes with no good puzzle match get coach advice only."""
+
+    url: str = "https://lichess.org/training/{slug}"
+    themes: dict[str, str] = {
+        "fork": "Fork",
+        "pin": "Pin",
+        "skewer": "Skewer",
+        "discoveredAttack": "Discovered attack",
+        "hangingPiece": "Hanging piece",
+        "backRankMate": "Back rank mate",
+        "mateIn1": "Mate in 1",
+        "mateIn2": "Mate in 2",
+        "kingsideAttack": "Kingside attack",
+        "defensiveMove": "Defensive move",
+        "endgame": "Endgame",
+        "pawnEndgame": "Pawn endgame",
+        "rookEndgame": "Rook endgame",
+        "opening": "Opening",
+    }
+    for_theme: dict[str, list[str]] = {
+        "hung_piece": ["hangingPiece"],
+        "missed_tactic": ["fork", "pin", "skewer", "discoveredAttack", "backRankMate"],
+        "allowed_tactic": ["defensiveMove", "fork"],
+        "missed_capture_or_check": ["hangingPiece", "mateIn1"],
+        "king_safety": ["kingsideAttack", "defensiveMove"],
+        "endgame_technique": ["endgame", "rookEndgame", "pawnEndgame"],
+    }
+
+
 class MomentSettings(BaseModel):
     """Critical moments (SPEC_V2 §8): which moves become exercises, and how they're graded."""
 
@@ -219,6 +251,7 @@ class Settings(BaseSettings):
     limits: Limits = Limits()
     moments: MomentSettings = MomentSettings()
     playback: PlaybackSettings = PlaybackSettings()
+    puzzles: PuzzleSettings = PuzzleSettings()
     tendencies: TendencySettings = TendencySettings()
     onboarding: OnboardingSettings = OnboardingSettings()
 

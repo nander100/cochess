@@ -23,6 +23,7 @@ from app.db.models import (
     ChatMessageRow,
     EngineResultRow,
     Game,
+    GameStatsRow,
     GameSummaryRow,
     GameThemeFactRow,
     LlmUsageRow,
@@ -70,7 +71,7 @@ def delete_game(session: Session, settings: Settings, game: Game) -> None:
     )
     _clear_coaching(session, game_id)
     delete_variations(session, game_id)
-    for table in (EngineResultRow, GameSummaryRow, GameThemeFactRow):
+    for table in (EngineResultRow, GameSummaryRow, GameStatsRow, GameThemeFactRow):
         session.execute(delete(table).where(table.game_id == game_id))
     session.delete(game)
     session.flush()
@@ -92,8 +93,8 @@ def _reanalyze(session: Session, settings: Settings, game: Game) -> None:
     )
     scan = load_results(session, game.id, ["scan"])
     if pending_verify_fens(session, parsed, game, scan, settings):
-        session.execute(delete(GameSummaryRow).where(GameSummaryRow.game_id == game.id))
-        session.execute(delete(GameThemeFactRow).where(GameThemeFactRow.game_id == game.id))
+        for table in (GameSummaryRow, GameStatsRow, GameThemeFactRow):
+            session.execute(delete(table).where(table.game_id == game.id))
         game.status = "scanned"
         session.flush()
         if game.user_id is not None:

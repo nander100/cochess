@@ -81,7 +81,7 @@ async def generate_synopsis(
     # links name the key moments (km<N>).
     rules = Rules(
         allowed=frozenset(allowed), limits=settings.coach, lines=lines,
-        words_only_evals=player.detail_level == "plain",
+        words_only_evals=player.detail_level == "plain", puzzles=settings.puzzles,
     )  # fmt: skip
     reply = await _call(client, request, sessions, game_id)
     done = process(reply.text, rules)

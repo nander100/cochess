@@ -203,6 +203,7 @@ class TestGameDetail:
             "moves": [],
             "line_links": [],
             "annotations": [],
+            "puzzles": [],
         }
         assert detail["chat"] == [  # a v1 conversation: no board positions were recorded
             {

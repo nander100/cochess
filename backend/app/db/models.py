@@ -367,3 +367,19 @@ class LineLinkRow(Base):
     settle_ply: Mapped[int | None] = mapped_column(Integer)
     caption: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+
+
+class GameStatsRow(Base):
+    """A game's numbers for the dashboard (SPEC_V3 §8.1, PLAN_V3 adjustment 6), written with its
+    summary so the dashboard never parses 200 summaries."""
+
+    __tablename__ = "game_stats"
+
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), primary_key=True)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
+    accuracy: Mapped[float | None] = mapped_column(Float)  # the player's
+    accuracy_opening: Mapped[float | None] = mapped_column(Float)
+    accuracy_middlegame: Mapped[float | None] = mapped_column(Float)
+    accuracy_endgame: Mapped[float | None] = mapped_column(Float)
+    moments_total: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)

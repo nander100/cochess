@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request, Response
 from sqlalchemy.orm import sessionmaker
 
 from app.api import coach as coach_routes
+from app.api import dashboard as dashboard_routes
 from app.api import engine as engine_routes
 from app.api import games, profile, settings_routes, validation
 from app.api import lines as line_routes
@@ -70,4 +71,5 @@ def create_app(
     app.include_router(variation_routes.router)
     app.include_router(walkthrough_routes.router)
     app.include_router(line_routes.router)
+    app.include_router(dashboard_routes.router)
     return app

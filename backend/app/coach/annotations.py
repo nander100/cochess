@@ -34,6 +34,7 @@ DropReason = Literal[
     "moment_leak",  # points out a move the player is meant to find
     "unknown_line",  # a line link that names no line in the data (SPEC_V3 §9.4)
     "too_many_links",
+    "unknown_puzzle",  # a puzzle tag for a theme outside the allowed list (SPEC_V3 §8.2)
 ]
 
 BOARD_TAG = re.compile(r"<\s*/?\s*board\b[^<>]*>", re.IGNORECASE)
