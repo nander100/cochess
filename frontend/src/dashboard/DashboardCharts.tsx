@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   CartesianGrid,
   ComposedChart,
-  LabelList,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -19,16 +18,16 @@ import { SERIES, useTokenColors } from './chartColors'
 const INK = ['--color-fg', '--color-muted', '--color-border', '--color-bg', '--chess-good', '--chess-blunder'] as const
 const CHART_HEIGHT = 240
 const MARKER = 8 // px: the smallest a dot can be and still be hit
+const MARK = 5 // px: half a result marker's width
 const RESULTS = ['win', 'loss', 'draw'] as const
 const RESULT_LABEL: Record<UserResult, string> = { win: 'Win', loss: 'Loss', draw: 'Draw' }
-const SHAPE: Record<UserResult, 'circle' | 'cross' | 'square'> = { win: 'circle', loss: 'cross', draw: 'square' }
 
 interface MistakeChartProps {
   trend: Dashboard['mistake_trend']
 }
 
 /** Mistake types over time (SPEC_V3 §8.1): the weighted rate per game of the top 5 themes after
- * each analyzed game. Each line is labeled at its end, and the legend hides or shows a theme. */
+ * each analyzed game. The legend names each line and hides or shows it. */
 export function MistakeChart({ trend }: MistakeChartProps) {
   const series = useTokenColors(SERIES)
   const ink = useTokenColors(INK)
@@ -61,7 +60,7 @@ export function MistakeChart({ trend }: MistakeChartProps) {
         ))}
       </div>
       <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-        <LineChart data={data} margin={{ top: 8, right: 120, bottom: 16, left: 0 }}>
+        <LineChart data={data} margin={{ top: 8, right: 16, bottom: 16, left: 0 }}>
           <CartesianGrid stroke={ink['--color-border']} vertical={false} />
           <XAxis
             dataKey="games"
@@ -90,20 +89,7 @@ export function MistakeChart({ trend }: MistakeChartProps) {
                 dot={false}
                 activeDot={{ r: MARKER / 2 }}
                 isAnimationActive={false}
-              >
-                <LabelList
-                  dataKey={theme.theme}
-                  content={(props) => {
-                    const { x, y, index: at } = props as { x?: number | string; y?: number | string; index?: number }
-                    if (at !== data.length - 1 || x === undefined || y === undefined) return null
-                    return (
-                      <text x={Number(x) + 6} y={Number(y)} dy={4} fill={ink['--color-fg']} fontSize={12}>
-                        {theme.label}
-                      </text>
-                    )
-                  }}
-                />
-              </Line>
+              />
             ),
           )}
         </LineChart>
@@ -134,7 +120,7 @@ export function AccuracyChart({ accuracy }: AccuracyChartProps) {
   }
   return (
     <figure className="dashboard-chart" aria-label="Accuracy trend">
-      <div className="dashboard-legend" role="group" aria-label="Which games">
+      <div className="dashboard-legend dashboard-segments" role="group" aria-label="Which games">
         {(['both', 'white', 'black'] as const).map((value) => (
           <button
             key={value}
@@ -164,17 +150,18 @@ export function AccuracyChart({ accuracy }: AccuracyChartProps) {
             labelFormatter={(game) => `Game ${String(game)}`}
             formatter={(value, name) => [`${String(value)}%`, String(name)]}
           />
-          {RESULTS.map((result) => (
-            <Scatter
-              key={result}
-              name={RESULT_LABEL[result]}
-              data={data.filter((d) => d.result === result)}
-              dataKey="accuracy"
-              fill={fill[result]}
-              shape={SHAPE[result]}
-              isAnimationActive={false}
-            />
-          ))}
+          {/* One series: in a composed chart Recharts plots the chart's data, not a Scatter's own,
+              so each game's marker is drawn from its result. */}
+          <Scatter
+            name="Accuracy"
+            dataKey="accuracy"
+            isAnimationActive={false}
+            shape={(props: unknown) => {
+              const { cx, cy, payload } = props as { cx?: number; cy?: number; payload?: { result: UserResult } }
+              if (cx === undefined || cy === undefined || !payload) return <g />
+              return <ResultMark x={cx} y={cy} result={payload.result} color={fill[payload.result]} />
+            }}
+          />
           <Line
             dataKey="rolling"
             name="Average of the last 10"
@@ -226,5 +213,20 @@ function PhaseBars({ byPhase }: { byPhase: Dashboard['accuracy']['by_phase'] }) 
         )
       })}
     </dl>
+  )
+}
+
+/** A game's dot on the accuracy chart: a circle for a win, a cross for a loss, a square for a
+ * draw, so the result never depends on color alone. */
+function ResultMark({ x, y, result, color }: { x: number; y: number; result: UserResult; color: string }) {
+  if (result === 'win') return <circle cx={x} cy={y} r={MARK} fill={color} />
+  if (result === 'draw') return <rect x={x - MARK} y={y - MARK} width={MARK * 2} height={MARK * 2} fill={color} />
+  return (
+    <path
+      d={`M${x - MARK} ${y - MARK}L${x + MARK} ${y + MARK}M${x + MARK} ${y - MARK}L${x - MARK} ${y + MARK}`}
+      stroke={color}
+      strokeWidth={2.5}
+      strokeLinecap="round"
+    />
   )
 }

@@ -84,7 +84,7 @@ cochess/
 │   │   │   └── validate.py      # move validation + leak check (text, tags, annotations)
 │   │   ├── importers/           # + lichess.py (Chess.com on hold)
 │   │   └── db/                  # models, session, persistence helpers per area
-│   ├── scripts/                 # print_summary, print_tendencies, synopsis, annotations_demo (owner tools)
+│   ├── scripts/                 # print_summary, print_tendencies, synopsis, annotations_demo, seed_owner_games (owner tools)
 │   └── tests/                   # fixtures/pgn/user = owner games, fixtures/engine = real results
 └── frontend/
     ├── src/
@@ -96,7 +96,7 @@ cochess/
     │   ├── moments/             # critical-moment stepper
     │   ├── walkthrough/         # + stepper panel and useWalkthrough (the per-step scan lives in analysis/walkthrough.ts)
     │   ├── playback/            # + line playback hook and control bar (scans: analysis/playback.ts)
-    │   ├── dashboard/           # + cards and charts
+    │   ├── dashboard/           # + DashboardView (on the Games page), lazy DashboardCharts (Recharts), chart color tokens
     │   ├── onboarding/          # paste-and-check table, slots, baseline report
     │   ├── components/          # ChatPanel, CoachText (markdown + board-tag icons), GameInput, Synopsis, ...
     │   ├── pages/               # Games, Analysis, Onboarding, Profile, Redeem, LatestGamePage (+ the nav's /analysis and /moments), GameOptions
@@ -121,7 +121,7 @@ Backend (run from `backend/`):
 - Migrations: `uv run alembic upgrade head` / `uv run alembic revision --autogenerate -m "..."`. The app also migrates at startup.
 - Users: `uv run python -m app.cli create-user --name "..."`, `uv run python -m app.cli invite --user "..."` (prints a one-time `PUBLIC_BASE_URL/redeem#token=…` link), `uv run python -m app.cli assign-games --user "..."`, `uv run python -m app.cli backfill [--user "..."]` (rebuilds summaries from stored engine results, no engine runs; lists duplicate uploads without deleting). In Docker: `docker compose exec backend uv run --no-dev python -m app.cli …`.
 - Optional per-player daily token cap: `USER_DAILY_TOKEN_LIMIT` (off by default).
-- Owner tools (real games): `uv run python -m scripts.synopsis game5b --elo 800` (calls the Claude API), `uv run python -m scripts.annotations_demo game1w --db <scratch.db>` (real coach chat and moment replies with board tags, plus the annotation log, on a scratch database; calls the Claude API), `uv run python -m scripts.print_summary game1w [--elo 1400] [--compact]`, `uv run python -m scripts.print_tendencies --user "..."`.
+- Owner tools (real games): `uv run python -m scripts.seed_owner_games --db <scratch.db>` (fixture games with stored engine results, no coach calls; prints a login link), `uv run python -m scripts.synopsis game5b --elo 800` (calls the Claude API), `uv run python -m scripts.annotations_demo game1w --db <scratch.db>` (real coach chat and moment replies with board tags, plus the annotation log, on a scratch database; calls the Claude API), `uv run python -m scripts.print_summary game1w [--elo 1400] [--compact]`, `uv run python -m scripts.print_tendencies --user "..."`.
 
 Frontend (run from `frontend/`):
 - Install: `npm install` (`postinstall` copies the Stockfish lite builds into `public/engine/`, gitignored)

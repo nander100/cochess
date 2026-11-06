@@ -124,6 +124,16 @@
   text-decoration: line-through;
 }
 
+/* One choice of several (which color's games): the pressed one is filled, none is struck out. */
+.dashboard-segments .dashboard-legend-item[aria-pressed='false'] {
+  text-decoration: none;
+}
+
+.dashboard-segments .dashboard-legend-item[aria-pressed='true'] {
+  background: var(--color-tint);
+  border-color: var(--color-fg);
+}
+
 .dashboard-swatch {
   width: var(--space-3);
   height: var(--space-3);
@@ -174,16 +184,16 @@
 
 .dashboard-phases {
   display: grid;
-  gap: var(--space-2);
+  grid-template-columns: max-content 1fr;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
   margin: 0;
+  font: var(--text-small);
 }
 
+/* Each phase's term and bar sit in the list's two columns, so the labels share one width. */
 .dashboard-phase {
-  display: grid;
-  grid-template-columns: var(--space-16) 1fr;
-  align-items: center;
-  gap: var(--space-3);
-  font: var(--text-small);
+  display: contents;
 }
 
 .dashboard-phase dt {
