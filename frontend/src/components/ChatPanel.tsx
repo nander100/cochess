@@ -4,7 +4,7 @@ import type { Annotation, CoachReply } from '../api/types'
 import { Button, ChatBubble, TintedPanel, TypingIndicator } from '../ui'
 import './ChatPanel.css'
 import type { ChatMessage } from './chatMessages'
-import { CoachText } from './CoachText'
+import { CoachText, type PlayLine } from './CoachText'
 
 const MAX_MESSAGE_CHARS = 2000 // mirrors backend CoachSettings.chat_max_message_chars
 const EXPLAIN_TEXT = 'Explain this position'
@@ -21,9 +21,11 @@ interface ChatPanelProps {
   where?: string
   /** The position on the board, as a node id: what messages sent now are about. */
   path?: string
-  /** A coach answer arrived for the position `path`, with these board tags. */
-  onReply?: (path: string, annotations: Annotation[]) => void
+  /** A coach answer arrived for the position `path`. */
+  onReply?: (path: string, reply: CoachReply) => void
   onShowTag?: ShowChatTag
+  /** Play a linked line on the board (SPEC_V3 §9.5). */
+  onPlayLine?: PlayLine
   /** The conversation so far, when reopening a game. */
   initial?: readonly ChatMessage[]
   /** Told the current Explain action (null when it can't run now), for the X shortcut. */
@@ -38,7 +40,7 @@ const PROGRESS_LABEL: Record<ChatProgress, string> = {
 
 /** Questions about the position on the board, and the Explain button (SPEC_V2 §6). */
 export function ChatPanel({
-  ask, explain, where, path, initial = [], onExplainReady, onReply, onShowTag,
+  ask, explain, where, path, initial = [], onExplainReady, onReply, onShowTag, onPlayLine,
 }: ChatPanelProps) {
   const id = useId()
   const [messages, setMessages] = useState<ChatMessage[]>(() => [...initial])
@@ -55,9 +57,12 @@ export function ChatPanel({
       const reply = await run(setProgress)
       setMessages((previous) => [
         ...previous,
-        { role: 'coach', text: reply.text, path: sentFrom, annotations: reply.annotations },
+        {
+          role: 'coach', text: reply.text, path: sentFrom, annotations: reply.annotations,
+          moves: reply.moves ?? [], line_links: reply.line_links ?? [],
+        }, // prettier-ignore
       ])
-      if (sentFrom !== null) onReply?.(sentFrom, reply.annotations)
+      if (sentFrom !== null) onReply?.(sentFrom, reply)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Something went wrong.')
     } finally {
@@ -108,7 +113,7 @@ export function ChatPanel({
             <ChatBubble from={message.role}>
               {message.where && <span className="chat-where">{message.where}</span>}
               {message.role === 'coach' ? (
-                <CoachText text={message.text} annotations={message.annotations} onShowTag={showTag} />
+                <CoachText text={message.text} tokens={message} onShowTag={showTag} onPlayLine={onPlayLine} />
               ) : (
                 <p>{message.text}</p>
               )}

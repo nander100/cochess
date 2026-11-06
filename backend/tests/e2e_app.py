@@ -22,7 +22,11 @@ TASKS: tuple[Task, ...] = (
 ANSWERS: dict[Task, str] = {
     "synopsis": "### Overall\nE2E synopsis: a fighting game.",
     # A square highlight is valid on any position, so the board tag is always drawn (SPEC_V3 §6).
-    "chat": 'E2E chat answer: look at the loose pieces. <board squares="d5:blue"/>',
+    # The line link, in its own paragraph, is the position's top engine line (SPEC_V3 §9.4).
+    "chat": (
+        'E2E chat answer: look at the loose pieces. <board squares="d5:blue"/>\n\n'
+        "{{line:here.engine1|Play the engine's idea}}"
+    ),
     "explain": "E2E explanation: both sides are developing.",
     "moment_intro": "E2E moment: what would you play here instead?",
     "moment_feedback": "E2E feedback: let's compare your move with the engine's.",

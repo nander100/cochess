@@ -4,23 +4,21 @@ import { type ChatDeps, type ChatProgress, askCoach, explainPosition } from '../
 import { BeforeSearches, type MomentDeps, fenAfter } from '../analysis/moments'
 import { type AnalysisRun, type AnalysisStatus, type PipelineDeps, resumeGame, statusLabel } from '../analysis/pipeline'
 import { ApiError, isLoggedOut } from '../api/client'
-import type { Annotation, EngineResult, GameDetail, MomentInfo } from '../api/types'
+import type { Annotation, CoachReply, EngineResult, GameDetail, LineLink, MessageTokens, MomentInfo } from '../api/types'
 import { Board, type BoardMove } from '../board/Board'
 import { latestByPath } from '../board/coachShapes'
 import { useCoachDrawings } from '../board/useCoachDrawings'
 import { EnginePanel, type LiveEngine } from '../board/EnginePanel'
 import { EvalBar } from '../board/EvalBar'
-import { EvalGraph, type GraphPoint } from '../board/EvalGraph'
+import { EvalGraph } from '../board/EvalGraph'
 import { MoveList } from '../board/MoveList'
 import { useVariationSaver } from '../board/useVariationSaver'
-import { deleteVariation, fromUci, isWithin, variationMoves, promoteVariation, withLine, withVariations } from '../board/variations'
+import { deleteVariation, isWithin, promoteVariation, variationMoves, withLine } from '../board/variations'
 import {
   type GameTree,
   ROOT,
   type TreeNode,
   addMove,
-  fromMoves,
-  lineFrom,
   next,
   pathTo,
   positionLabel,
@@ -40,11 +38,25 @@ import { type LiveLine, isGameOver } from '../engine/live'
 import { analyzeAll } from '../engine/runner'
 import { BoardNav, GameHeading, MovesPanel } from './AnalysisParts'
 import { GameOptions } from './GameOptions'
-import Markdown from 'react-markdown'
+import { CoachText, type PlayLine } from '../components/CoachText'
 import { useSettings } from '../settings/settingsContext'
+import { PlaybackBar } from '../playback/PlaybackBar'
+import { usePlayback } from '../playback/usePlayback'
 import { Button, ColorSwatch, EmptyState, ErrorState, FeatureCard, ProgressBar, Skeleton, Tabs } from '../ui'
 import './GamePage.css'
 import { errorText } from './util'
+import {
+  positionKey,
+  storedByPosition,
+  positionEval,
+  graphPoints,
+  branchPly,
+  mainlineNode,
+  endOfLine,
+  toUci,
+  initialTree,
+  withMomentLines,
+} from './gameHelpers'
 
 interface GamePageProps {
   deps: PipelineDeps
@@ -141,6 +153,8 @@ interface AnalysisBoardProps {
 
 type Tab = 'coach' | 'moments'
 
+const NO_SHAPES: readonly Annotation[] = []
+
 function AnalysisBoard({
   detail, deps, fresh, onLoggedOut, onAnalyzed, autoResume, onColorChanged, onDeleted,
   initialTab, initialMoment, onTabChange,
@@ -226,6 +240,36 @@ function AnalysisBoard({
   // Line walkthroughs (SPEC_V3 §7): the board steps through the line; the tree is left alone.
   const walker = useWalkthrough(deps.api, loadEngine, detail.id, onLoggedOut)
   const walking = walker.walk !== null
+  // Line playback (SPEC_V3 §9.5): a coach's line link plays on the board.
+  const { settings: playSettings } = useSettings()
+  const player = usePlayback(
+    {
+      api: deps.api,
+      async scan(fen) {
+        const { engine: handle, config } = await loadEngine()
+        return handle.analyze({ fen, ply: null }, 'scan', config.scan)
+      },
+    },
+    playSettings.playback_seconds,
+  )
+  const playing = player.state !== null
+  const [savedLines, setSavedLines] = useState<ReadonlySet<string>>(() => new Set())
+  function playLine(link: LineLink) {
+    walker.close()
+    player.play(link)
+  }
+  function savePlayedLine() {
+    const link = player.state?.link
+    if (!link) return
+    changeTree(withLine(tree, [...link.start_path_uci, ...link.moves_uci]))
+    setSavedLines((saved) => new Set(saved).add(link.line_id))
+  }
+  function walkPlayedLine() {
+    const link = player.state?.link
+    if (!link) return
+    player.close()
+    walker.open(link.start_path_uci.join(' '), link.moves_uci.slice(0, WALK_MAX_PLIES))
+  }
 
   const navigate = useCallback((id: string) => {
     if (!locked) setCurrent(id)
@@ -238,11 +282,12 @@ function AnalysisBoard({
     explainAction.current = explain
   }, [])
   useShortcuts({
-    prev: walking ? walker.prev : back,
-    next: walking ? walker.next : forward,
+    prev: playing ? player.back : walking ? walker.prev : back,
+    next: playing ? player.forward : walking ? walker.next : forward,
     start: walking ? () => walker.go(0) : () => navigate(ROOT),
     end: walking ? () => walker.go(Number.MAX_SAFE_INTEGER) : () => navigate(endOfLine(tree, current)),
-    escape: walking ? walker.close : null,
+    escape: playing ? player.close : walking ? walker.close : null,
+    pause: playing ? () => (player.state?.playing ? player.pause() : player.resume()) : null,
     walk: !walking && !locked && topLine().length > 0 ? () => walkFrom(current, topLine()) : null,
     flip: () => setFlipped((value) => !value),
     // E and X wait while a moment is unsolved (SPEC_V3 §4.4).
@@ -341,11 +386,13 @@ function AnalysisBoard({
   function showMomentTag(annotation: Annotation | null) {
     if (momentNodeId !== null) drawings.focus(momentNodeId, annotation)
   }
-  const view = walker.view // while walking, the board shows the step instead
+  // While playing a line or walking one, the board shows that instead of the game.
+  const view = player.view ? { ...player.view, annotations: undefined } : walker.view
   const gameFen = locked && momentFen ? ((candidate && fenAfter(momentFen, candidate)) ?? momentFen) : node.fen
   const boardFen = view?.fen ?? gameFen
   const gameLastMove = locked && momentNodeId !== null ? (candidate ?? tree.nodes[momentNodeId].uci) : node.uci
-  const boardLastMove = view ? (view.lastMove ?? tree.nodes[walker.walk?.startId ?? ROOT]?.uci ?? null) : gameLastMove
+  const viewStart = player.state ? player.state.link.start_path_uci.join(' ') : (walker.walk?.startId ?? ROOT)
+  const boardLastMove = view ? (view.lastMove ?? tree.nodes[viewStart]?.uci ?? null) : gameLastMove
   const evaluation = view
     ? { winPct: view.winPct, evalText: view.evalText }
     : locked
@@ -389,14 +436,23 @@ function AnalysisBoard({
               fen={boardFen}
               orientation={orientation}
               lastMove={boardLastMove}
-              movable={!walking && (!locked || (candidate === null && (moment?.state === 'intro' || moment?.state === 'attempt')))}
+              movable={!walking && !playing && (!locked || (candidate === null && (moment?.state === 'intro' || moment?.state === 'attempt')))}
               onMove={play}
               sound={settings.sounds}
-              annotations={view?.annotations ?? coachShapes}
+              annotations={view ? (view.annotations ?? NO_SHAPES) : coachShapes}
             />
           </div>
+          {player.state && (
+            <PlaybackBar
+              playback={player}
+              state={player.state}
+              onWalk={walkPlayedLine}
+              onSave={savePlayedLine}
+              saved={savedLines.has(player.state.link.line_id)}
+            />
+          )}
           <BoardNav
-            disabled={locked}
+            disabled={locked || playing}
             onFirst={walking ? () => walker.go(0) : () => navigate(ROOT)}
             onBack={walking ? walker.prev : back}
             onForward={walking ? walker.next : forward}
@@ -481,6 +537,7 @@ function AnalysisBoard({
               onLoggedOut={onLoggedOut}
               onBack={() => openTab('coach')}
               onShowTag={showMomentTag}
+              onPlayLine={playLine}
             />
           )}
           {detail.status === 'analyzed' && tab === 'coach' && (
@@ -495,8 +552,12 @@ function AnalysisBoard({
               practice={moments.some(isUnsolved) ? () => openTab('moments') : null}
               unsolved={moments.filter(isUnsolved).length}
               onExplainReady={registerExplain}
-              onReply={drawings.record}
+              onReply={(path, reply) => {
+                drawings.record(path, reply.annotations)
+                player.prefetch(reply.line_links ?? [])
+              }}
               onShowTag={showChatTag}
+              onPlayLine={playLine}
               moves={
                 <MovesPanel count={detail.moves.length}>
                   <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} onDelete={deleteLine} onPromote={promoteLine} onWalk={walkVariation} />
@@ -579,7 +640,7 @@ function ResumeAnalysis({ detail, deps, autoStart, onLoggedOut, onDone }: {
 /** The synopsis and the chat, for an analyzed game. */
 function Coach({
   detail, deps, board, ensureAnalyzed, loadEngine, autoSynopsis, spoiler, practice, unsolved, moves, onExplainReady,
-  onReply, onShowTag, onLoggedOut,
+  onReply, onShowTag, onPlayLine, onLoggedOut,
 }: {
   detail: GameDetail
   deps: PipelineDeps
@@ -597,13 +658,15 @@ function Coach({
   moves: ReactNode
   /** The chat panel registers Explain here, for the X shortcut. */
   onExplainReady: (explain: (() => void) | null) => void
-  /** A coach answer and its board tags, for the board (SPEC_V3 §6.3). */
-  onReply: (path: string, annotations: readonly Annotation[]) => void
+  /** A coach answer, for the board's shapes and its line links' background scan. */
+  onReply: (path: string, reply: CoachReply) => void
   onShowTag: ShowChatTag
+  /** Play a linked line on the board (SPEC_V3 §9.5). */
+  onPlayLine: PlayLine
   onLoggedOut: () => void
 }) {
   const [synopsis, setSynopsis] = useState<SynopsisState | null>(
-    detail.synopsis ? { status: 'done', text: detail.synopsis.text, error: null } : null,
+    detail.synopsis ? { status: 'done', text: detail.synopsis.text, error: null, tokens: detail.synopsis } : null,
   )
   const started = useRef(false)
 
@@ -611,15 +674,18 @@ function Coach({
     setSynopsis({ status: 'writing', text: '', error: null })
     let text = ''
     let finished = false
+    const tokens: Required<Pick<MessageTokens, 'moves' | 'line_links'>> = { moves: [], line_links: [] }
     try {
       await deps.api.streamSynopsis(detail.id, (event) => {
         if (event.type === 'text') {
           text += event.text
           setSynopsis({ status: 'writing', text, error: null })
-        } else if (event.type === 'done' || event.type === 'error') {
+        } else if (event.type === 'move') tokens.moves.push(event.move)
+        else if (event.type === 'line_link') tokens.line_links.push(event.link)
+        else if (event.type === 'done' || event.type === 'error') {
           finished = true
           const error = event.type === 'error' ? event.message : null
-          setSynopsis({ status: error ? 'error' : 'done', text, error })
+          setSynopsis({ status: error ? 'error' : 'done', text, error, tokens })
         }
       })
       if (!finished) setSynopsis({ status: 'error', text, error: 'The connection to the coach was lost.' })
@@ -659,13 +725,13 @@ function Coach({
           <details className="synopsis-spoiler">
             <summary>Show the summary (spoilers: it names better moves for your critical moments)</summary>
             <div className="synopsis-text">
-              <Markdown>{synopsis.text}</Markdown>
+              <CoachText text={synopsis.text} tokens={synopsis.tokens} onPlayLine={onPlayLine} />
             </div>
           </details>
           {practiceButton}
         </FeatureCard>
       ) : synopsis ? (
-        <Synopsis state={synopsis} onRetry={() => void write()} action={practiceButton} />
+        <Synopsis state={synopsis} onRetry={() => void write()} action={practiceButton} onPlayLine={onPlayLine} />
       ) : (
         <FeatureCard as="section" className="synopsis" aria-label="Coach's synopsis">
           <CoachSummaryHeading />
@@ -683,6 +749,7 @@ function Coach({
         path={board.id}
         onReply={onReply}
         onShowTag={onShowTag}
+        onPlayLine={onPlayLine}
         ask={async (message, onProgress) => {
           const position = await positionRequest(board, ensureAnalyzed, onProgress)
           return askCoach(chatDeps, detail.id, { message, ...position }, onProgress)
@@ -707,81 +774,3 @@ async function positionRequest(
   return { path_uci: pathTo(node.id), ...(result ? { engine_result: result } : {}) }
 }
 
-/** The game as POST /api/games returned it, for the engine pipeline. */
-/** A position's identity for matching stored engine results: FEN without the move counters. */
-function positionKey(fen: string): string {
-  return fen.split(' ').slice(0, 4).join(' ')
-}
-
-function storedByPosition(results: GameDetail['engine_results']): Map<string, GameDetail['engine_results'][number]> {
-  return new Map(results.map((result) => [positionKey(result.fen), result]))
-}
-
-/** What the eval bar shows for the position on the board. */
-function positionEval(
-  node: TreeNode,
-  detail: GameDetail,
-  stored: Map<string, GameDetail['engine_results'][number]>,
-): { winPct: number | null; evalText: string | null } {
-  if (node.mainline && node.id !== ROOT) return { winPct: node.winPctAfter, evalText: node.evalAfter }
-  const best = stored.get(positionKey(node.fen))?.lines[0]
-  if (node.id === ROOT) return { winPct: detail.start_win_pct, evalText: best?.eval ?? null }
-  return { winPct: best?.win_pct ?? null, evalText: best?.eval ?? null }
-}
-
-function graphPoints(detail: GameDetail): GraphPoint[] {
-  if (detail.start_win_pct === null) return []
-  const start: GraphPoint = { ply: 0, winPct: detail.start_win_pct, evalText: null, moveText: null, label: null, side: null }
-  return [
-    start,
-    ...detail.moves.flatMap((move) =>
-      move.win_pct_after === null
-        ? []
-        : [
-            {
-              ply: move.ply,
-              winPct: move.win_pct_after,
-              evalText: move.eval_after,
-              moveText: `${move.move_number}${move.side === 'white' ? '.' : '...'} ${move.san}`,
-              label: move.label,
-              side: move.side,
-            },
-          ],
-    ),
-  ]
-}
-
-/** The mainline ply the position belongs to: its own, or where its variation left the game. */
-function branchPly(tree: GameTree, node: TreeNode): number {
-  let walker: TreeNode | undefined = node
-  while (walker && !walker.mainline) walker = walker.parent === null ? undefined : tree.nodes[walker.parent]
-  return walker?.ply ?? 0
-}
-
-function mainlineNode(tree: GameTree, ply: number): string {
-  const line = lineFrom(tree, ROOT)
-  return line[Math.min(ply, line.length - 1)].id
-}
-
-function endOfLine(tree: GameTree, nodeId: string): string {
-  const line = lineFrom(tree, nodeId)
-  return line[line.length - 1].id
-}
-
-function toUci(move: BoardMove): string {
-  return `${move.from}${move.to}${move.promotion ?? ''}`
-}
-
-/** The game, then the saved variations; before the first save, finished moments' lines. */
-function initialTree(detail: GameDetail): GameTree {
-  const game = fromMoves(detail.moves, detail.final_fen)
-  if (detail.variations) return withVariations(game, detail.variations)
-  return detail.moments.filter((m) => !isUnsolved(m)).reduce(withMomentLines, game)
-}
-
-/** A finished moment's tries and the engine's move, as variations from its position. */
-function withMomentLines(tree: GameTree, moment: MomentInfo): GameTree {
-  const from = mainlineNode(tree, moment.ply - 1)
-  const moves = [...moment.attempts.map((a) => a.uci), ...(moment.best_uci ? [moment.best_uci] : [])]
-  return moves.reduce((acc, uci) => addMove(acc, from, fromUci(uci))?.tree ?? acc, tree)
-}

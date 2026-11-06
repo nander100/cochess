@@ -1,6 +1,6 @@
 import type { ApiClient } from '../api/client'
 import type { CoachEvent, EnginePositionRequest } from '../api/sse'
-import type { Annotation, ChatRequest, CoachReply, EngineResult, PositionRequest } from '../api/types'
+import type { Annotation, ChatRequest, CoachReply, EngineResult, LineLink, MoveToken, PositionRequest } from '../api/types'
 
 /** looking: the engine analyzes the board position first; writing: the coach is answering;
  * thinking: the coach asked the engine for a deeper look (a deep-dive). */
@@ -58,16 +58,30 @@ type Outcome =
 async function collect(
   run: (onEvent: (event: CoachEvent) => void) => Promise<void>,
 ): Promise<Outcome> {
-  const state: { text: string; annotations: Annotation[]; outcome: Outcome | null; error: string | null } = {
+  const state: {
+    text: string
+    annotations: Annotation[]
+    moves: MoveToken[]
+    links: LineLink[]
+    outcome: Outcome | null
+    error: string | null
+  } = {
     text: '',
     annotations: [],
+    moves: [],
+    links: [],
     outcome: null,
     error: null,
   }
   await run((event) => {
     if (event.type === 'text') state.text += event.text
     else if (event.type === 'annotation') state.annotations.push(event.annotation)
-    else if (event.type === 'done') state.outcome = { kind: 'text', reply: { text: state.text, annotations: state.annotations } }
+    else if (event.type === 'move') state.moves.push(event.move)
+    else if (event.type === 'line_link') state.links.push(event.link)
+    else if (event.type === 'done') {
+      const reply = { text: state.text, annotations: state.annotations, moves: state.moves, line_links: state.links }
+      state.outcome = { kind: 'text', reply }
+    }
     else if (event.type === 'error') state.error = event.message
     else if (event.type === 'engine_request') {
       state.outcome = { kind: 'engine', requestId: event.request_id, positions: event.positions }

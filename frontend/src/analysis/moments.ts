@@ -1,7 +1,7 @@
 import { Chess } from 'chess.js'
 import type { ApiClient } from '../api/client'
 import type { CoachEvent } from '../api/sse'
-import type { Annotation, EngineResult, MomentGrade, MomentState } from '../api/types'
+import type { Annotation, EngineResult, LineLink, MomentGrade, MomentState, MoveToken } from '../api/types'
 import { isGameOver } from '../engine/live'
 
 /** checking: the engine is analyzing the move; writing: the coach is answering. */
@@ -15,8 +15,10 @@ export interface MomentDeps {
 
 export interface MomentReply {
   text: string
-  /** Board tags on the moment's position (SPEC_V3 §6). */
+  /** Board tags on the moment's position (SPEC_V3 §6), move tags and line links (§9.4). */
   annotations: Annotation[]
+  moves: MoveToken[]
+  line_links: LineLink[]
   /** Set after an attempt: how the engine graded it, and the moment's new state. */
   grade: MomentGrade | null
   state: MomentState | null
@@ -113,6 +115,8 @@ async function collect(run: (onEvent: (event: CoachEvent) => void) => Promise<vo
   const reply: {
     text: string
     annotations: Annotation[]
+    moves: MoveToken[]
+    line_links: LineLink[]
     done: boolean
     error: string | null
     grade: MomentGrade | null
@@ -120,6 +124,8 @@ async function collect(run: (onEvent: (event: CoachEvent) => void) => Promise<vo
   } = {
     text: '',
     annotations: [],
+    moves: [],
+    line_links: [],
     done: false,
     error: null,
     grade: null,
@@ -128,6 +134,8 @@ async function collect(run: (onEvent: (event: CoachEvent) => void) => Promise<vo
   await run((event) => {
     if (event.type === 'text') reply.text += event.text
     else if (event.type === 'annotation') reply.annotations.push(event.annotation)
+    else if (event.type === 'move') reply.moves.push(event.move)
+    else if (event.type === 'line_link') reply.line_links.push(event.link)
     else if (event.type === 'done') reply.done = true
     else if (event.type === 'error') reply.error = event.message
     else if (event.type === 'moment') {
@@ -137,5 +145,8 @@ async function collect(run: (onEvent: (event: CoachEvent) => void) => Promise<vo
   })
   if (reply.error !== null) throw new Error(reply.error)
   if (!reply.done) throw new Error('The connection to the coach was lost.')
-  return { text: reply.text, annotations: reply.annotations, grade: reply.grade, state: reply.state }
+  return {
+    text: reply.text, annotations: reply.annotations, moves: reply.moves, line_links: reply.line_links,
+    grade: reply.grade, state: reply.state,
+  } // prettier-ignore
 }

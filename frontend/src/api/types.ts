@@ -170,6 +170,8 @@ export interface ChatEntry {
   path_uci?: string[] | null
   /** A coach answer's board tags (SPEC_V3 §6). */
   annotations?: Annotation[]
+  moves?: MoveToken[]
+  line_links?: LineLink[]
 }
 
 /** The coach's colors for arrows and highlights (SPEC_V3 §6.1). */
@@ -204,6 +206,8 @@ export interface WalkthroughStep {
   text: string
   /** Arrows and highlights on the position after this step's move. */
   annotation: Annotation | null
+  /** The text's move tags (SPEC_V3 §9.4). */
+  moves?: MoveToken[]
 }
 
 /** A line explained step by step by the coach. */
@@ -215,13 +219,60 @@ export interface Walkthrough {
   steps: WalkthroughStep[]
   summary: string
   invalid_moves_removed: string[]
+  intro_moves?: MoveToken[]
+  summary_moves?: MoveToken[]
 }
 
-/** A coach answer: its text (board tags as `cc:board/N` placeholder links) and their shapes. */
-export interface CoachReply {
+/** A move tag (SPEC_V3 §9.4): the backend's words for a validated move. Its placeholder link
+ * `cc:move/{index}` is in the text; it shows as words, notation, or both by detail level. */
+export interface MoveToken {
+  index: number
+  char_offset: number
+  san: string
+  words: string
+  move_number: number | null
+  white: boolean | null
+}
+
+/** A line link (SPEC_V3 §9.4): a line from the data, played on the board when clicked. */
+export interface LineLink {
+  index: number
+  char_offset: number
+  line_id: string
+  ref: string
+  label: string
+  kind: 'engine' | 'refutation' | 'candidate' | 'best' | 'variation'
+  start_path_uci: string[]
+  moves_uci: string[]
+}
+
+/** A coach message's structured parts, tied to `cc:` placeholders in its text. */
+export interface MessageTokens {
+  moves?: MoveToken[]
+  line_links?: LineLink[]
+  annotations?: Annotation[]
+}
+
+/** A coach answer: its text (tags as `cc:` placeholder links) and their tokens. */
+export interface CoachReply extends MessageTokens {
   text: string
   annotations: Annotation[]
 }
+
+/** Where a linked line's playback stops and why (SPEC_V3 §9.6), decided by the backend. */
+export interface Playback {
+  line_id: string
+  start_fen: string
+  moves_uci: string[]
+  moves_san: string[]
+  evals: (string | null)[]
+  win_pcts: (number | null)[]
+  settle_ply: number
+  caption: string
+}
+
+/** How the coach writes and how moves are shown (SPEC_V3 §9.3). */
+export type DetailLevel = 'plain' | 'standard' | 'technical'
 
 /** A chat message or Explain request: the board position as UCI moves from the start
  * (SPEC_V2 §5.2), and the browser's engine result for it when the backend has none yet. */
@@ -244,6 +295,8 @@ export interface MomentMessage {
   kind: string
   /** A coach message's board tags, on the moment's position (SPEC_V3 §6). */
   annotations?: Annotation[]
+  moves?: MoveToken[]
+  line_links?: LineLink[]
 }
 
 /** A critical moment and the player's progress on it. The best move is only there once the
@@ -292,7 +345,7 @@ export interface GameDetail {
   engine_results: StoredEngineResult[]
   /** While status is "scanned": the positions still to verify. */
   verify_fens: string[]
-  synopsis: { text: string; invalid_moves_removed: string[] } | null
+  synopsis: ({ text: string; invalid_moves_removed: string[] } & MessageTokens) | null
   chat: ChatEntry[]
   moments: MomentInfo[]
   /** The saved variations in display order, or null if they were never saved (SPEC_V3 §5.1). */
@@ -383,6 +436,7 @@ export interface BaselineReport {
   invalid_moves_removed: string[]
   game_ids: string[]
   created_at: string
+  moves?: MoveToken[]
 }
 
 export interface OnboardingStatus {
@@ -430,4 +484,9 @@ export interface UserSettings {
   piece_set: PieceSet
   sounds: boolean
   engine_panel: boolean
+  /** "auto" follows the rating band; `effective_detail_level` is what that means now. */
+  coach_detail_level: DetailLevel | 'auto'
+  effective_detail_level: DetailLevel
+  /** Line playback: one move every this many seconds, 0.75 to 3 (SPEC_V3 §9.5). */
+  playback_seconds: number
 }

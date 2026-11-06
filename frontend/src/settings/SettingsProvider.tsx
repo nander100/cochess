@@ -57,6 +57,10 @@ export function SettingsProvider({ api, enabled, children }: SettingsProviderPro
     (change: Partial<UserSettings>) => {
       const before = latest.current
       const next = { ...before, ...change }
+      // A level chosen outright applies at once; "auto" waits for the server's answer.
+      if (change.coach_detail_level && change.coach_detail_level !== 'auto') {
+        next.effective_detail_level = change.coach_detail_level
+      }
       early.current = { ...early.current, ...change }
       setSettings(next)
       if (change.theme) setPreference(change.theme)

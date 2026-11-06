@@ -84,3 +84,21 @@ test('an annotation event keeps only well-formed shapes', async () => {
     },
   ])
 })
+
+test('move and line_link events are parsed', async () => {
+  const move = { index: 0, char_offset: 3, san: 'Nf3', words: 'knight to f3', move_number: 2, white: true }
+  const link = {
+    index: 0, char_offset: 9, line_id: 'l1', ref: 'here.engine1', label: 'see', kind: 'engine',
+    start_path_uci: [], moves_uci: ['e2e4'],
+  } // prettier-ignore
+  const events = await collect(
+    `event: move\ndata: ${JSON.stringify(move)}\n\n`,
+    `event: line_link\ndata: ${JSON.stringify(link)}\n\n`,
+    'event: move\ndata: {"san": 3}\n\n',
+  )
+
+  expect(events).toEqual([
+    { type: 'move', move },
+    { type: 'line_link', link },
+  ])
+})

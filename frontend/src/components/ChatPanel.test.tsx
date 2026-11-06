@@ -102,7 +102,7 @@ test('a board tag shows as an icon; hovering it shows that tag, clicking it goes
   fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
   const tag = await screen.findByRole('button', { name: 'Show this on the board' })
-  expect(onReply).toHaveBeenCalledWith('e2e4 e7e5', [TAG])
+  expect(onReply).toHaveBeenCalledWith('e2e4 e7e5', expect.objectContaining({ annotations: [TAG] }))
   expect(screen.getByText(/eyes f7/)).toBeInTheDocument()
   expect(screen.queryByText('board')).not.toBeInTheDocument()
 

@@ -21,3 +21,39 @@ button.coach-board-tag:focus-visible {
   background: var(--color-border);
   color: var(--color-fg);
 }
+
+/* A move tag (SPEC_V3 §9.4): words or notation; the other shows on hover. */
+.coach-move[title] {
+  text-decoration: underline dotted var(--color-muted);
+  text-underline-offset: var(--space-1);
+  cursor: help;
+}
+
+.coach-move-notation {
+  font-weight: 600;
+}
+
+/* A line link (SPEC_V3 §9.5): plays the line on the board. */
+.coach-line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-nav);
+  background: none;
+  color: var(--chess-plan);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: var(--space-1);
+}
+
+button.coach-line {
+  cursor: pointer;
+}
+
+button.coach-line:hover,
+button.coach-line:focus-visible {
+  background: var(--color-tint);
+}

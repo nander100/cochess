@@ -206,6 +206,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   piece_set: 'cburnett',
   sounds: false,
   engine_panel: false,
+  coach_detail_level: 'auto',
+  effective_detail_level: 'standard',
+  playback_seconds: 1.5,
 }
 
 export const EMPTY_TENDENCIES = {
@@ -253,6 +256,10 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     momentReveal: vi.fn(coachSays('The move was 2. d4.', { grade: null, state: 'revealed' })),
     momentAsk: vi.fn(coachSays('Think about the centre.')),
     momentWrapUp: vi.fn(coachSays('Well done.')),
+    playback: vi.fn(async (lineId: string) => ({
+      line_id: lineId, start_fen: '', moves_uci: [], moves_san: [], evals: [], win_pcts: [], settle_ply: 2,
+      caption: 'White has won a knight.',
+    })), // prettier-ignore
     walkthrough: vi.fn(async (_gameId: string, body: WalkthroughRequest, onEvent: (e: CoachEvent) => void) => {
       onEvent({ type: 'status', message: 'Coach is writing…' })
       onEvent({ type: 'walkthrough', walkthrough: walkthroughFor(body) })

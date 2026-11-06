@@ -7,6 +7,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   piece_set: 'cburnett',
   sounds: false,
   engine_panel: false,
+  coach_detail_level: 'auto',
+  effective_detail_level: 'standard', // replaced by the server's answer once settings load
+  playback_seconds: 1.5,
 }
 
 export interface SettingsState {

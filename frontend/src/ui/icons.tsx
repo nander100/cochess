@@ -106,3 +106,22 @@ export const BoardArrowIcon = (p: IconProps) => (
     <path d="M8 16l8-8M11 8h5v5" />
   </Icon>
 )
+
+/** Play: a linked line, or playback after a pause (SPEC_V3 §9.5). */
+export const PlayIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M7 4l12 8-12 8z" />
+  </Icon>
+)
+
+export const PauseIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M8 5v14M16 5v14" />
+  </Icon>
+)
+
+export const ReplayIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4" />
+  </Icon>
+)

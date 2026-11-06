@@ -1,6 +1,6 @@
 // Server-sent events over fetch (EventSource can't POST). Coach endpoints always stream SSE.
 
-import type { Annotation, AnnotationColor, Walkthrough } from './types'
+import type { Annotation, AnnotationColor, LineLink, MoveToken, Walkthrough } from './types'
 
 export type CoachEvent =
   | { type: 'status'; message: string }
@@ -12,6 +12,9 @@ export type CoachEvent =
   | { type: 'moment'; grade: string | null; state: string }
   /** One checked board tag of the reply (SPEC_V3 §11.1), sent after the text. */
   | { type: 'annotation'; annotation: Annotation }
+  /** A move tag and a line link of the reply (SPEC_V3 §9.4), sent after the text. */
+  | { type: 'move'; move: MoveToken }
+  | { type: 'line_link'; link: LineLink }
   /** A finished line walkthrough (SPEC_V3 §7), checked by the backend. */
   | { type: 'walkthrough'; walkthrough: Walkthrough }
 
@@ -83,6 +86,14 @@ function toCoachEvent(name: string, payload: unknown): CoachEvent | null {
     case 'moment':
       return typeof record.state === 'string'
         ? { type: 'moment', grade: typeof record.grade === 'string' ? record.grade : null, state: record.state }
+        : null
+    case 'move':
+      return typeof record.san === 'string' && typeof record.words === 'string' && typeof record.index === 'number'
+        ? { type: 'move', move: record as unknown as MoveToken }
+        : null
+    case 'line_link':
+      return typeof record.line_id === 'string' && Array.isArray(record.moves_uci) && typeof record.index === 'number'
+        ? { type: 'line_link', link: record as unknown as LineLink }
         : null
     case 'walkthrough':
       return isWalkthrough(record) ? { type: 'walkthrough', walkthrough: record } : null

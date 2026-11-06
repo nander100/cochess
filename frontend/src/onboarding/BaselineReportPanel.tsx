@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import Markdown from 'react-markdown'
+import { CoachText } from '../components/CoachText'
+import { plainWords } from '../components/plainWords'
 import { Link } from 'react-router'
 import { type ApiClient, isLoggedOut } from '../api/client'
 import type { BaselineReport } from '../api/types'
@@ -42,13 +43,13 @@ export function BaselineReportPanel({ api, onLoggedOut }: BaselineReportPanelPro
       {report && (
         <>
           <h2 className="baseline-title">Written {gameDate(report.created_at)} from your 12 games</h2>
-          <p>{openingLine(report.text)}</p>
+          <p>{openingLine(plainWords(report.text))}</p>
           <Button className="baseline-read" onClick={() => setOpen(true)}>
             Read the report
           </Button>
           <Modal title="Your baseline report" open={open} onClose={() => setOpen(false)}>
             <div className="baseline-text">
-              <Markdown>{report.text}</Markdown>
+              <CoachText text={report.text} tokens={{ moves: report.moves }} />
             </div>
           </Modal>
         </>

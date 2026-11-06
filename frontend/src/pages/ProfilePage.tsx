@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { type ApiClient, isLoggedOut } from '../api/client'
-import type { BoardScheme, PieceSet, Profile, TendencyReport, TimeControl } from '../api/types'
+import type { BoardScheme, DetailLevel, PieceSet, Profile, TendencyReport, TimeControl, UserSettings } from '../api/types'
 import { BaselineReportPanel } from '../onboarding/BaselineReportPanel'
 import { useSettings } from '../settings/settingsContext'
 import { ShortcutList } from '../shortcuts/ShortcutHelp'
@@ -38,6 +38,19 @@ const PIECE_SETS: readonly ToggleOption<PieceSet>[] = [
   { value: 'cburnett', label: 'Classic' },
   { value: 'merida', label: 'Merida' },
 ]
+
+const DETAIL_LEVELS: readonly ToggleOption<UserSettings['coach_detail_level']>[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'plain', label: 'Plain' },
+  { value: 'standard', label: 'Standard' },
+  { value: 'technical', label: 'Technical' },
+]
+
+const DETAIL_HELP: Record<DetailLevel, string> = {
+  plain: 'Plain: everyday words, no notation, evaluations in words.',
+  standard: 'Standard: words first, notation when you hover a move, the number after the words.',
+  technical: 'Technical: notation and numbers, concise.',
+}
 
 const TIME_CONTROL_NAME: Record<TimeControl, string> = { bullet: 'Bullet', blitz: 'Blitz', rapid: 'Rapid', classical: 'Classical' }
 
@@ -211,8 +224,7 @@ function AboutYou({ api, profile, onSaved, onLoggedOut }: AboutYouProps) {
 }
 
 /** Settings (SPEC_V3 §4.3) as a section of the profile, styled like the design's Appearance block.
- * Changes apply at once and are saved for the player; there's nothing to submit. Coach detail
- * level and playback speed arrive in M5. */
+ * Changes apply at once and are saved for the player; there's nothing to submit. */
 function SettingsSection() {
   const { settings, update } = useSettings()
   return (
@@ -228,6 +240,27 @@ function SettingsSection() {
         onChange={(board_scheme) => update({ board_scheme })}
       />
       <SegmentedToggle legend="Pieces" options={PIECE_SETS} value={settings.piece_set} onChange={(piece_set) => update({ piece_set })} />
+      <SegmentedToggle
+        legend="Coach detail level"
+        options={DETAIL_LEVELS}
+        value={settings.coach_detail_level}
+        onChange={(coach_detail_level) => update({ coach_detail_level })}
+      />
+      <p className="profile-help">
+        {DETAIL_HELP[settings.effective_detail_level]}
+        {settings.coach_detail_level === 'auto' && ' (Auto follows your rating.)'}
+      </p>
+      <label className="profile-range">
+        <span>Line playback speed: one move every {settings.playback_seconds} s</span>
+        <input
+          type="range"
+          min={0.75}
+          max={3}
+          step={0.25}
+          value={settings.playback_seconds}
+          onChange={(event) => update({ playback_seconds: Number(event.target.value) })}
+        />
+      </label>
       <div className="profile-switches">
         <Switch label="Sounds on move" checked={settings.sounds} onChange={(sounds) => update({ sounds })} />
         <Switch

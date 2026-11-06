@@ -14,6 +14,7 @@ import type {
   OnboardingStatus,
   ParseResponse,
   PgnExport,
+  Playback,
   PositionRequest,
   Profile,
   ProfileUpdate,
@@ -97,6 +98,8 @@ export interface ApiClient {
   ): Promise<void>
   momentAsk(gameId: string, index: number, message: string, onEvent: (event: CoachEvent) => void): Promise<void>
   momentWrapUp(gameId: string, onEvent: (event: CoachEvent) => void): Promise<void>
+  /** Where a linked line's playback stops (SPEC_V3 §9.6), from the browser's scans of it. */
+  playback(lineId: string, stepResults: EngineResult[]): Promise<Playback>
   /** A line walkthrough (SPEC_V3 §7): a 428 error means the line's positions must be scanned. */
   walkthrough(gameId: string, body: WalkthroughRequest, onEvent: (event: CoachEvent) => void): Promise<void>
   /** Onboarding (SPEC_V2 §10): the pasted games as a table, with the slot each would fill. */
@@ -206,6 +209,7 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
       stream(`/api/games/${gameId}/moments/${index}/ask`, { message }, onEvent),
     momentWrapUp: (gameId, onEvent) => stream(`/api/games/${gameId}/moments/wrap_up`, null, onEvent),
     walkthrough: (gameId, body, onEvent) => stream(`/api/games/${gameId}/walkthrough`, body, onEvent),
+    playback: (lineId, stepResults) => post(`/api/lines/${lineId}/playback`, { step_results: stepResults }),
     onboardingParse: (pgnText, choices) => post('/api/onboarding/parse', { pgn_text: pgnText, choices }),
     onboardingSubmit: (games) => post('/api/onboarding/submit', { games }),
     onboardingStatus: () => request('/api/onboarding/status'),

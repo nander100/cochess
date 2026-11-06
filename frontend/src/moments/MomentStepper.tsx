@@ -13,7 +13,7 @@ import { isLoggedOut } from '../api/client'
 import type { GameDetail, MomentInfo, MomentMessage } from '../api/types'
 import { errorText } from '../pages/util'
 import { Button, ChatBubble, CoachAvatar, Eyebrow, FeatureCard, StepChips, TintedPanel, Tooltip, TypingIndicator } from '../ui'
-import { CoachText, type ShowTag } from '../components/CoachText'
+import { CoachText, type PlayLine, type ShowTag } from '../components/CoachText'
 import './MomentStepper.css'
 import { isUnsolved, numbered } from './moment'
 
@@ -57,13 +57,15 @@ interface MomentStepperProps {
   onBack?: () => void
   /** A board tag in a coach message was hovered or clicked (SPEC_V3 §6.3). */
   onShowTag?: ShowTag
+  /** Play a linked line on the board (SPEC_V3 §9.5). */
+  onPlayLine?: PlayLine
 }
 
 /** The critical-moment exercise (SPEC_V2 §8.2): intro → attempts → feedback → reveal → next. */
 export function MomentStepper(props: MomentStepperProps) {
   const {
     gameId, moments, current, onSelect, fen, candidate, onTakeBack, deps, searches, onUpdated, onLoggedOut, onBack,
-    onShowTag,
+    onShowTag, onPlayLine,
   } = props
   const id = useId()
   const moment = moments.find((m) => m.index === current) ?? moments[0]
@@ -87,7 +89,10 @@ export function MomentStepper(props: MomentStepperProps) {
       setLastGrade(reply.grade)
       setPending((previous) => [
         ...previous,
-        { role: 'coach', text: reply.text, kind: 'pending', annotations: reply.annotations },
+        {
+          role: 'coach', text: reply.text, kind: 'pending', annotations: reply.annotations,
+          moves: reply.moves, line_links: reply.line_links,
+        }, // prettier-ignore
       ])
       const fresh = await deps.api.getGame(gameId)
       setPending([])
@@ -215,7 +220,7 @@ export function MomentStepper(props: MomentStepperProps) {
           {earlier.map((message, i) => (
             <li key={i}>
               <ChatBubble from={message.role === 'coach' ? 'coach' : 'player'}>
-                <CoachText text={message.text} annotations={message.annotations} onShowTag={onShowTag} />
+                <CoachText text={message.text} tokens={message} onShowTag={onShowTag} onPlayLine={onPlayLine} />
               </ChatBubble>
             </li>
           ))}
@@ -225,14 +230,14 @@ export function MomentStepper(props: MomentStepperProps) {
         <FeatureCard className="moment-feedback" aria-live="polite">
           <CoachAvatar />
           <div className="moment-feedback-text">
-            <CoachText text={latest.text} annotations={latest.annotations} onShowTag={onShowTag} />
+            <CoachText text={latest.text} tokens={latest} onShowTag={onShowTag} onPlayLine={onPlayLine} />
           </div>
         </FeatureCard>
       )}
       {latest && isHint && (
         <TintedPanel className="moment-hint" aria-live="polite">
           <span className="moment-panel-label">Hint</span>
-          <CoachText text={latest.text} annotations={latest.annotations} onShowTag={onShowTag} />
+          <CoachText text={latest.text} tokens={latest} onShowTag={onShowTag} onPlayLine={onPlayLine} />
         </TintedPanel>
       )}
       {lastGrade && !busy && <p className={`moment-grade ${lastGrade}`}>{GRADE_LABEL[lastGrade] ?? lastGrade}</p>}
@@ -343,7 +348,7 @@ export function MomentStepper(props: MomentStepperProps) {
         <FeatureCard className="moment-feedback moment-wrap-up">
           <CoachAvatar />
           <div className="moment-feedback-text">
-            <CoachText text={wrapUp.text} annotations={wrapUp.annotations} onShowTag={onShowTag} />
+            <CoachText text={wrapUp.text} tokens={wrapUp} onShowTag={onShowTag} onPlayLine={onPlayLine} />
           </div>
         </FeatureCard>
       )}

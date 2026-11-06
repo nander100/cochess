@@ -188,3 +188,22 @@
   font-family: var(--font-body);
   letter-spacing: normal;
 }
+
+.profile-help {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  color: var(--color-muted);
+  font: var(--text-small);
+}
+
+/* Line playback speed (SPEC_V3 §9.5). */
+.profile-range {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font: var(--text-ui-strong);
+}
+
+.profile-range input {
+  accent-color: var(--color-primary);
+  max-width: var(--side-panel);
+}

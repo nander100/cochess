@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Markdown from 'react-markdown'
+import { CoachText } from '../components/CoachText'
 import { Link } from 'react-router'
 import { coachStep } from '../analysis/moments'
 import type { PipelineDeps } from '../analysis/pipeline'
 import { type QueueProgress, queueLabel, runOnboardingQueue } from '../analysis/queue'
 import { isLoggedOut } from '../api/client'
-import type { OnboardingStatus } from '../api/types'
+import type { MoveToken, OnboardingStatus } from '../api/types'
 import { CATEGORY_LABEL, SLOT_LABEL } from '../onboarding/labels'
 import { PasteGames } from '../onboarding/PasteGames'
 import { SlotChecklist } from '../onboarding/SlotChecklist'
@@ -24,7 +24,7 @@ export function OnboardingPage({ deps, onLoggedOut }: OnboardingPageProps) {
   const [status, setStatus] = useState<OnboardingStatus | null>(null)
   const [progress, setProgress] = useState<QueueProgress | null>(null)
   const [writing, setWriting] = useState(false)
-  const [report, setReport] = useState<string | null>(null)
+  const [report, setReport] = useState<{ text: string; moves: MoveToken[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [removing, setRemoving] = useState<string | null>(null) // asking before removing this game
@@ -94,7 +94,7 @@ export function OnboardingPage({ deps, onLoggedOut }: OnboardingPageProps) {
     setWriting(true)
     try {
       const reply = await coachStep((onEvent) => api.streamBaselineReport(onEvent), () => {})
-      setReport(reply.text)
+      setReport({ text: reply.text, moves: reply.moves })
       setStatus(await api.onboardingStatus())
     } catch (caught) {
       fail(caught)
@@ -111,7 +111,7 @@ export function OnboardingPage({ deps, onLoggedOut }: OnboardingPageProps) {
     )
   }
 
-  const shownReport = report ?? status.report?.text ?? null
+  const shownReport = report ?? (status.report ? { text: status.report.text, moves: status.report.moves ?? [] } : null)
   const primary = status.primary_time_control
   const pending = status.games.length - status.analyzed
   const filled = status.slots.reduce((sum, slot) => sum + Math.min(slot.filled, slot.of), 0)
@@ -232,7 +232,7 @@ export function OnboardingPage({ deps, onLoggedOut }: OnboardingPageProps) {
           <span className="ui-eyebrow">Baseline report</span>
           {shownReport ? (
             <div className="onboarding-report-body">
-              <Markdown>{shownReport}</Markdown>
+              <CoachText text={shownReport.text} tokens={{ moves: shownReport.moves }} />
             </div>
           ) : (
             <>

@@ -1,0 +1,35 @@
+/* Line playback controls under the board (SPEC_V3 §9.5). Tokens only. */
+.playback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: var(--board-frame-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-tint);
+}
+
+.playback-title {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0;
+  font: var(--text-ui);
+}
+
+.playback-count {
+  color: var(--color-muted);
+}
+
+.playback-caption {
+  margin: 0;
+  font: var(--text-small-heading);
+}
+
+.playback-controls,
+.playback-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}

@@ -129,3 +129,15 @@ test("a change made before the saved settings arrive isn't undone by them", asyn
   await vi.waitFor(() => expect(document.documentElement.dataset.pieces).toBe('merida'))
   expect(document.documentElement.dataset.theme).toBe('dark')
 })
+
+test('the coach detail level and playback speed are settings', async () => {
+  const { api } = setup()
+  await vi.waitFor(() => expect(api.settings).toHaveBeenCalled())
+
+  fireEvent.click(within(screen.getByRole('group', { name: 'Coach detail level' })).getByLabelText('Plain'))
+  fireEvent.change(screen.getByLabelText(/Line playback speed/), { target: { value: '2.5' } })
+
+  expect(api.updateSettings).toHaveBeenCalledWith({ coach_detail_level: 'plain' })
+  expect(api.updateSettings).toHaveBeenCalledWith({ playback_seconds: 2.5 })
+  expect(screen.getByText(/Plain: everyday words/)).toBeInTheDocument()
+})

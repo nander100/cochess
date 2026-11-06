@@ -35,7 +35,7 @@ describe('tryMove', () => {
 
     const reply = await tryMove(d, new BeforeSearches(), 'g1', 1, START, 'g1f3', '  develop  ', (p) => progress.push(p))
 
-    expect(reply).toEqual({ text: 'Not quite. Look at your queen.', annotations: [], grade: 'mistake', state: 'attempt' })
+    expect(reply).toEqual({ text: 'Not quite. Look at your queen.', annotations: [], moves: [], line_links: [], grade: 'mistake', state: 'attempt' })
     expect(progress).toEqual(['checking', 'writing'])
     const [, index, body] = vi.mocked(d.api.momentAttempt).mock.calls[0]
     expect(index).toBe(1)
@@ -114,6 +114,6 @@ describe('coach steps', () => {
   it('returns plain text with no grade', async () => {
     const reply = await coachStep(coachSays('Hello.'), () => {})
 
-    expect(reply).toEqual({ text: 'Hello.', annotations: [], grade: null, state: null })
+    expect(reply).toEqual({ text: 'Hello.', annotations: [], moves: [], line_links: [], grade: null, state: null })
   })
 })

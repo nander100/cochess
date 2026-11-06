@@ -77,16 +77,16 @@ function Ready({ result, walk, onStep, onSave }: ReadyProps) {
               Step {current.index} of {total}: {numberedSan(before, [current.uci])}
               {current.eval_after && <span className="walkthrough-eval"> · {current.eval_after}</span>}
             </p>
-            <CoachText text={current.text} />
+            <CoachText text={current.text} tokens={{ moves: current.moves }} />
             {walk.step === total && (
               <div className="walkthrough-summary">
                 <strong>The takeaway</strong>
-                <CoachText text={result.summary} />
+                <CoachText text={result.summary} tokens={{ moves: result.summary_moves }} />
               </div>
             )}
           </>
         ) : (
-          <CoachText text={result.intro} />
+          <CoachText text={result.intro} tokens={{ moves: result.intro_moves }} />
         )}
       </FeatureCard>
       <div className="walkthrough-nav">
