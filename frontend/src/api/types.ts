@@ -54,6 +54,17 @@ export interface ImportRow {
   error: { code: string; message: string; move_number: number | null } | null
 }
 
+/** POST /api/onboarding/import: the newest games that fill the assessment's empty slots. */
+export interface AssessmentImport {
+  platform: Platform
+  username: string
+  /** How many recent games in the player's main time control were looked at. */
+  fetched: number
+  games: { pgn: string; external_id: string }[]
+  /** Slots these games still don't fill. */
+  missing: { slot: Slot; count: number }[]
+}
+
 export interface ImportResponse {
   platform: Platform
   username: string

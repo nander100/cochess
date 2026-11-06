@@ -226,6 +226,8 @@ class ImportSettings(BaseModel):
     contact: str | None = None  # e.g. an email or URL the platforms can reach
     default_games: int = 20
     max_games: int = 50
+    # The assessment's import looks this far back for games that fill its 12 slots.
+    assessment_games: int = 100
     timeout_seconds: float = 15
     cooldown_seconds: float = 10  # per player, between imports
     chesscom_max_archives: int = 12  # monthly archives walked back, newest first

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import App from './App'
 import type { PipelineDeps } from './analysis/pipeline'
@@ -19,6 +19,12 @@ vi.mock('./board/Board', () => ({
     </div>
   ),
 }))
+
+// The game, assessment and profile pages are lazy-loaded (App.tsx): load them once up front so
+// a test's first render doesn't race the dynamic import.
+beforeAll(async () => {
+  await Promise.all([import('./pages/GamePage'), import('./pages/OnboardingPage'), import('./pages/ProfilePage')])
+})
 
 function renderApp(deps: PipelineDeps, path = '/new') {
   return render(
@@ -388,6 +394,7 @@ describe('keyboard shortcuts', () => {
   test('Home, End, ← and → move through the game; F flips the board', async () => {
     renderApp(fakeDeps(), '/games/game-1')
     await screen.findByText('White to move · move 1')
+    await act(async () => {})
 
     key('End')
     expect(screen.getByText('White to move · move 4')).toBeInTheDocument()
@@ -403,6 +410,7 @@ describe('keyboard shortcuts', () => {
     const deps = fakeDeps()
     renderApp(deps, '/games/game-1')
     await screen.findByText('White to move · move 1')
+    await act(async () => {})
 
     key('e')
     expect(screen.getByLabelText('Engine')).toBeChecked()
@@ -417,6 +425,7 @@ describe('keyboard shortcuts', () => {
     const deps = fakeDeps({ getGame: vi.fn(async () => ({ ...DETAIL, moments: [open] })) })
     renderApp(deps, '/games/game-1')
     await screen.findByText('White to move · move 1')
+    await act(async () => {})
 
     key('n')
     expect(await screen.findByRole('heading', { name: 'Find a better move' })).toBeInTheDocument()
@@ -429,6 +438,7 @@ describe('keyboard shortcuts', () => {
   test('? lists the shortcuts and / puts the cursor in the question box', async () => {
     renderApp(fakeDeps(), '/games/game-1')
     await screen.findByText('White to move · move 1')
+    await act(async () => {})
 
     key('?')
     const dialog = screen.getByRole('dialog', { name: 'Keyboard shortcuts' })

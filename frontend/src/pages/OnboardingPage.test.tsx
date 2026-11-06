@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from 'vitest'
 import App from '../App'
 import type { PipelineDeps } from '../analysis/pipeline'
 import type { GameChoice, OnboardingGame, OnboardingStatus, ParsedRow, ParseResponse } from '../api/types'
-import { DEFAULT_SETTINGS, DETAIL, EMPTY_ONBOARDING, EMPTY_SLOTS, REPORT_TEXT, fakeDeps, importRow } from '../test/fakes'
+import { DEFAULT_SETTINGS, DETAIL, EMPTY_ONBOARDING, EMPTY_SLOTS, REPORT_TEXT, fakeDeps } from '../test/fakes'
 
 vi.mock('../board/Board', () => ({ Board: () => <div data-testid="board" /> }))
 
@@ -73,18 +73,20 @@ describe('adding games', () => {
     expect(screen.getByRole('button', { name: 'Add 2 games' })).toBeEnabled()
   })
 
-  test('importing fills the paste box, checks it, and adds games with their platform ids', async () => {
-    const imported = importRow(0, { pgn: '[White "nander100"]\n\n1. e4 e5 1-0' })
+  test('importing pastes only the games that fill empty slots, and says which are still missing', async () => {
+    const picked = '[White "nander100"]\n\n1. e4 e5 1-0'
     const deps = fakeDeps({
       settings: vi.fn(async () => ({ ...DEFAULT_SETTINGS, chesscom_username: 'nander100' })),
-      importGames: vi.fn(async () => ({
-        platform: 'chesscom' as const, username: 'nander100', games_left_today: 10,
-        games: [imported, importRow(1, { already_imported: true })],
+      onboardingImport: vi.fn(async () => ({
+        platform: 'chesscom' as const, username: 'nander100', fetched: 100,
+        games: [{ pgn: picked, external_id: '1000' }],
+        missing: [{ slot: 'white_win' as const, count: 2 }, { slot: 'white_loss' as const, count: 3 },
+                  { slot: 'black_loss' as const, count: 1 }],
       })), // prettier-ignore
       onboardingParse: vi.fn(async () => ({
         primary_time_control: 'rapid' as const,
         slots: EMPTY_SLOTS,
-        games: [row(0, { pgn: imported.pgn, color_detected: true })],
+        games: [row(0, { pgn: picked, color_detected: true })],
       })),
       onboardingSubmit: vi.fn(async () => ({
         results: [{ index: 0, slot: 'white_win' as const, reason: null, game_id: 'new-1' }],
@@ -93,17 +95,37 @@ describe('adding games', () => {
     })
     renderAt(deps, '/onboarding')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Import from Chess.com' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Import 12 games from Chess.com' }))
 
     await screen.findByRole('table')
-    expect(deps.api.importGames).toHaveBeenCalledWith({ platform: 'chesscom', max: 50 })
-    expect(vi.mocked(deps.api.onboardingParse).mock.calls[0][0]).toBe(imported.pgn) // the added one is left out
+    expect(deps.api.onboardingImport).toHaveBeenCalledWith('chesscom')
+    expect(vi.mocked(deps.api.onboardingParse).mock.calls[0][0]).toBe(picked)
+    expect(screen.getByText(
+      'Picked 1 game from your last 100 Chess.com games in your main time control. ' +
+      'Still needed: 2 white wins, 3 white losses, 1 black loss. Paste those games below, or play some more.',
+    )).toBeInTheDocument() // prettier-ignore
     fireEvent.click(screen.getByRole('button', { name: 'Add 1 game' }))
     await screen.findByText('Added 1 game.')
     expect(vi.mocked(deps.api.onboardingSubmit).mock.calls[0][0][0].external).toEqual({
       platform: 'chesscom',
       external_id: '1000',
     })
+  })
+
+  test('an import that fills no slot says so', async () => {
+    const deps = fakeDeps({
+      settings: vi.fn(async () => ({ ...DEFAULT_SETTINGS, lichess_username: 'me' })),
+      onboardingImport: vi.fn(async () => ({
+        platform: 'lichess' as const, username: 'me', fetched: 40, games: [], missing: [],
+      })), // prettier-ignore
+    })
+    renderAt(deps, '/onboarding')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Import 12 games from Lichess' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'None of your last 40 Lichess games in your main time control fill an empty slot.',
+    )
   })
 
   test('without a username, the form points to the profile', async () => {

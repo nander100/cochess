@@ -78,15 +78,10 @@ def import_games(
     session: SessionDep,
     settings: SettingsDep,
 ) -> ImportResponse:
-    username = _username(session, user.id, body.platform)
-    _cool_down(request, user.id, settings)
     limit = min(body.max or settings.imports.default_games, settings.imports.max_games)
-    query = ImportQuery(username, limit, body.tc, body.since)
-    transport = getattr(request.app.state, "import_transport", None)  # tests fake the platforms
-    try:
-        fetched = fetch_games(body.platform, query, settings.imports, transport)
-    except ImportFailure as failure:
-        raise HTTPException(FAILURE_STATUS[failure.kind], detail=str(failure)) from failure
+    username, fetched = fetch_recent(
+        request, session, user.id, settings, body.platform, limit, body.tc, body.since
+    )
     known_ids, known_prints = _known(session, user.id, body.platform)
     usernames = usernames_for(session, user.id)
     rows = [
@@ -99,6 +94,28 @@ def import_games(
         games=rows,
         games_left_today=games_left_today(session, user.id, settings),
     )
+
+
+def fetch_recent(
+    request: Request,
+    session: Session,
+    user_id: str,
+    settings: Settings,
+    platform: Platform,
+    max_games: int,
+    category: TimeControl | None = None,
+    since: date | None = None,
+) -> tuple[str, list[ImportedGame]]:
+    """The player's username on `platform` and their latest games there, after the cooldown.
+    Platform failures become HTTP errors with a message the player can act on."""
+    username = _username(session, user_id, platform)
+    _cool_down(request, user_id, settings)
+    query = ImportQuery(username, max_games, category, since)
+    transport = getattr(request.app.state, "import_transport", None)  # tests fake the platforms
+    try:
+        return username, fetch_games(platform, query, settings.imports, transport)
+    except ImportFailure as failure:
+        raise HTTPException(FAILURE_STATUS[failure.kind], detail=str(failure)) from failure
 
 
 def _username(session: Session, user_id: str, platform: Platform) -> str:

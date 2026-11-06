@@ -13,6 +13,7 @@ from app.api import imports as import_routes
 from app.api import lines as line_routes
 from app.api import moments as moment_routes
 from app.api import onboarding as onboarding_routes
+from app.api import onboarding_import as onboarding_import_routes
 from app.api import tendencies as tendency_routes
 from app.api import variations as variation_routes
 from app.api import walkthrough as walkthrough_routes
@@ -74,4 +75,5 @@ def create_app(
     app.include_router(line_routes.router)
     app.include_router(dashboard_routes.router)
     app.include_router(import_routes.router)
+    app.include_router(onboarding_import_routes.router)
     return app

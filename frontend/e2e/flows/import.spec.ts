@@ -32,8 +32,8 @@ test('recent games are imported from Chess.com and analyzed', async ({ page }) =
   await expect(table.getByText('Already added')).toBeVisible()
 })
 
-// SPEC_V3 §10, assessment path, with Lichess faked: "Import from Lichess" fills the paste box,
-// the player's own game gets its color from the username and fills a slot, and it's stored once.
+// SPEC_V3 §10, assessment path, with Lichess faked: the import picks only games that fill an
+// empty slot (the player's own White loss), says which slots are still short, and stores it once.
 test('the assessment imports games from Lichess into the paste table', async ({ page }) => {
   const name = `e2e_lichess_${Date.now()}`
   await logInWithProfile(page, newLoginLink(`Lichess ${name}`), 1200)
@@ -44,22 +44,21 @@ test('the assessment imports games from Lichess into the paste table', async ({ 
   await expect(accounts.getByRole('status')).toHaveText('Saved')
 
   await page.goto('/onboarding')
-  await page.getByRole('button', { name: 'Import from Lichess' }).click()
+  await page.getByRole('button', { name: 'Import 12 games from Lichess' }).click()
 
+  // Only the player's own game fills a slot (a White loss); the other game isn't theirs.
   const table = page.locator('table.paste-table')
-  await expect(table.locator('tbody tr')).toHaveCount(2)
+  await expect(table.locator('tbody tr')).toHaveCount(1)
   await expect(page.getByLabel(/Paste one or more games/)).toHaveValue(new RegExp(`\\[White "${name}"\\]`))
   await expect(table.getByText('From your username')).toHaveCount(1)
-  await expect(page.getByLabel('Your color in game 1')).toHaveValue('white')
-  // The other game isn't the player's: it waits for a color, so Add waits too.
-  await expect(page.getByRole('button', { name: 'Choose your color for 1 game' })).toBeDisabled()
-  await page.getByLabel('Your color in game 2').selectOption('black')
-  await page.getByRole('button', { name: 'Add 2 games' }).click()
-  await expect(page.getByText('Added 2 games.')).toBeVisible()
+  await expect(page.getByText(/Picked 1 game from your last 2 Lichess games/)).toBeVisible()
+  await expect(page.getByText(/Still needed: 3 white wins, 2 white losses, 3 black wins, 3 black losses/)).toBeVisible()
+  await page.getByRole('button', { name: 'Add 1 game' }).click()
+  await expect(page.getByText('Added 1 game.')).toBeVisible()
 
   await page.goto('/games')
   const panel = page.getByRole('region', { name: 'Import recent games' })
   await panel.getByLabel('From').selectOption('lichess')
   await panel.getByRole('button', { name: 'Fetch games' }).click()
-  await expect(panel.getByRole('table', { name: 'Fetched games' }).getByText('Already added')).toHaveCount(2)
+  await expect(panel.getByRole('table', { name: 'Fetched games' }).getByText('Already added')).toHaveCount(1)
 })

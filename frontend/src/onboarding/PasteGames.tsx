@@ -1,9 +1,9 @@
 import { type FormEvent, useId, useState } from 'react'
 import { ApiError, type ApiClient, isLoggedOut } from '../api/client'
 import type {
-  Color, ExternalRef, GameChoice, ParseResponse, ParsedRow, Platform, SubmitGame, TimeControl,
+  AssessmentImport, Color, ExternalRef, GameChoice, ParseResponse, ParsedRow, Platform, SubmitGame, TimeControl,
 } from '../api/types' // prettier-ignore
-import { PLATFORM_LABEL, addable } from '../importing/importRows'
+import { PLATFORM_LABEL } from '../importing/importRows'
 import { Link } from 'react-router'
 import { errorText } from '../pages/util'
 import { useSettings, usernames } from '../settings/settingsContext'
@@ -11,7 +11,6 @@ import { Button, Pill, Table, useToast } from '../ui'
 import { CATEGORY_LABEL, PICKABLE, SLOT_LABEL, reasonText } from './labels'
 import './Onboarding.css'
 
-const IMPORT_MAX = 50 // the most a platform import returns; slots pick what fits
 
 interface PasteGamesProps {
   api: ApiClient
@@ -30,6 +29,7 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
   const [choices, setChoices] = useState<(GameChoice | null)[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [externals, setExternals] = useState<ReadonlyMap<string, ExternalRef>>(() => new Map())
   const { show } = useToast()
   const { settings } = useSettings()
@@ -67,19 +67,22 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
     await checkText(text)
   }
 
-  /** Fetch the player's recent games (SPEC_V3 §10) into the paste box, then check them. Games
-   * already added are left out; each game's platform id goes with it when it's added. */
+  /** Bring in the assessment's games from a platform (SPEC_V3 §10, owner request 2026-11-06):
+   * the backend picks the newest games that fill the empty slots, at most 12, and they're
+   * checked as a paste. Each game's platform id goes with it when it's added. */
   async function importFrom(platform: Platform) {
-    const response = await run(() => api.importGames({ platform, max: IMPORT_MAX }))
+    setNotice(null)
+    const response = await run(() => api.onboardingImport(platform))
     if (!response) return
-    const fresh = response.games.filter((row) => addable(row) && row.pgn !== null)
-    if (fresh.length === 0) {
-      setError(`No new games found on ${PLATFORM_LABEL[platform]} for ${response.username}.`)
+    const where = `your last ${response.fetched} ${PLATFORM_LABEL[platform]} games in your main time control`
+    if (response.games.length === 0) {
+      setError(`None of ${where} fill an empty slot.`)
       return
     }
-    const pgns = fresh.map((row) => row.pgn ?? '')
-    setExternals(new Map(fresh.map((row) => [row.pgn ?? '', { platform, external_id: row.external_id }])))
+    const pgns = response.games.map((game) => game.pgn)
+    setExternals(new Map(response.games.map((game) => [game.pgn, { platform, external_id: game.external_id }])))
     setText(pgns.join('\n\n'))
+    setNotice(missingText(response.games.length, where, response.missing))
     await checkText(pgns.join('\n\n'))
   }
 
@@ -160,6 +163,7 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
           value={text}
           onChange={(event) => {
             setText(event.target.value)
+            setNotice(null)
             setParsed(null)
             setExternals(new Map())
           }}
@@ -172,7 +176,7 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
           </Button>
           {importable.map((platform) => (
             <Button key={platform} variant="outline" disabled={busy} onClick={() => void importFrom(platform)}>
-              Import from {PLATFORM_LABEL[platform]}
+              Import 12 games from {PLATFORM_LABEL[platform]}
             </Button>
           ))}
         </div>
@@ -184,6 +188,11 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
       </form>
       {parsed && (
         <div className="paste-results">
+          {notice && (
+            <p className="paste-note" role="status">
+              {notice}
+            </p>
+          )}
           <h2 className="paste-subtitle">Checked games</h2>
           <Table className="paste-table" aria-label="Checked games">
             <thead>
@@ -231,6 +240,17 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
       )}
     </section>
   )
+}
+
+/** What an assessment import found, and which slots its games leave empty. */
+function missingText(found: number, where: string, missing: AssessmentImport['missing']): string {
+  const picked = `Picked ${plural(found)} from ${where}.`
+  if (missing.length === 0) return picked
+  const short = missing.map((m) => {
+    const label = SLOT_LABEL[m.slot].toLowerCase() // "white win", "black loss"
+    return `${m.count} ${m.count === 1 ? label : label.replace(/loss$/, 'losses').replace(/win$/, 'wins')}`
+  })
+  return `${picked} Still needed: ${short.join(', ')}. Paste those games below, or play some more.`
 }
 
 /** A game the player can still use, but hasn't said which side they played. */

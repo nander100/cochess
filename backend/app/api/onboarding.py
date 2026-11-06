@@ -67,7 +67,7 @@ def parse(
     body: ParseRequest, user: CurrentUser, session: SessionDep, settings: SettingsDep
 ) -> ParseResponse:
     """The pasted games as a table, with the slot each would fill or why it can't (§10.3)."""
-    primary = _primary(user)
+    primary = primary_time_control(user)
     try:
         split = split_games(body.pgn_text, settings.limits, settings.onboarding)
     except PgnError as error:
@@ -83,7 +83,7 @@ def parse(
     detected = [detect_color(game, usernames) for game in games]
     colors = [c.user_color or d for c, d in zip(choices, detected, strict=True)]
     filled = onboarding_games(session, user.id)
-    decisions = _decide(session, user, settings, games, colors, choices, filled, primary)
+    decisions = decide_slots(session, user, settings, games, colors, choices, filled, primary)
     rows = [
         _row(i, piece, suggestions[i], colors[i], decision, settings, choices[i].user_color is None)
         for i, (piece, decision) in enumerate(zip(split, decisions, strict=True))
@@ -99,7 +99,7 @@ def submit(
 ) -> SubmitResponse:
     """Store the games that fill a slot as onboarding games, queued for analysis. The backend
     decides again from the PGNs: what the browser showed is only a preview."""
-    primary = _primary(user)
+    primary = primary_time_control(user)
     games = [_parse_one(item.pgn, settings) for item in body.games]
     usernames = usernames_for(session, user.id)
     colors: list[Color | None] = [
@@ -111,7 +111,7 @@ def submit(
         for item, color in zip(body.games, colors, strict=True)
     ]
     filled = onboarding_games(session, user.id)
-    decisions = _decide(session, user, settings, games, colors, choices, filled, primary)
+    decisions = decide_slots(session, user, settings, games, colors, choices, filled, primary)
 
     results = []
     stored = list(filled)
@@ -205,7 +205,7 @@ def _events(result: BaselineResult) -> list[str]:
     return text_events(result.text, result.invalid_moves_removed, MessageTokens(moves=result.moves))
 
 
-def _primary(user: User) -> TimeControl:
+def primary_time_control(user: User) -> TimeControl:
     if not is_complete(user) or user.time_control is None:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=PROFILE_FIRST)
     return cast(TimeControl, user.time_control)
@@ -231,7 +231,7 @@ def _category(game: ParsedGame, choice: GameChoice, settings: Settings) -> Categ
     return from_header or choice.time_control_category
 
 
-def _decide(
+def decide_slots(
     session: Session,
     user: User,
     settings: Settings,

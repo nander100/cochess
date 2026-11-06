@@ -1,5 +1,7 @@
 import { type CoachEvent, readCoachEvents } from './sse'
 import type {
+  AssessmentImport,
+  Platform,
   ImportRequest,
   ImportResponse,
   AttemptRequest,
@@ -113,6 +115,8 @@ export interface ApiClient {
   /** Onboarding (SPEC_V2 §10): the pasted games as a table, with the slot each would fill. */
   onboardingParse(pgnText: string, choices: (GameChoice | null)[]): Promise<ParseResponse>
   onboardingSubmit(games: SubmitGame[]): Promise<SubmitResponse>
+  /** The newest games on a platform that fill the assessment's empty slots (at most 12). */
+  onboardingImport(platform: Platform): Promise<AssessmentImport>
   onboardingStatus(): Promise<OnboardingStatus>
   /** Write the baseline report (or show the stored one); it streams back like a synopsis. */
   streamBaselineReport(onEvent: (event: CoachEvent) => void): Promise<void>
@@ -227,6 +231,7 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
     playback: (lineId, stepResults) => post(`/api/lines/${lineId}/playback`, { step_results: stepResults }),
     onboardingParse: (pgnText, choices) => post('/api/onboarding/parse', { pgn_text: pgnText, choices }),
     onboardingSubmit: (games) => post('/api/onboarding/submit', { games }),
+    onboardingImport: (platform) => post('/api/onboarding/import', { platform }),
     onboardingStatus: () => request('/api/onboarding/status'),
     streamBaselineReport: (onEvent) => stream('/api/onboarding/report', null, onEvent),
     baselineReport: async () => {
