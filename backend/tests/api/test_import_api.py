@@ -57,16 +57,19 @@ def test_an_added_game_is_marked_and_cannot_be_added_twice(
 ) -> None:
     client.patch("/api/settings", json={"lichess_username": "me"})
     fake(app)
-    first = client.post("/api/import", json={"platform": "lichess"}).json()["games"][0]
+    first_body = client.post("/api/import", json={"platform": "lichess"}).json()
+    first, first_left = first_body["games"][0], first_body["games_left_today"]
     added = client.post(
         "/api/games",
         json={"pgn": first["pgn"], "external": {"platform": "lichess", "external_id": "lc000001"}},
     )
     assert added.status_code == 201, added.text
 
-    again = client.post("/api/import", json={"platform": "lichess"}).json()["games"]
+    again_body = client.post("/api/import", json={"platform": "lichess"}).json()
+    again = again_body["games"]
 
     assert [r["already_imported"] for r in again] == [True, False]
+    assert again_body["games_left_today"] == first_left - 1  # imports count toward the cap
     duplicate = client.post(
         "/api/games",
         json={"pgn": first["pgn"], "external": {"platform": "lichess", "external_id": "lc000001"}},

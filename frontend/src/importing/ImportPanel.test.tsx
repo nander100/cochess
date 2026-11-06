@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router'
 import { ApiError } from '../api/client'
 import type { UserSettings } from '../api/types'
 import { SettingsContext } from '../settings/settingsContext'
-import { DEFAULT_SETTINGS, DETAIL, fakeDeps, importRow } from '../test/fakes'
+import { DEFAULT_SETTINGS, DETAIL, GAME, fakeDeps, importRow } from '../test/fakes'
 import { ToastProvider } from '../ui'
 import { ImportPanel } from './ImportPanel'
 
@@ -24,6 +24,7 @@ function setup(deps = fakeDeps(), settings: Partial<UserSettings> = { chesscom_u
 const FOUND = {
   platform: 'chesscom' as const,
   username: 'nander100',
+  games_left_today: 10,
   games: [importRow(0), importRow(1, { already_imported: true }), importRow(2, { user_color: null })],
 }
 
@@ -80,4 +81,40 @@ test("a platform's refusal is shown next to the form", async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Fetch games' }))
 
   expect(await screen.findByRole('alert')).toHaveTextContent('has no player called nander100')
+})
+
+test("only today's room is added; the rest waits for tomorrow", async () => {
+  const deps = fakeDeps({
+    importGames: vi.fn(async () => ({ ...FOUND, games_left_today: 1, games: [importRow(0), importRow(3)] })),
+    getGame: vi.fn(async () => DETAIL),
+  })
+  setup(deps)
+  fireEvent.click(screen.getByRole('button', { name: 'Fetch games' }))
+  await screen.findByRole('table', { name: 'Fetched games' })
+
+  expect(screen.getByText('Only 1 more game can be added today, so the first one ticked will be added.')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Add and analyze 1 game' }))
+
+  expect(await screen.findByText(/Added and analyzed 1 game\. Today's limit is reached: import the other 1 game tomorrow\./)).toBeInTheDocument()
+  expect(deps.api.createGame).toHaveBeenCalledTimes(1)
+})
+
+test('a cap reached during the batch stops adding but keeps and analyzes what was added', async () => {
+  const capped = new ApiError(429, 'CoChess analyzes at most 10 new games a day per player while in testing.')
+  const deps = fakeDeps({
+    importGames: vi.fn(async () => ({ ...FOUND, games: [importRow(0), importRow(3), importRow(4)] })),
+    createGame: vi.fn()
+      .mockResolvedValueOnce({ ...GAME, game_id: 'g1' })
+      .mockRejectedValueOnce(capped),
+    getGame: vi.fn(async () => DETAIL),
+  })
+  setup(deps)
+  fireEvent.click(screen.getByRole('button', { name: 'Fetch games' }))
+  await screen.findByRole('table', { name: 'Fetched games' })
+
+  fireEvent.click(screen.getByRole('button', { name: 'Add and analyze 3 games' }))
+
+  expect(await screen.findByText(/Added and analyzed 1 game\. Today's limit is reached: import the other 2 games tomorrow\./)).toBeInTheDocument()
+  expect(deps.api.createGame).toHaveBeenCalledTimes(2)
+  expect(deps.api.getGame).toHaveBeenCalledWith('g1')
 })

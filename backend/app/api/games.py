@@ -149,9 +149,9 @@ def remove_game(game: OwnedGame, session: SessionDep, settings: SettingsDep) -> 
     delete_game(session, settings, game)
 
 
-def _check_daily_cap(session: Session, user_id: str, settings: Settings) -> None:
-    """New single-game uploads per player per rolling 24 hours (PLAN_V2 §6 Q8)."""
-    cap = settings.limits.max_games_per_day
+def games_left_today(session: Session, user_id: str, settings: Settings) -> int:
+    """How many more single games (pasted or imported) the player may add in this rolling 24
+    hours (PLAN_V2 §6 Q8; imports count, owner decision 2026-11-06)."""
     since = datetime.now(UTC) - timedelta(days=1)
     recent = (
         session.scalar(
@@ -161,7 +161,13 @@ def _check_daily_cap(session: Session, user_id: str, settings: Settings) -> None
         )
         or 0
     )
-    if recent >= cap:
+    return max(0, settings.limits.max_games_per_day - recent)
+
+
+def _check_daily_cap(session: Session, user_id: str, settings: Settings) -> None:
+    """New single-game uploads per player per rolling 24 hours (PLAN_V2 §6 Q8)."""
+    cap = settings.limits.max_games_per_day
+    if games_left_today(session, user_id, settings) == 0:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"CoChess analyzes at most {cap} new games a day per player while in "

@@ -78,7 +78,7 @@ describe('adding games', () => {
     const deps = fakeDeps({
       settings: vi.fn(async () => ({ ...DEFAULT_SETTINGS, chesscom_username: 'nander100' })),
       importGames: vi.fn(async () => ({
-        platform: 'chesscom' as const, username: 'nander100',
+        platform: 'chesscom' as const, username: 'nander100', games_left_today: 10,
         games: [imported, importRow(1, { already_imported: true })],
       })), // prettier-ignore
       onboardingParse: vi.fn(async () => ({

@@ -58,6 +58,8 @@ export interface ImportResponse {
   platform: Platform
   username: string
   games: ImportRow[]
+  /** Imported games count toward the daily cap of new games. */
+  games_left_today: number
 }
 
 export type TimeControl = 'bullet' | 'blitz' | 'rapid' | 'classical'

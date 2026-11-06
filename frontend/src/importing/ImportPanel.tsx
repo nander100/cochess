@@ -85,26 +85,34 @@ export function ImportPanel({ deps, onLoggedOut, onAdded }: ImportPanelProps) {
 
   async function addGames() {
     if (found === null) return
-    const requests = requestsFor(found.games, choices)
+    const ticked = requestsFor(found.games, choices)
+    // Imported games count toward the daily cap: add what fits today (owner decision 2026-11-06).
+    const requests = ticked.slice(0, found.games_left_today)
+    let leftOver = ticked.length - requests.length
     setBusy(true)
     setError(null)
     try {
       const ids: string[] = []
       let skipped = 0
-      for (const request of requests) {
+      for (const [i, request] of requests.entries()) {
         try {
           ids.push((await api.createGame(request)).game_id)
         } catch (caught) {
           // Added since the table was fetched (another tab, the assessment): nothing to do.
           if (caught instanceof ApiError && caught.status === 409 && caught.message.includes('already')) skipped += 1
-          else throw caught
+          // Today's cap reached meanwhile (a game pasted in another tab): stop, keep what's added.
+          else if (caught instanceof ApiError && caught.status === 429) {
+            leftOver += requests.length - i
+            break
+          } else throw caught
         }
       }
       setFound(null)
       onAdded()
       await runGamesQueue(deps, ids, setProgress)
       const extra = skipped > 0 ? ` (${skipped} ${skipped === 1 ? 'was' : 'were'} already here)` : ''
-      show(`Added and analyzed ${ids.length} game${ids.length === 1 ? '' : 's'}${extra}.`, 'info')
+      const later = leftOver > 0 ? ` Today's limit is reached: import the other ${plural(leftOver)} tomorrow.` : ''
+      show(`Added and analyzed ${plural(ids.length)}${extra}.${later}`, 'info')
     } catch (caught) {
       failed(caught)
     } finally {
@@ -115,7 +123,8 @@ export function ImportPanel({ deps, onLoggedOut, onAdded }: ImportPanelProps) {
   }
 
   const rows = found?.games ?? []
-  const toAdd = found ? requestsFor(rows, choices).length : 0
+  const ticked = found ? requestsFor(rows, choices).length : 0
+  const toAdd = Math.min(ticked, found?.games_left_today ?? 0)
   const missing = found ? missingColors(rows, choices) : 0
 
   return (
@@ -182,6 +191,9 @@ export function ImportPanel({ deps, onLoggedOut, onAdded }: ImportPanelProps) {
             onColor={(index, color: Color) => setChoices(update(choices, index, { color }))}
           />
           <div className="import-actions">
+            <span className="import-note" role="status">
+              {roomText(found.games_left_today, ticked)}
+            </span>
             <Button variant="secondary" onClick={() => void addGames()} disabled={busy || toAdd === 0 || missing > 0}>
               {addLabel(missing, toAdd)}
             </Button>
@@ -191,6 +203,18 @@ export function ImportPanel({ deps, onLoggedOut, onAdded }: ImportPanelProps) {
       {progress && <ProgressBar label={queueLabel(progress)} done={progress.game - 1} total={progress.total} />}
     </TintedPanel>
   )
+}
+
+function plural(n: number): string {
+  return `${n} game${n === 1 ? '' : 's'}`
+}
+
+/** Today's room under the daily cap of new games, next to the Add button. */
+function roomText(left: number, ticked: number): string {
+  if (left === 0) return "You've added today's limit of new games. Import these tomorrow."
+  const more = left === 1 ? '1 more game' : `${left} more games`
+  if (ticked > left) return `Only ${more} can be added today, so the first ${left === 1 ? 'one' : left} ticked will be added.`
+  return `You can add ${more} today.`
 }
 
 function addLabel(missing: number, toAdd: number): string {

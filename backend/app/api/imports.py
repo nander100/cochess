@@ -15,6 +15,7 @@ from app.analysis.evals import Color
 from app.analysis.onboarding import detect_color, time_control_category
 from app.analysis.pgn import PgnError, parse_pgn
 from app.api.deps import get_app_settings, get_session
+from app.api.games import games_left_today
 from app.api.schemas import PgnErrorDetail, Platform, TimeControl
 from app.auth.deps import CurrentUser
 from app.config import Settings
@@ -65,6 +66,8 @@ class ImportResponse(BaseModel):
     platform: Platform
     username: str
     games: list[ImportRow]
+    # Imported games count toward the daily cap (owner decision 2026-11-06).
+    games_left_today: int
 
 
 @router.post("")
@@ -90,7 +93,12 @@ def import_games(
         _row(i, game, settings, usernames, known_ids, known_prints)
         for i, game in enumerate(fetched)
     ]
-    return ImportResponse(platform=body.platform, username=username, games=rows)
+    return ImportResponse(
+        platform=body.platform,
+        username=username,
+        games=rows,
+        games_left_today=games_left_today(session, user.id, settings),
+    )
 
 
 def _username(session: Session, user_id: str, platform: Platform) -> str:

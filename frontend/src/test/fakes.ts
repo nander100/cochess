@@ -272,7 +272,7 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     momentAsk: vi.fn(coachSays('Think about the centre.')),
     momentWrapUp: vi.fn(coachSays('Well done.')),
     dashboard: vi.fn(async () => EMPTY_DASHBOARD),
-    importGames: vi.fn(async () => ({ platform: 'lichess' as const, username: 'me', games: [] })),
+    importGames: vi.fn(async () => ({ platform: 'lichess' as const, username: 'me', games: [], games_left_today: 10 })),
     playback: vi.fn(async (lineId: string) => ({
       line_id: lineId, start_fen: '', moves_uci: [], moves_san: [], evals: [], win_pcts: [], settle_ply: 2,
       caption: 'White has won a knight.',
