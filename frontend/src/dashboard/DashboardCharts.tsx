@@ -35,6 +35,7 @@ export function MistakeChart({ trend }: MistakeChartProps) {
   const data = trend.points.map((p) => ({ games: p.games_analyzed, ...p.rates }))
   // A theme keeps its color whatever is hidden: color follows the theme, not its place.
   const color = (index: number) => series[SERIES[index]]
+  const pointsOf = (theme: string) => trend.points.filter((p) => typeof p.rates[theme] === 'number').length
   function toggle(theme: string) {
     setHidden((was) => {
       const next = new Set(was)
@@ -86,7 +87,8 @@ export function MistakeChart({ trend }: MistakeChartProps) {
                 name={theme.label}
                 stroke={color(index)}
                 strokeWidth={2}
-                dot={false}
+                // A theme seen at only one point would draw nothing as a line: give it a dot.
+                dot={pointsOf(theme.theme) === 1 ? { r: MARKER / 2, fill: color(index), strokeWidth: 0 } : false}
                 activeDot={{ r: MARKER / 2 }}
                 isAnimationActive={false}
               />

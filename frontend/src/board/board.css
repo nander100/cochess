@@ -219,3 +219,11 @@ cg-board square.check {
   color: var(--color-muted);
   font: var(--text-small);
 }
+
+/* chessground sets this as an inline style attribute on its SVG layers, which the production
+   CSP (style-src 'self') blocks; the same rule from the stylesheet keeps the shapes' colors from
+   following the page's dark color scheme. */
+cg-container svg.cg-shapes,
+cg-container svg.cg-custom-svgs {
+  color-scheme: light only;
+}
