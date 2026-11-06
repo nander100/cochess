@@ -50,10 +50,10 @@ def tool(steps: list[dict[str, Any]], intro: str = "A calm developing line.") ->
 
 GOOD = tool(
     [
-        {"index": 1, "text": "2. Nf3 attacks the e5 pawn.", "arrows": ["f3e5:red", "d7d6:blue",
-                                                                       "h1h8:red"]},
+        {"index": 1, "text": "{{move:2.Nf3}} attacks the e5 pawn.",
+         "arrows": ["f3e5:red", "d7d6:blue", "h1h8:red"]},
         {"index": 2, "text": "Black defends it.", "squares": ["e5:green"]},
-        {"index": 3, "text": "3. d4 strikes at the centre."},
+        {"index": 3, "text": "{{move:3.d4}} strikes at the centre."},
     ]
 )  # fmt: skip
 
@@ -85,7 +85,8 @@ def test_a_line_is_walked_through_step_by_step() -> None:
     assert walk["start_path_uci"] == START and walk["line_uci"] == LINE
     assert [s["san"] for s in walk["steps"]] == ["Nf3", "d6", "d4"]
     assert [s["fen_after"] for s in walk["steps"]] == fens(START, LINE)[1:]
-    assert walk["steps"][0]["text"] == "2. Nf3 attacks the e5 pawn."
+    assert walk["steps"][0]["text"] == "[knight to f3](cc:move/0) attacks the e5 pawn."
+    assert walk["steps"][0]["moves"][0]["san"] == "Nf3"
     assert walk["steps"][0]["eval_after"] == "0.0" and walk["steps"][0]["win_pct_after"] == 50.0
     # Shapes are checked on the position after the step's move: the knight's threat and the
     # line's next move pass; an arrow that's neither is dropped and logged.
@@ -149,8 +150,8 @@ def test_a_reply_without_the_tool_is_retried() -> None:
 
 
 def test_moves_outside_the_data_are_regenerated_then_removed() -> None:
-    bad = tool([{"index": 1, "text": "Better was Qh5."}, {"index": 2, "text": "Fine."},
-                {"index": 3, "text": "Then Qh5 again."}])  # fmt: skip
+    bad = tool([{"index": 1, "text": "Better was {{move:Qh5}}."}, {"index": 2, "text": "Fine."},
+                {"index": 3, "text": "Then {{move:Qh5}} again."}])  # fmt: skip
     client, fake, _, game_id = chat_setup(bad, bad)
 
     walk = walkthrough_of(ask(client, game_id))
@@ -203,7 +204,7 @@ def test_an_unsolved_moments_best_line_is_withheld() -> None:
 
 
 def test_a_revealed_moments_best_line_can_be_walked_through() -> None:
-    one_step = tool([{"index": 1, "text": "5. gxf3 takes back with the pawn."}])
+    one_step = tool([{"index": 1, "text": "{{move:5.gxf3}} takes back with the pawn."}])
     client, _, app, gid = moment_setup(one_step)
     store_before(app, gid)
     with app.state.session_factory() as session:
@@ -264,12 +265,23 @@ def test_new_walkthroughs_per_game_are_limited() -> None:
 
 
 def test_a_move_written_with_the_wrong_number_is_regenerated_then_removed() -> None:
-    wrong = tool([{"index": 1, "text": "5. Nf3 attacks e5."}, {"index": 2, "text": "Fine."},
-                  {"index": 3, "text": "Then d4."}])  # fmt: skip
+    wrong = tool([{"index": 1, "text": "{{move:5.Nf3}} attacks e5."}, {"index": 2, "text": "Fine."},
+                  {"index": 3, "text": "Then {{move:3.d4}}."}])  # fmt: skip
     client, fake, _, game_id = chat_setup(wrong, wrong)
 
     walk = walkthrough_of(ask(client, game_id))
 
     assert "wrong move number: Nf3" in str(fake.requests[1].messages[2]["content"])
-    assert walk["steps"][0]["text"] == "5. [move removed] attacks e5."
+    assert walk["steps"][0]["text"] == "[move removed] attacks e5."
     assert walk["invalid_moves_removed"] == ["Nf3"]
+
+
+def test_bare_notation_in_a_step_is_regenerated_then_shown_as_a_move_tag() -> None:
+    bare = tool([{"index": 1, "text": "2. Nf3 hits e5."}, {"index": 2, "text": "Fine."},
+                 {"index": 3, "text": "Then the centre."}])  # fmt: skip
+    client, fake, _, game_id = chat_setup(bare, bare)
+
+    walk = walkthrough_of(ask(client, game_id))
+
+    assert "move tag" in str(fake.requests[1].messages[2]["content"])
+    assert walk["steps"][0]["text"] == "[knight to f3](cc:move/0) hits e5."

@@ -14,6 +14,6 @@ Answer only by calling the `line_walkthrough` tool, once:
 - `summary`: one or two sentences: what the player should take away from the line.
 - Match the player's level (`rating_band`).
 
-Moves: name only moves from the line, the step facts, or `pgn_to_move`, written as the hard rules say.
+Moves: name only moves from the line, the step facts, or `pgn_to_move`, as move tags (`{{move:15...c5}}`), one at a time. No line links and no board tags inside step text: the shapes go in `arrows` and `squares`.
 
 Arrows and highlights (optional, at most one or two per step): `arrows` as `"fromto:color"` and `squares` as `"square:color"`, using the colors from the Annotations section. A step's shapes are drawn on the position **after** that step's move: show the threat the move creates (red or yellow, from a piece to an enemy piece it now attacks), the line's next move (blue), or a square that matters. Don't draw the move that was just played; the board already shows it.

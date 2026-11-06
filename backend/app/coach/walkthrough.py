@@ -28,6 +28,7 @@ from app.coach.annotations import (
     plan_moves,
 )
 from app.coach.client import CoachClient, CoachReply, CoachRequest, system_blocks
+from app.coach.markup import MoveToken, Problems, Processed, Rules, note, process
 from app.coach.payload import (
     CoachPayload,
     PlayerPayload,
@@ -35,7 +36,7 @@ from app.coach.payload import (
     WalkthroughPayload,
     render,
 )
-from app.coach.validate import allowed_moves, find_invalid, misnumbered, normalize, strip_moves
+from app.coach.validate import allowed_moves, normalize
 from app.config import Settings
 from app.db.annotations import log_dropped
 from app.db.coach import record_usage
@@ -98,6 +99,7 @@ class WalkthroughStep(BaseModel):
     win_pct_after: float | None  # White's, 0..100, for the eval bar
     text: str
     annotation: Annotation | None = None
+    moves: list[MoveToken] = []  # the text's move tags (SPEC_V3 §9.4)
 
 
 class Walkthrough(BaseModel):
@@ -108,6 +110,8 @@ class Walkthrough(BaseModel):
     steps: list[WalkthroughStep]
     summary: str
     invalid_moves_removed: list[str] = []
+    intro_moves: list[MoveToken] = []
+    summary_moves: list[MoveToken] = []
 
 
 class _ToolStep(BaseModel):
@@ -214,18 +218,20 @@ async def generate(
         tool_choice={"type": "tool", "name": TOOL_NAME},
     )
     reply = await _complete(client, request, sessions, call.game_id)
-    output, problems = _check(reply, call)
+    output, problems = _check(reply, call, settings)
     if problems:
         retry = [*messages, *_retry_turns(reply, problems, len(call.line_uci))]
         reply = await _complete(client, replace(request, messages=retry), sessions, call.game_id)
-        output, problems = _check(reply, call)
+        output, problems = _check(reply, call, settings)
     if output is None:
         logger.warning("walkthrough failed: game=%s problems=%s", call.game_id, problems)
         raise WalkthroughError(FAILED)
     return _finish(output, call, settings, sessions)
 
 
-def _check(reply: CoachReply, call: WalkthroughCall) -> tuple[_ToolOutput | None, list[str]]:
+def _check(
+    reply: CoachReply, call: WalkthroughCall, settings: Settings
+) -> tuple[_ToolOutput | None, list[str]]:
     """The tool output if its structure is usable, and what's wrong with it. Moves outside the
     data still leave a usable output: they're removed if the retry doesn't fix them."""
     block = next((b for b in reply.content if b.type == "tool_use" and b.name == TOOL_NAME), None)
@@ -241,28 +247,26 @@ def _check(reply: CoachReply, call: WalkthroughCall) -> tuple[_ToolOutput | None
     plies = len(call.line_uci)
     if [s.index for s in output.steps] != list(range(1, plies + 1)):
         return None, [f"the steps must be indexed 1 to {plies}, one per move"]
-    problems = []
-    invalid = _invalid(output, call)
-    if invalid:
-        problems.append(f"moves not in the data: {', '.join(invalid)}")
-    wrong = _misnumbered(output, call)
-    if wrong:
-        problems.append(f"moves written with the wrong move number: {', '.join(wrong)}")
-    return output, problems
+    merged = _merged([done.problems for done in _process(output, call, settings)])
+    return output, [note(merged)] if merged.any else []
 
 
-def _misnumbered(output: _ToolOutput, call: WalkthroughCall) -> list[str]:
-    found: list[str] = []
-    for text in [output.intro, *(s.text for s in output.steps), output.summary]:
-        found += [m for m in misnumbered(text, call.numbering) if m not in found]
-    return found
+def _process(output: _ToolOutput, call: WalkthroughCall, settings: Settings) -> list[Processed]:
+    """The intro, each step's text and the summary, through the markup checks (SPEC_V3 §9.4):
+    move tags only, from the data, with the right numbers, one at a time."""
+    rules = Rules(allowed=call.allowed, limits=settings.coach, numbering=call.numbering)
+    texts = [output.intro, *(step.text for step in output.steps), output.summary]
+    return [process(text, rules) for text in texts]
 
 
-def _invalid(output: _ToolOutput, call: WalkthroughCall) -> list[str]:
-    found: list[str] = []
-    for text in [output.intro, *(s.text for s in output.steps), output.summary]:
-        found += [m for m in find_invalid(text, set(call.allowed)) if m not in found]
-    return found
+def _merged(all_problems: list[Problems]) -> Problems:
+    merged = Problems()
+    for problems in all_problems:
+        for name in ("invalid", "leaks", "bare", "misnumbered", "line_leaks"):
+            bucket = getattr(merged, name)
+            bucket += [m for m in getattr(problems, name) if m not in bucket]
+        merged.runs += problems.runs
+    return merged
 
 
 def _retry_turns(reply: CoachReply, problems: list[str], plies: int) -> list[MessageParam]:
@@ -280,15 +284,15 @@ def _finish(
     output: _ToolOutput, call: WalkthroughCall, settings: Settings, sessions: sessionmaker[Session]
 ) -> Walkthrough:
     # Moves outside the data, or written with a number they don't have, are removed.
-    invalid = _invalid(output, call)
-    invalid += [m for m in _misnumbered(output, call) if m not in invalid]
+    done = _process(output, call, settings)
+    intro, texts, summary = done[0], done[1:-1], done[-1]
+    invalid: list[str] = []
+    for part in done:
+        invalid += [m for m in part.removed if m not in invalid]
     if invalid:
         logger.warning(
             "coach moves removed: game=%s endpoint=walkthrough moves=%s", call.game_id, invalid
         )
-
-    def clean(text: str) -> str:
-        return strip_moves(text, invalid) if invalid else text
 
     steps: list[WalkthroughStep] = []
     dropped: list[Dropped] = []
@@ -312,8 +316,9 @@ def _finish(
                 fen_after=call.fens_after[i],
                 eval_after=format_eval(evaluation) if evaluation is not None else None,
                 win_pct_after=win_percent(evaluation) if evaluation is not None else None,
-                text=clean(step.text),
+                text=texts[i].text,
                 annotation=annotation,
+                moves=texts[i].moves,
             )
         )
     with sessions() as session:
@@ -325,10 +330,12 @@ def _finish(
         start_path_uci=call.start.path_uci,
         line_uci=list(call.line_uci),
         start_fen=call.start.fen,
-        intro=clean(output.intro),
+        intro=intro.text,
         steps=steps,
-        summary=clean(output.summary),
+        summary=summary.text,
         invalid_moves_removed=invalid,
+        intro_moves=intro.moves,
+        summary_moves=summary.moves,
     )
 
 
