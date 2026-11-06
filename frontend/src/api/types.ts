@@ -232,6 +232,8 @@ export interface MoveToken {
   words: string
   move_number: number | null
   white: boolean | null
+  /** Its words begin a sentence: shown capitalized. */
+  sentence_start?: boolean
 }
 
 /** A line link (SPEC_V3 §9.4): a line from the data, played on the board when clicked. */

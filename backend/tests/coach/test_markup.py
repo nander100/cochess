@@ -167,3 +167,31 @@ def test_the_note_names_what_to_fix() -> None:
     assert "not in the data: Qh5" in text
     assert "move tag" in text and "more than one move in a row" in text
     assert "supposed to find" in text and text.endswith("Rewrite the complete answer.")
+
+
+def test_a_move_in_inline_code_is_bare_notation() -> None:
+    done = process("Black answers with `Nc6` and then `exd5`; `the d-file` stays code.", RULES)
+
+    assert done.problems.bare == ["Nc6", "exd5"]
+    assert [m.san for m in done.moves] == ["Nc6", "exd5"]
+    assert "`the d-file`" in done.text
+    pawn_moves = process("`b5` and then `e4`", Rules(frozenset({"b5", "e4"}), LIMITS))
+    assert pawn_moves.problems.bare == ["b5", "e4"]  # caught as notation, so rewritten once
+
+
+def test_notation_in_a_link_label_is_bare_and_shown_in_words() -> None:
+    done = process("{{line:here.engine1|see the line after exd5 and Qh5}}", RULES)
+
+    assert done.problems.bare == ["exd5", "Qh5"]
+    assert done.line_links[0].label == "see the line after pawn takes on d5 and"
+    assert done.removed == ["Qh5"]
+
+
+def test_a_move_that_begins_a_sentence_is_marked() -> None:
+    done = process(
+        "{{move:Nf3}} develops. Then {{move:Nc6}}. And:\n- {{move:Bb5}} pins? "
+        "**{{move:O-O}}** too.",
+        RULES,
+    )
+
+    assert [m.sentence_start for m in done.moves] == [True, False, True, True]

@@ -26,7 +26,7 @@ _SAN = re.compile(
 REMOVED = "[move removed]"
 # A whole token that is a SAN move, for reading the data side. Bare pawn moves count here
 # ("1. e4 e5"): in data every token is a move; in the coach's prose a bare square usually isn't.
-_FULL_SAN = re.compile(
+FULL_SAN = re.compile(
     r"(?:O-O(?:-O)?|0-0(?:-0)?|[KQRBN][a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?"
     r"|[a-h](?:x[a-h])?[1-8](?:=[QRBN])?)[+#]?"
 )
@@ -60,7 +60,7 @@ def allowed_moves(data: Any, *, skip_keys: Iterable[str] = ("user_prompt",)) -> 
         if isinstance(value, str):
             for word in value.split():
                 token = _ANNOTATION.sub("", _MOVE_NUMBER.sub("", word))
-                if _FULL_SAN.fullmatch(token):
+                if FULL_SAN.fullmatch(token):
                     found.add(normalize(token))
         elif isinstance(value, dict):
             for key, item in value.items():

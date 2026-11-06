@@ -51,3 +51,13 @@ test('without a player, a line link is plain words', () => {
   expect(screen.queryByRole('button', { name: 'see why' })).not.toBeInTheDocument()
   expect(screen.getByText('see why')).toBeInTheDocument()
 })
+
+test('words that begin a sentence are capitalized', () => {
+  const settings = { ...DEFAULT_SETTINGS, effective_detail_level: 'plain' as const }
+  render(
+    <SettingsContext.Provider value={{ settings, loaded: true, update: vi.fn() }}>
+      <CoachText text="[queen takes on d4](cc:move/0) wins." tokens={{ moves: [{ ...MOVE, sentence_start: true }] }} />
+    </SettingsContext.Provider>,
+  )
+  expect(screen.getByText('Queen takes on d4')).toBeInTheDocument()
+})

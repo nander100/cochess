@@ -99,9 +99,10 @@ function MoveTag({ index }: { index: number }) {
       </span>
     )
   }
+  const words = move.sentence_start ? move.words.charAt(0).toUpperCase() + move.words.slice(1) : move.words
   return (
     <span className="coach-move" title={level === 'standard' ? notation(move) : undefined}>
-      {move.words}
+      {words}
     </span>
   )
 }

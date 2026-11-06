@@ -31,7 +31,7 @@ INTRO_SHOWN = (
 )
 INTRO_MOVES = [
     {"index": 0, "char_offset": 11, "san": "Qxf3", "words": "queen takes on f3", "move_number": 5,
-     "white": True},
+     "white": True, "sentence_start": False},
 ]  # fmt: skip
 FEEDBACK = (
     "After {{move:5.a3}} the engine shows you end up worse. Look again at what your queen does."

@@ -26,7 +26,7 @@ from app.coach.annotations import (
     serialize,
     trim_before,
 )
-from app.coach.validate import NUMBER_BEFORE, REMOVED, move_tokens, normalize
+from app.coach.validate import FULL_SAN, NUMBER_BEFORE, REMOVED, move_tokens, normalize
 from app.config import CoachSettings
 
 LineKind = Literal["engine", "refutation", "candidate", "best", "variation"]
@@ -35,7 +35,11 @@ MOVE_TAG = re.compile(r"\{\{\s*move\s*:\s*(?P<body>[^{}|]*?)\s*\}\}", re.IGNOREC
 LINE_TAG = re.compile(
     r"\{\{\s*line\s*:\s*(?P<ref>[^{}|]*?)\s*\|\s*(?P<label>[^{}]*?)\s*\}\}", re.IGNORECASE
 )
-_ANY_TAG = re.compile(r"\{\{[^{}]*\}\}|<\s*/?\s*board\b[^<>]*>", re.IGNORECASE)
+# Tags, and inline code spans: a move in `backticks` is notation too ("`b5` and then `e4`").
+_ANY_TAG = re.compile(r"\{\{[^{}]*\}\}|<\s*/?\s*board\b[^<>]*>|`[^`\n]+`", re.IGNORECASE)
+_CODE_MOVE = re.compile(r"^`\s*((?:\d+\s*(?:\.\.\.|…|\.)\s*)?(\S+?))\s*`$")
+# A move's words begin a sentence after these (and at the start, or a list item).
+_SENTENCE_END = (".", "!", "?", ":", "\n", "-")
 _NUMBERED = re.compile(r"^(?P<number>\d+)\s*(?P<dots>\.\.\.|…|\.)\s*(?P<san>\S+)$")
 _REF = re.compile(r"^(here|km\d+)\.(engine[1-4]|refutation|candidate|best|variation)$")
 # Between two moves "in a row": nothing but spaces, punctuation and move numbers.
@@ -50,6 +54,7 @@ class MoveToken(BaseModel):
     words: str
     move_number: int | None = None
     white: bool | None = None  # the side that played it, when the move number says
+    sentence_start: bool = False  # its words begin a sentence: shown capitalized
 
 
 class LineLink(BaseModel):
@@ -171,6 +176,8 @@ def process(text: str, rules: Rules) -> Processed:
             _line(line, out)
         elif BOARD_TAG.fullmatch(tag):
             _board(tag, text[match.end() : match.end() + 1], out)
+        elif tag.startswith("`"):
+            _code(tag, match.start(), match.end(), out)
         else:
             out.dropped.append(Dropped(tag=tag, reason="malformed"))  # an unknown {{...}} tag
         last = match.end()
@@ -205,6 +212,18 @@ def _plain(start: int, end: int, out: _Out) -> None:
         _move(body, start + token_start, start + token_end, out)
         cursor = token_end
     out.plain(segment[cursor:])
+
+
+def _code(span: str, start: int, end: int, out: _Out) -> None:
+    """Inline code: a move written there is bare notation; anything else stays as it is."""
+    code = _CODE_MOVE.match(span)
+    san = code[2].rstrip("!?") if code else ""
+    if code is None or not FULL_SAN.fullmatch(san):
+        out.plain(span)
+        return
+    if san not in out.problems.bare:
+        out.problems.bare.append(san)
+    _move(code[1].replace(" ", ""), start, end, out)
 
 
 def _dots(written: str) -> str:
@@ -247,10 +266,11 @@ def _move(body: str, start: int, end: int, out: _Out) -> None:
         _remove(san, out, out.problems.misnumbered)
     else:
         index = len(out.moves)
+        before = "".join(out.text).rstrip(" *_")
         out.moves.append(
             MoveToken(
                 index=index, char_offset=out.offset, san=san, words=words, move_number=number,
-                white=white,
+                white=white, sentence_start=not before or before.endswith(_SENTENCE_END),
             )
         )  # fmt: skip
         out.text.append(f"[{words}](cc:move/{index})")
@@ -281,7 +301,7 @@ def _remove(san: str, out: _Out, bucket: list[str]) -> None:
 def _line(match: re.Match[str], out: _Out) -> None:
     rules = out.rules
     ref = match["ref"].strip().lower()
-    label = _LABEL_UNSAFE.sub("", match["label"]).strip()
+    label = _label(_LABEL_UNSAFE.sub("", match["label"]).strip(), out)
     tag = match.group(0)
     resolved = rules.lines.get(ref)
     if ref in rules.withheld:
@@ -304,6 +324,24 @@ def _line(match: re.Match[str], out: _Out) -> None:
         out.raw.append(f"{{{{line:{ref}|{label}}}}}")
         return
     out.plain(label)  # the words stay, as plain text
+
+
+def _label(label: str, out: _Out) -> str:
+    """A link's words can't hold notation either: a move there is bare (regenerate once); in the
+    final text a valid one is shown in words and anything else is left out."""
+    pieces, last = [], 0
+    for start, end, token in move_tokens(label):
+        if token not in out.problems.bare:
+            out.problems.bare.append(token)
+        key = normalize(token)
+        allowed = key in out.rules.allowed and key not in out.rules.banned
+        pieces.append(label[last:start])
+        pieces.append(san_words(token) if allowed else "")
+        if not allowed and token not in out.removed:
+            out.removed.append(token)
+        last = end
+    pieces.append(label[last:])
+    return " ".join("".join(pieces).split())
 
 
 def _board(tag: str, after: str, out: _Out) -> None:
