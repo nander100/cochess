@@ -1,0 +1,54 @@
+/* The walkthrough stepper (SPEC_V3 §7.3), in the side column. Tokens only. */
+.walkthrough {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.walkthrough-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.walkthrough-line {
+  margin: 0;
+  font: var(--text-panel);
+}
+
+.walkthrough-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+
+.walkthrough-step-label {
+  margin: 0;
+  font: var(--text-ui-strong);
+}
+
+.walkthrough-eval {
+  color: var(--color-muted);
+}
+
+.walkthrough-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: var(--board-frame-width) solid var(--color-border);
+}
+
+.walkthrough-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.walkthrough-keys {
+  margin: 0;
+  color: var(--color-muted);
+  font: var(--text-small);
+}

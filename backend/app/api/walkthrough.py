@@ -162,7 +162,8 @@ def _checked_results(
             continue
         result = by_key.get(position_key(fen))
         if result is None:
-            raise _unprocessable(NEEDS_SCAN)
+            # 428: the browser asks for a cached walkthrough first, then scans only if needed.
+            raise HTTPException(status.HTTP_428_PRECONDITION_REQUIRED, detail=NEEDS_SCAN)
         try:
             checked[fen] = check_for_position(result, fen=fen, tier_configs=tiers)
         except EngineResultError as error:

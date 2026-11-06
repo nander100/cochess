@@ -1,5 +1,5 @@
-/** Keyboard shortcuts (SPEC_V3 §4.4) for the features that exist so far. W (walk through a line)
- * and Space (pause playback) arrive with M4 and M5. */
+/** Keyboard shortcuts (SPEC_V3 §4.4) for the features that exist so far. Space (pause playback)
+ * arrives with M5. */
 export type ShortcutId =
   | 'prev'
   | 'next'
@@ -8,6 +8,7 @@ export type ShortcutId =
   | 'flip'
   | 'engine'
   | 'explain'
+  | 'walk'
   | 'nextMoment'
   | 'escape'
   | 'focusChat'
@@ -28,6 +29,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { id: 'flip', keys: ['F'], label: 'Flip the board' },
   { id: 'engine', keys: ['E'], label: 'Turn the engine panel on or off (not during an unsolved moment)' },
   { id: 'explain', keys: ['X'], label: 'Explain this position (not during an unsolved moment)' },
+  { id: 'walk', keys: ['W'], label: "Walk through the engine's top line from this position" },
   { id: 'nextMoment', keys: ['N'], label: 'Next critical moment' },
   { id: 'escape', keys: ['Esc'], label: 'Close a dialog' },
   { id: 'focusChat', keys: ['/'], label: 'Type a question to the coach' },
@@ -47,6 +49,8 @@ const BY_KEY: Record<string, ShortcutId> = {
   E: 'engine',
   x: 'explain',
   X: 'explain',
+  w: 'walk',
+  W: 'walk',
   n: 'nextMoment',
   N: 'nextMoment',
   Escape: 'escape',

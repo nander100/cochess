@@ -104,6 +104,18 @@ export function isWithin(nodeId: string, startId: string): boolean {
 }
 
 /** A UCI move ("e7e8q") as the board describes moves. */
+/** The moves of the line that starts at `startId` and follows each node's first child, up to
+ * `max` of them: a variation as it reads in the move list. */
+export function variationMoves(tree: GameTree, startId: string, max: number): string[] {
+  const moves: string[] = []
+  let node: TreeNode | undefined = tree.nodes[startId]
+  while (node && node.uci && moves.length < max) {
+    moves.push(node.uci)
+    node = node.children.length > 0 ? tree.nodes[node.children[0]] : undefined
+  }
+  return moves
+}
+
 export function fromUci(uci: string): BoardMove {
   return { from: uci.slice(0, 2), to: uci.slice(2, 4), ...(uci.length > 4 ? { promotion: uci[4] } : {}) }
 }

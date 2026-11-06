@@ -13,7 +13,7 @@ import { EvalBar } from '../board/EvalBar'
 import { EvalGraph, type GraphPoint } from '../board/EvalGraph'
 import { MoveList } from '../board/MoveList'
 import { useVariationSaver } from '../board/useVariationSaver'
-import { deleteVariation, fromUci, isWithin, promoteVariation, withVariations } from '../board/variations'
+import { deleteVariation, fromUci, isWithin, variationMoves, promoteVariation, withLine, withVariations } from '../board/variations'
 import {
   type GameTree,
   ROOT,
@@ -32,6 +32,9 @@ import { chatMessages } from '../components/chatMessages'
 import { EngineStats } from '../components/EngineStats'
 import { isUnsolved } from '../moments/moment'
 import { MomentStepper } from '../moments/MomentStepper'
+import { WalkthroughPanel } from '../walkthrough/WalkthroughPanel'
+import { useWalkthrough } from '../walkthrough/useWalkthrough'
+import { WALK_MAX_PLIES } from '../analysis/walkthrough'
 import { CoachSummaryHeading, Synopsis, type SynopsisState } from '../components/Synopsis'
 import { type LiveLine, isGameOver } from '../engine/live'
 import { analyzeAll } from '../engine/runner'
@@ -218,6 +221,10 @@ function AnalysisBoard({
     },
   }
 
+  // Line walkthroughs (SPEC_V3 §7): the board steps through the line; the tree is left alone.
+  const walker = useWalkthrough(deps.api, loadEngine, detail.id, onLoggedOut)
+  const walking = walker.walk !== null
+
   const navigate = useCallback((id: string) => {
     if (!locked) setCurrent(id)
   }, [locked])
@@ -229,16 +236,36 @@ function AnalysisBoard({
     explainAction.current = explain
   }, [])
   useShortcuts({
-    prev: back,
-    next: forward,
-    start: () => navigate(ROOT),
-    end: () => navigate(endOfLine(tree, current)),
+    prev: walking ? walker.prev : back,
+    next: walking ? walker.next : forward,
+    start: walking ? () => walker.go(0) : () => navigate(ROOT),
+    end: walking ? () => walker.go(Number.MAX_SAFE_INTEGER) : () => navigate(endOfLine(tree, current)),
+    escape: walking ? walker.close : null,
+    walk: !walking && !locked && topLine().length > 0 ? () => walkFrom(current, topLine()) : null,
     flip: () => setFlipped((value) => !value),
     // E and X wait while a moment is unsolved (SPEC_V3 §4.4).
     engine: locked ? null : () => setEngineOn(!engineOn),
     explain: locked || tab !== 'coach' ? null : () => explainAction.current?.(),
     nextMoment: moments.length > 0 ? goToNextMoment : null,
   })
+
+  /** The engine's top line from the board's position: the live one, else the stored one. */
+  function topLine(): readonly string[] {
+    if (engineOn && live?.fen === node.fen) return live.line.uci
+    return stored.get(positionKey(node.fen))?.lines[0]?.moves_uci ?? []
+  }
+  function walkFrom(startId: string, line: readonly string[]) {
+    if (!locked && line.length > 0) walker.open(startId, line.slice(0, WALK_MAX_PLIES))
+  }
+  function walkVariation(startId: string) {
+    walkFrom(tree.nodes[startId].parent ?? ROOT, variationMoves(tree, startId, WALK_MAX_PLIES))
+  }
+  function saveWalk() {
+    const opened = walker.walk
+    if (!opened) return
+    changeTree(withLine(tree, [...pathTo(opened.startId), ...opened.line]))
+    walker.markSaved()
+  }
 
   /** N: the next unfinished critical moment after the one shown (or the first). */
   function goToNextMoment() {
@@ -311,9 +338,14 @@ function AnalysisBoard({
   function showMomentTag(annotation: Annotation | null) {
     if (momentNodeId !== null) drawings.focus(momentNodeId, annotation)
   }
-  const boardFen = locked && momentFen ? ((candidate && fenAfter(momentFen, candidate)) ?? momentFen) : node.fen
-  const boardLastMove = locked && momentNodeId !== null ? (candidate ?? tree.nodes[momentNodeId].uci) : node.uci
-  const evaluation = locked
+  const view = walker.view // while walking, the board shows the step instead
+  const gameFen = locked && momentFen ? ((candidate && fenAfter(momentFen, candidate)) ?? momentFen) : node.fen
+  const boardFen = view?.fen ?? gameFen
+  const gameLastMove = locked && momentNodeId !== null ? (candidate ?? tree.nodes[momentNodeId].uci) : node.uci
+  const boardLastMove = view ? (view.lastMove ?? tree.nodes[walker.walk?.startId ?? ROOT]?.uci ?? null) : gameLastMove
+  const evaluation = view
+    ? { winPct: view.winPct, evalText: view.evalText }
+    : locked
     ? candidate || momentNodeId === null
       ? { winPct: null, evalText: null }
       : positionEval(tree.nodes[momentNodeId], detail, stored)
@@ -344,25 +376,28 @@ function AnalysisBoard({
       <div className="analysis-layout">
         <section className="board-column" aria-label="Board">
           {/* Always shown, so the board never shifts (chessground keeps its screen position). */}
-          <BoardTurn fen={boardFen} moveNumber={locked && moment ? moment.move_number : Math.floor(node.ply / 2) + 1} />
+          <BoardTurn
+            fen={boardFen}
+            moveNumber={view ? Number(boardFen.split(' ')[5]) : locked && moment ? moment.move_number : Math.floor(node.ply / 2) + 1}
+          />
           <div className="board-row">
             <EvalBar winPct={evaluation.winPct} evalText={evaluation.evalText} orientation={orientation} />
             <Board
               fen={boardFen}
               orientation={orientation}
               lastMove={boardLastMove}
-              movable={!locked || (candidate === null && (moment?.state === 'intro' || moment?.state === 'attempt'))}
+              movable={!walking && (!locked || (candidate === null && (moment?.state === 'intro' || moment?.state === 'attempt')))}
               onMove={play}
               sound={settings.sounds}
-              annotations={coachShapes}
+              annotations={view?.annotations ?? coachShapes}
             />
           </div>
           <BoardNav
             disabled={locked}
-            onFirst={() => navigate(ROOT)}
-            onBack={back}
-            onForward={forward}
-            onLast={() => navigate(endOfLine(tree, current))}
+            onFirst={walking ? () => walker.go(0) : () => navigate(ROOT)}
+            onBack={walking ? walker.prev : back}
+            onForward={walking ? walker.next : forward}
+            onLast={walking ? () => walker.go(Number.MAX_SAFE_INTEGER) : () => navigate(endOfLine(tree, current))}
             onFlip={() => setFlipped((value) => !value)}
           />
           {points.length > 1 && (
@@ -376,26 +411,50 @@ function AnalysisBoard({
           {locked ? (
             <p className="engine-locked">The engine is off while you work on this moment.</p>
           ) : (
-            <EnginePanel fen={node.fen} enabled={engineOn} onToggle={setEngineOn} load={loadEngine} onBest={setLive} />
+            <EnginePanel
+              fen={node.fen}
+              enabled={engineOn}
+              onToggle={setEngineOn}
+              load={loadEngine}
+              onBest={setLive}
+              onWalk={walking ? undefined : (line) => walkFrom(current, line)}
+            />
+          )}
+          {!locked && !walking && !engineOn && topLine().length > 0 && (
+            <Button variant="outline" className="walk-stored" onClick={() => walkFrom(current, topLine())}>
+              Walk me through the engine&apos;s line
+            </Button>
           )}
           {fresh && <EngineStats run={fresh} />}
         </section>
         <aside className="side-column" aria-label="Coach">
-          {detail.status === 'analyzed' && moments.length > 0 ? (
-            <Tabs
-              label="Coaching"
-              tabs={[
-                { value: 'coach', label: 'Coach' },
-                { value: 'moments', label: `Critical moments (${moments.filter((m) => !isUnsolved(m)).length}/${moments.length})` },
-              ]}
-              value={tab}
-              onChange={openTab}
-            >
-              {coachView()}
-            </Tabs>
-          ) : (
-            coachView()
+          {walker.walk && (
+            <WalkthroughPanel
+              walk={walker.walk}
+              onStep={walker.go}
+              onClose={walker.close}
+              onSave={saveWalk}
+              onRetry={walker.retry}
+            />
           )}
+          {/* Hidden, not unmounted, while walking: the chat, its draft and the open panels stay. */}
+          <div className="side-coach" hidden={walking}>
+            {detail.status === 'analyzed' && moments.length > 0 ? (
+              <Tabs
+                label="Coaching"
+                tabs={[
+                  { value: 'coach', label: 'Coach' },
+                  { value: 'moments', label: `Critical moments (${moments.filter((m) => !isUnsolved(m)).length}/${moments.length})` },
+                ]}
+                value={tab}
+                onChange={openTab}
+              >
+                {coachView()}
+              </Tabs>
+            ) : (
+              coachView()
+            )}
+          </div>
         </aside>
       </div>
     </section>
@@ -437,7 +496,7 @@ function AnalysisBoard({
               onShowTag={showChatTag}
               moves={
                 <MovesPanel count={detail.moves.length}>
-                  <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} onDelete={deleteLine} onPromote={promoteLine} />
+                  <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} onDelete={deleteLine} onPromote={promoteLine} onWalk={walkVariation} />
                 </MovesPanel>
               }
               onLoggedOut={onLoggedOut}
@@ -445,7 +504,7 @@ function AnalysisBoard({
           )}
           {detail.status !== 'analyzed' && (
             <MovesPanel count={detail.moves.length}>
-              <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} onDelete={deleteLine} onPromote={promoteLine} />
+              <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} onDelete={deleteLine} onPromote={promoteLine} onWalk={walkVariation} />
             </MovesPanel>
           )}
       </div>

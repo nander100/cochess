@@ -2,11 +2,11 @@ import { type CoachEvent, readCoachEvents } from './sse'
 import type {
   AttemptRequest,
   BaselineReport,
+  ChatRequest,
   Color,
   CreateGameRequest,
   CreateGameResponse,
   EngineConfig,
-  ChatRequest,
   EngineResult,
   GameChoice,
   GameDetail,
@@ -19,11 +19,12 @@ import type {
   ProfileUpdate,
   SavedVariation,
   ScanResponse,
-  TendencyReport,
-  UserSettings,
   SubmitGame,
   SubmitResponse,
+  TendencyReport,
+  UserSettings,
   VerifyResponse,
+  WalkthroughRequest,
 } from './types'
 
 /** An API call failed. `message` is suitable to show the user. */
@@ -96,6 +97,8 @@ export interface ApiClient {
   ): Promise<void>
   momentAsk(gameId: string, index: number, message: string, onEvent: (event: CoachEvent) => void): Promise<void>
   momentWrapUp(gameId: string, onEvent: (event: CoachEvent) => void): Promise<void>
+  /** A line walkthrough (SPEC_V3 §7): a 428 error means the line's positions must be scanned. */
+  walkthrough(gameId: string, body: WalkthroughRequest, onEvent: (event: CoachEvent) => void): Promise<void>
   /** Onboarding (SPEC_V2 §10): the pasted games as a table, with the slot each would fill. */
   onboardingParse(pgnText: string, choices: (GameChoice | null)[]): Promise<ParseResponse>
   onboardingSubmit(games: SubmitGame[]): Promise<SubmitResponse>
@@ -202,6 +205,7 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
     momentAsk: (gameId, index, message, onEvent) =>
       stream(`/api/games/${gameId}/moments/${index}/ask`, { message }, onEvent),
     momentWrapUp: (gameId, onEvent) => stream(`/api/games/${gameId}/moments/wrap_up`, null, onEvent),
+    walkthrough: (gameId, body, onEvent) => stream(`/api/games/${gameId}/walkthrough`, body, onEvent),
     onboardingParse: (pgnText, choices) => post('/api/onboarding/parse', { pgn_text: pgnText, choices }),
     onboardingSubmit: (games) => post('/api/onboarding/submit', { games }),
     onboardingStatus: () => request('/api/onboarding/status'),

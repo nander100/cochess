@@ -90,7 +90,7 @@ cochess/
     │   ├── analysis/            # analysis pipeline, chat round trip, onboarding queue
     │   ├── board/               # chessground wrapper, game tree, move list, eval graph (+ annotations, saved variations, playback)
     │   ├── moments/             # critical-moment stepper
-    │   ├── walkthrough/         # + stepper
+    │   ├── walkthrough/         # + stepper panel and useWalkthrough (the per-step scan lives in analysis/walkthrough.ts)
     │   ├── dashboard/           # + cards and charts
     │   ├── onboarding/          # paste-and-check table, slots, baseline report
     │   ├── components/          # ChatPanel, CoachText (markdown + board-tag icons), GameInput, Synopsis, ...

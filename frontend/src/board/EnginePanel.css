@@ -58,3 +58,7 @@
 .engine-stats .line {
   font-family: var(--font-mono);
 }
+
+.engine-walk {
+  margin-left: var(--space-2);
+}

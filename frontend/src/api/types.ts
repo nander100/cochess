@@ -184,6 +184,39 @@ export interface Annotation {
   squares: { square: string; color: AnnotationColor }[]
 }
 
+/** A request for a line walkthrough (SPEC_V3 §7.2): the start, the line (UCI, at most 10 plies)
+ * and the browser's scan of each position along it (empty to ask for a cached walkthrough). */
+export interface WalkthroughRequest {
+  start_path_uci: string[]
+  line_uci: string[]
+  step_results: EngineResult[]
+}
+
+export interface WalkthroughStep {
+  index: number
+  uci: string
+  san: string
+  fen_after: string
+  /** "+0.8", White's point of view; null when the step wasn't evaluated. */
+  eval_after: string | null
+  /** White's win%, for the eval bar. */
+  win_pct_after: number | null
+  text: string
+  /** Arrows and highlights on the position after this step's move. */
+  annotation: Annotation | null
+}
+
+/** A line explained step by step by the coach. */
+export interface Walkthrough {
+  start_path_uci: string[]
+  line_uci: string[]
+  start_fen: string
+  intro: string
+  steps: WalkthroughStep[]
+  summary: string
+  invalid_moves_removed: string[]
+}
+
 /** A coach answer: its text (board tags as `cc:board/N` placeholder links) and their shapes. */
 export interface CoachReply {
   text: string

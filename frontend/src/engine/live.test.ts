@@ -24,8 +24,8 @@ test('live lines: White-POV evals, win% for the bar, SAN text, capped plies', ()
 
   // Black to move: a side-to-move score of -30 is +0.3 for White; mate -2 for Black is White mating.
   expect(lines).toEqual([
-    { rank: 1, evalText: '+0.3', winPct: expect.closeTo(52.76, 1), text: '1... e5 2. Nf3' },
-    { rank: 2, evalText: '+M2', winPct: 100, text: '1... c5' },
+    { rank: 1, evalText: '+0.3', winPct: expect.closeTo(52.76, 1), text: '1... e5 2. Nf3', uci: ['e7e5', 'g1f3'] },
+    { rank: 2, evalText: '+M2', winPct: 100, text: '1... c5', uci: ['c7c5'] },
   ])
 })
 

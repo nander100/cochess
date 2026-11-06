@@ -5,7 +5,9 @@ Run by Playwright (frontend/playwright.config.ts) as
 move validation and the test can tell which call it got.
 """
 
-from anthropic.types import TextBlock
+import json
+
+from anthropic.types import ContentBlock, TextBlock, ToolUseBlock
 from fastapi import FastAPI
 
 from app.coach.client import CoachReply, CoachRequest, Usage, system_prompt
@@ -14,7 +16,8 @@ from app.config import get_settings
 from app.main import create_app
 
 TASKS: tuple[Task, ...] = (
-    "synopsis", "chat", "explain", "moment_intro", "moment_feedback", "baseline_report"
+    "synopsis", "chat", "explain", "moment_intro", "moment_feedback", "baseline_report",
+    "walkthrough",
 )  # fmt: skip
 ANSWERS: dict[Task, str] = {
     "synopsis": "### Overall\nE2E synopsis: a fighting game.",
@@ -24,19 +27,36 @@ ANSWERS: dict[Task, str] = {
     "moment_intro": "E2E moment: what would you play here instead?",
     "moment_feedback": "E2E feedback: let's compare your move with the engine's.",
     "baseline_report": "### Overview\nE2E baseline report.",
+    "walkthrough": "E2E walkthrough intro: watch the centre.",
 }
 
 
 class ScriptedCoach:
     async def complete(self, request: CoachRequest) -> CoachReply:
-        text = ANSWERS[_task(request)]
+        task = _task(request)
+        text = ANSWERS[task]
+        content: list[ContentBlock] = [TextBlock.model_construct(type="text", text=text)]
+        stop = "end_turn"
+        if task == "walkthrough":  # the forced line_walkthrough tool: one step per move
+            content, text, stop = [_walkthrough_call(request, text)], "", "tool_use"
         return CoachReply(
             text=text,
-            content=[TextBlock.model_construct(type="text", text=text)],
-            stop_reason="end_turn",
+            content=content,
+            stop_reason=stop,
             usage=Usage(input_tokens=1, output_tokens=1, cache_read_tokens=0, cache_write_tokens=0),
             model="e2e-scripted",
         )
+
+
+def _walkthrough_call(request: CoachRequest, intro: str) -> ContentBlock:
+    sent = str(request.messages[0]["content"])
+    payload = json.loads(sent.rpartition("\n\n")[2])
+    plies = len(payload["walkthrough"]["steps"])
+    steps = [{"index": i, "text": f"E2E step {i}: a purposeful move."} for i in range(1, plies + 1)]
+    walk = {"intro": intro, "steps": steps, "summary": "E2E takeaway: keep developing."}
+    return ToolUseBlock.model_construct(
+        type="tool_use", id="toolu_e2e", name="line_walkthrough", input=walk
+    )
 
 
 def _task(request: CoachRequest) -> Task:

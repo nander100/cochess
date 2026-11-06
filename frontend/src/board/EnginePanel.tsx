@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { EngineConfig } from '../api/types'
 import { type LiveLine, isGameOver, toLiveLines } from '../engine/live'
 import type { EngineHandle } from '../engine/StockfishEngine'
-import { Switch } from '../ui'
+import { Button, Switch } from '../ui'
 import './EnginePanel.css'
 
 export interface LiveEngine {
@@ -18,6 +18,8 @@ interface EnginePanelProps {
   load: () => Promise<LiveEngine>
   /** The best line for `fen` as it deepens (for the eval bar), or null when there's none. */
   onBest: (best: { fen: string; line: LiveLine } | null) => void
+  /** "Walk me through it" on a line (SPEC_V3 §7.1); left out where walkthroughs can't run. */
+  onWalk?: (line: readonly string[]) => void
 }
 
 /** A search of one position; anything shown for another position is derived as "loading". */
@@ -31,7 +33,7 @@ type Status = { kind: 'idle' | 'loading' | 'game-over' } | Search
  * The live engine (SPEC_V2 §5.5): off by default; when on, searches the position on the board
  * (top 3 lines), restarting when the position changes and stopping after the tier's cap.
  */
-export function EnginePanel({ fen, enabled, onToggle, load, onBest }: EnginePanelProps) {
+export function EnginePanel({ fen, enabled, onToggle, load, onBest, onWalk }: EnginePanelProps) {
   const [search, setSearch] = useState<Search | null>(null)
   const report = useRef(onBest)
   useEffect(() => {
@@ -84,6 +86,11 @@ export function EnginePanel({ fen, enabled, onToggle, load, onBest }: EnginePane
           {lines.map((line) => (
             <li key={line.rank}>
               <span className="engine-eval">{line.evalText}</span> {line.text}
+              {onWalk && line.uci.length > 0 && (
+                <Button variant="link" className="engine-walk" onClick={() => onWalk(line.uci)}>
+                  Walk me through it
+                </Button>
+              )}
             </li>
           ))}
         </ol>

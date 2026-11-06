@@ -39,6 +39,17 @@
   min-width: 0;
 }
 
+.side-coach {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.side-coach[hidden] {
+  display: none;
+}
+
 .side-stack {
   display: flex;
   flex-direction: column;
@@ -74,4 +85,9 @@
   gap: var(--space-2);
   margin: 0;
   font: var(--text-ui-strong);
+}
+
+/* "Walk me through the engine's line" when the live engine is off (SPEC_V3 §7.1). */
+.walk-stored {
+  align-self: flex-start;
 }

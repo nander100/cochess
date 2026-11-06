@@ -3,6 +3,7 @@ import { ROOT, addMove, fromMoves, type GameTree } from './tree'
 import {
   canPromote,
   deleteVariation,
+  variationMoves,
   promoteVariation,
   variationStart,
   variationsOf,
@@ -118,4 +119,10 @@ test('every explored node knows the variation it belongs to', () => {
 test('a move already in the game is reused, not saved again', () => {
   const tree = addMove(game(), 'e2e4', { from: 'e7', to: 'e5' })?.tree ?? game()
   expect(variationsOf(tree)).toEqual([])
+})
+
+test('variationMoves reads a variation as the move list shows it, up to a limit', () => {
+  const tree = withLine(game(), ['e2e4', 'e7e5', 'f1c4', 'b8c6', 'd1h5'])
+  expect(variationMoves(tree, 'e2e4 e7e5 f1c4', 10)).toEqual(['f1c4', 'b8c6', 'd1h5'])
+  expect(variationMoves(tree, 'e2e4 e7e5 f1c4', 2)).toEqual(['f1c4', 'b8c6'])
 })

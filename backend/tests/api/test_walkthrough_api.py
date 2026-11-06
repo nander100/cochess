@@ -165,7 +165,7 @@ def test_bad_requests_are_refused_before_the_coach_is_called() -> None:
 
     assert ask(client, game_id, line_uci=["g1f3", "e7e5"]).status_code == 422  # illegal
     assert ask(client, game_id, line_uci=["a2a3"] * 11).status_code == 422  # too long
-    assert ask(client, game_id, step_results=scans()[:2]).status_code == 422  # not all scanned
+    assert ask(client, game_id, step_results=scans()[:2]).status_code == 428  # not all scanned
     deep = [fake_result(fen, "deep", plies=1, lines=9) for fen in fens(START, LINE)]
     assert ask(client, game_id, step_results=deep).status_code == 422  # more lines than allowed
     assert fake.requests == []
@@ -196,7 +196,7 @@ def test_an_unsolved_moments_best_line_is_withheld() -> None:
     assert refused.status_code == 409 and "Solve or reveal" in refused.json()["detail"]
     # A poor move from there gives nothing away (this one only lacks its scans).
     other = client.post(f"/api/games/{gid}/walkthrough", json=moment_body(client, gid, ["a2a3"]))
-    assert other.status_code == 422
+    assert other.status_code == 428
     assert fake.requests == []
 
 

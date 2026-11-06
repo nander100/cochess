@@ -28,10 +28,12 @@ interface MoveListProps {
   /** Saved-variation actions (SPEC_V3 §5.1), by the variation's first node. */
   onDelete?: (startId: string) => void
   onPromote?: (startId: string) => void
+  /** Walk through the variation starting at this node (SPEC_V3 §7.1). */
+  onWalk?: (startId: string) => void
 }
 
 /** The game's moves with the player's mistakes marked, and explored variations inline (SPEC_V2 §5.3). */
-export function MoveList({ tree, current, userColor, onSelect, onDelete, onPromote }: MoveListProps) {
+export function MoveList({ tree, current, userColor, onSelect, onDelete, onPromote, onWalk }: MoveListProps) {
   const [menu, setMenu] = useState<string | null>(null)
   const root = tree.nodes[ROOT]
   if (root.children.length === 0) return <p className="move-list">No moves.</p>
@@ -44,6 +46,7 @@ export function MoveList({ tree, current, userColor, onSelect, onDelete, onPromo
     onMenu: onDelete && onPromote ? setMenu : null,
     onDelete: (id) => act(onDelete, id),
     onPromote: (id) => act(onPromote, id),
+    onWalk: onWalk ? (id) => act(onWalk, id) : null,
   } // prettier-ignore
   return (
     <div className="move-list" aria-label="Moves">
@@ -66,6 +69,7 @@ interface Shared {
   onMenu: ((startId: string | null) => void) | null
   onDelete: (startId: string) => void
   onPromote: (startId: string) => void
+  onWalk: ((startId: string) => void) | null
 }
 
 interface LineProps extends Shared {
@@ -107,7 +111,7 @@ function Line(props: LineProps) {
 
 /** A saved variation, indented, with its options button; right-click opens the same menu. */
 function Variation(props: LineProps) {
-  const { tree, startId, menu, onMenu, onDelete, onPromote } = props
+  const { tree, startId, menu, onMenu, onDelete, onPromote, onWalk } = props
   const trigger = useRef<HTMLButtonElement>(null)
   const open = menu === startId
   const closeMenu = () => {
@@ -147,6 +151,7 @@ function Variation(props: LineProps) {
           canPromote={canPromote(tree, startId)}
           onPromote={() => onPromote(startId)}
           onDelete={() => onDelete(startId)}
+          onWalk={onWalk ? () => onWalk(startId) : undefined}
           onClose={closeMenu}
         />
       )}

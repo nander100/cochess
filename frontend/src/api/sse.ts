@@ -1,6 +1,6 @@
 // Server-sent events over fetch (EventSource can't POST). Coach endpoints always stream SSE.
 
-import type { Annotation, AnnotationColor } from './types'
+import type { Annotation, AnnotationColor, Walkthrough } from './types'
 
 export type CoachEvent =
   | { type: 'status'; message: string }
@@ -12,6 +12,8 @@ export type CoachEvent =
   | { type: 'moment'; grade: string | null; state: string }
   /** One checked board tag of the reply (SPEC_V3 §11.1), sent after the text. */
   | { type: 'annotation'; annotation: Annotation }
+  /** A finished line walkthrough (SPEC_V3 §7), checked by the backend. */
+  | { type: 'walkthrough'; walkthrough: Walkthrough }
 
 /** A position the coach wants the deep-dive engine tier to analyze (SPEC §8.3). */
 export interface EnginePositionRequest {
@@ -82,6 +84,8 @@ function toCoachEvent(name: string, payload: unknown): CoachEvent | null {
       return typeof record.state === 'string'
         ? { type: 'moment', grade: typeof record.grade === 'string' ? record.grade : null, state: record.state }
         : null
+    case 'walkthrough':
+      return isWalkthrough(record) ? { type: 'walkthrough', walkthrough: record } : null
     case 'annotation': {
       const annotation = toAnnotation(record)
       return annotation ? { type: 'annotation', annotation } : null
@@ -89,6 +93,23 @@ function toCoachEvent(name: string, payload: unknown): CoachEvent | null {
     default:
       return null
   }
+}
+
+/** The backend built and checked it; this only makes sure the shape is what the stepper needs. */
+function isWalkthrough(record: Record<string, unknown>): record is Walkthrough & Record<string, unknown> {
+  const { intro, summary, steps, start_fen, line_uci } = record
+  return (
+    typeof intro === 'string' &&
+    typeof summary === 'string' &&
+    typeof start_fen === 'string' &&
+    Array.isArray(line_uci) &&
+    Array.isArray(steps) &&
+    steps.length === line_uci.length &&
+    steps.every((step) => {
+      const { fen_after, text, uci } = (step ?? {}) as Record<string, unknown>
+      return typeof fen_after === 'string' && typeof text === 'string' && typeof uci === 'string'
+    })
+  )
 }
 
 const SQUARE = /^[a-h][1-8]$/

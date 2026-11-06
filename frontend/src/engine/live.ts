@@ -12,6 +12,8 @@ export interface LiveLine {
   winPct: number
   /** The line in SAN with move numbers: "14. Nf3 Nc6 15. Bb5". */
   text: string
+  /** The same moves as UCI, for walking through the line (SPEC_V3 §7.1). */
+  uci: string[]
 }
 
 /** The engine's lines for `fen` as the panel shows them, at most `maxPlies` moves each. */
@@ -23,6 +25,7 @@ export function toLiveLines(fen: string, lines: readonly InfoLine[], maxPlies: n
       evalText: formatEval(score),
       winPct: winPercent(score),
       text: numberedSan(fen, line.pv.slice(0, maxPlies)),
+      uci: line.pv.slice(0, maxPlies),
     }
   })
 }

@@ -14,6 +14,8 @@ import type {
   Profile,
   SlotCount,
   UserSettings,
+  Walkthrough,
+  WalkthroughRequest,
 } from '../api/types'
 import type { EngineHandle } from '../engine/StockfishEngine'
 
@@ -161,6 +163,24 @@ export function coachSays(text: string, moment?: { grade: string | null; state: 
   }
 }
 
+/** The coach's walkthrough of any line it's asked about: "Step N: <SAN>." for each move. */
+export function walkthroughFor(body: WalkthroughRequest): Walkthrough {
+  const board = new Chess()
+  for (const uci of body.start_path_uci) board.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] })
+  const start_fen = board.fen()
+  const steps = body.line_uci.map((uci, i) => {
+    const move = board.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] })
+    return {
+      index: i + 1, uci, san: move.san, fen_after: board.fen(), eval_after: '+0.3', win_pct_after: 53,
+      text: `Step ${i + 1}: ${move.san}.`, annotation: null,
+    } // prettier-ignore
+  })
+  return {
+    start_path_uci: body.start_path_uci, line_uci: body.line_uci, start_fen,
+    intro: 'Here is the idea of this line.', steps, summary: 'Remember the plan.', invalid_moves_removed: [],
+  } // prettier-ignore
+}
+
 export function fakeEngine(): EngineHandle {
   return {
     build: 'stockfish-19-lite',
@@ -233,6 +253,11 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     momentReveal: vi.fn(coachSays('The move was 2. d4.', { grade: null, state: 'revealed' })),
     momentAsk: vi.fn(coachSays('Think about the centre.')),
     momentWrapUp: vi.fn(coachSays('Well done.')),
+    walkthrough: vi.fn(async (_gameId: string, body: WalkthroughRequest, onEvent: (e: CoachEvent) => void) => {
+      onEvent({ type: 'status', message: 'Coach is writing…' })
+      onEvent({ type: 'walkthrough', walkthrough: walkthroughFor(body) })
+      onEvent({ type: 'done', invalid_moves_removed: [] })
+    }),
     onboardingParse: vi.fn(async () => ({ primary_time_control: 'rapid' as const, games: [], slots: EMPTY_SLOTS })),
     onboardingSubmit: vi.fn(async () => ({ results: [], slots: EMPTY_SLOTS })),
     onboardingStatus: vi.fn(async () => EMPTY_ONBOARDING),

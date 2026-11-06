@@ -4,6 +4,8 @@ interface VariationMenuProps {
   canPromote: boolean
   onPromote: () => void
   onDelete: () => void
+  /** "Walk me through it" (SPEC_V3 §7.1), when walkthroughs can run here. */
+  onWalk?: () => void
   /** Close without acting (Escape, or a click elsewhere). */
   onClose: () => void
 }
@@ -11,7 +13,7 @@ interface VariationMenuProps {
 /** "Promote" and "Delete" for one saved variation (SPEC_V3 §5.1). Opens on its options button
  * or a right-click on the line; arrow keys move between items and Escape closes it. Keys don't
  * reach the board's shortcuts while it's open. */
-export function VariationMenu({ canPromote, onPromote, onDelete, onClose }: VariationMenuProps) {
+export function VariationMenu({ canPromote, onPromote, onDelete, onWalk, onClose }: VariationMenuProps) {
   const ref = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)
   useEffect(() => {
@@ -41,6 +43,11 @@ export function VariationMenu({ canPromote, onPromote, onDelete, onClose }: Vari
 
   return (
     <div ref={ref} role="menu" aria-label="Variation" className="variation-menu" onKeyDown={keys}>
+      {onWalk && (
+        <button type="button" role="menuitem" onClick={onWalk}>
+          Walk me through it
+        </button>
+      )}
       <button type="button" role="menuitem" disabled={!canPromote} onClick={onPromote}>
         Promote to main line of my notes
       </button>
