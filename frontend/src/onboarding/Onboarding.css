@@ -171,3 +171,9 @@
   color: var(--color-muted);
   font: var(--text-small);
 }
+
+.paste-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

@@ -4,6 +4,7 @@ import type { CoachEvent } from '../api/sse'
 import { Chess } from 'chess.js'
 import type {
   Color,
+  ImportRow,
   CreateGameResponse,
   Dashboard,
   EngineConfig,
@@ -271,6 +272,7 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     momentAsk: vi.fn(coachSays('Think about the centre.')),
     momentWrapUp: vi.fn(coachSays('Well done.')),
     dashboard: vi.fn(async () => EMPTY_DASHBOARD),
+    importGames: vi.fn(async () => ({ platform: 'lichess' as const, username: 'me', games: [] })),
     playback: vi.fn(async (lineId: string) => ({
       line_id: lineId, start_fen: '', moves_uci: [], moves_san: [], evals: [], win_pcts: [], settle_ply: 2,
       caption: 'White has won a knight.',
@@ -293,4 +295,25 @@ export function fakeDeps(overrides: Partial<ApiClient> = {}): PipelineDeps & { e
   const engine = fakeEngine()
   let tick = 0
   return { api: fakeApi(overrides), getEngine: async () => engine, engine, now: () => (tick += 1000) }
+}
+
+/** One game from POST /api/import (SPEC_V3 §10). */
+export function importRow(n: number, overrides: Partial<ImportRow> = {}): ImportRow {
+  return {
+    index: n,
+    platform: 'chesscom',
+    external_id: `${1000 + n}`,
+    url: `https://www.chess.com/game/live/${1000 + n}`,
+    pgn: `[White "me"]\n[Black "Rival${n}"]\n\n1. e4 e5 1-0`,
+    white: 'me',
+    black: `Rival${n}`,
+    result: '1-0',
+    date: '2026.10.25',
+    time_control: '600',
+    category: 'rapid',
+    user_color: 'white',
+    already_imported: false,
+    error: null,
+    ...overrides,
+  }
 }

@@ -1,0 +1,53 @@
+/* "Import recent games" on the Games page (SPEC_V3 §10). Tokens only. */
+.import-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.import-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.import-since {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.import-note {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.import-players a {
+  color: inherit;
+}
+
+.import-muted {
+  color: var(--color-muted);
+}
+
+.import-unused td {
+  color: var(--color-muted);
+}
+
+.import-select {
+  min-width: var(--space-16);
+}
+
+.import-hint {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-muted);
+  font: var(--text-pill);
+  font-weight: 400;
+}
+
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+}

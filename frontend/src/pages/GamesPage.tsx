@@ -5,6 +5,7 @@ import { ApiError, isLoggedOut } from '../api/client'
 import type { CreateGameRequest, GameListItem, GameStatus, UserResult } from '../api/types'
 import { GameInput } from '../components/GameInput'
 import { DashboardView } from '../dashboard/DashboardView'
+import { ImportPanel } from '../importing/ImportPanel'
 import {
   ColorSwatch,
   EmptyState,
@@ -47,6 +48,7 @@ export function GamesPage({ deps, onLoggedOut }: GamesPageProps) {
   const { api } = deps
   const [games, setGames] = useState<GameListItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [version, setVersion] = useState(0) // bumped when imported games arrive: the dashboard reloads
 
   const load = useCallback(
     () =>
@@ -82,7 +84,15 @@ export function GamesPage({ deps, onLoggedOut }: GamesPageProps) {
       </section>
       {error && <ErrorState message={`Your games couldn't be loaded. ${error}`} onRetry={() => void load()} />}
       {!error && games === null && <Skeleton lines={4} label="Loading games…" />}
-      <DashboardView api={api} onLoggedOut={onLoggedOut} />
+      <ImportPanel
+        deps={deps}
+        onLoggedOut={onLoggedOut}
+        onAdded={() => {
+          void load()
+          setVersion((n) => n + 1)
+        }}
+      />
+      <DashboardView key={version} api={api} onLoggedOut={onLoggedOut} />
       {games !== null && <RecentGames games={games} />}
     </div>
   )

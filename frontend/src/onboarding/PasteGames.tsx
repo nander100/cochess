@@ -1,12 +1,17 @@
 import { type FormEvent, useId, useState } from 'react'
 import { ApiError, type ApiClient, isLoggedOut } from '../api/client'
-import type { Color, GameChoice, ParseResponse, ParsedRow, SubmitGame, TimeControl } from '../api/types'
+import type {
+  Color, ExternalRef, GameChoice, ParseResponse, ParsedRow, Platform, SubmitGame, TimeControl,
+} from '../api/types' // prettier-ignore
+import { PLATFORM_LABEL, addable } from '../importing/importRows'
 import { Link } from 'react-router'
 import { errorText } from '../pages/util'
 import { useSettings, usernames } from '../settings/settingsContext'
 import { Button, Pill, Table, useToast } from '../ui'
 import { CATEGORY_LABEL, PICKABLE, SLOT_LABEL, reasonText } from './labels'
 import './Onboarding.css'
+
+const IMPORT_MAX = 50 // the most a platform import returns; slots pick what fits
 
 interface PasteGamesProps {
   api: ApiClient
@@ -25,8 +30,13 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
   const [choices, setChoices] = useState<(GameChoice | null)[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [externals, setExternals] = useState<ReadonlyMap<string, ExternalRef>>(() => new Map())
   const { show } = useToast()
-  const names = usernames(useSettings().settings)
+  const { settings } = useSettings()
+  const names = usernames(settings)
+  const importable = (['chesscom', 'lichess'] as const).filter((p) =>
+    (p === 'chesscom' ? settings.chesscom_username : settings.lichess_username).trim(),
+  )
 
   async function run<T>(work: () => Promise<T>): Promise<T | null> {
     setBusy(true)
@@ -43,14 +53,34 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
     }
   }
 
-  async function check(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!text.trim()) return
-    const response = await run(() => api.onboardingParse(text, []))
+  async function checkText(pgnText: string) {
+    if (!pgnText.trim()) return
+    const response = await run(() => api.onboardingParse(pgnText, []))
     if (response) {
       setParsed(response)
       setChoices(response.games.map(() => null))
     }
+  }
+
+  async function check(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await checkText(text)
+  }
+
+  /** Fetch the player's recent games (SPEC_V3 §10) into the paste box, then check them. Games
+   * already added are left out; each game's platform id goes with it when it's added. */
+  async function importFrom(platform: Platform) {
+    const response = await run(() => api.importGames({ platform, max: IMPORT_MAX }))
+    if (!response) return
+    const fresh = response.games.filter((row) => addable(row) && row.pgn !== null)
+    if (fresh.length === 0) {
+      setError(`No new games found on ${PLATFORM_LABEL[platform]} for ${response.username}.`)
+      return
+    }
+    const pgns = fresh.map((row) => row.pgn ?? '')
+    setExternals(new Map(fresh.map((row) => [row.pgn ?? '', { platform, external_id: row.external_id }])))
+    setText(pgns.join('\n\n'))
+    await checkText(pgns.join('\n\n'))
   }
 
   async function apply(next: (GameChoice | null)[]) {
@@ -86,11 +116,15 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
 
   async function add() {
     if (missingColor.length > 0) return
-    const games: SubmitGame[] = usable.map((row) => ({
-      pgn: row.pgn,
-      user_color: row.user_color,
-      time_control_category: choices[row.index]?.time_control_category ?? null,
-    }))
+    const games: SubmitGame[] = usable.map((row) => {
+      const external = externals.get(row.pgn)
+      return {
+        pgn: row.pgn,
+        user_color: row.user_color,
+        time_control_category: choices[row.index]?.time_control_category ?? null,
+        ...(external ? { external } : {}),
+      }
+    })
     const response = await run(() => api.onboardingSubmit(games))
     if (!response) return
     const count = response.results.filter((result) => result.game_id !== null).length
@@ -127,13 +161,21 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
           onChange={(event) => {
             setText(event.target.value)
             setParsed(null)
+            setExternals(new Map())
           }}
           disabled={busy}
           placeholder={'[Event "Rated rapid game"]\n1. e4 c5 ...\n\n[Event "Rated rapid game"]\n1. d4 Nf6 ...'}
         />
-        <Button type="submit" className="paste-check" disabled={busy || !text.trim()}>
-          Check games
-        </Button>
+        <div className="paste-buttons">
+          <Button type="submit" className="paste-check" disabled={busy || !text.trim()}>
+            Check games
+          </Button>
+          {importable.map((platform) => (
+            <Button key={platform} variant="outline" disabled={busy} onClick={() => void importFrom(platform)}>
+              Import from {PLATFORM_LABEL[platform]}
+            </Button>
+          ))}
+        </div>
         {error && (
           <p className="form-error" role="alert">
             {error}

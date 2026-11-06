@@ -12,10 +12,52 @@ export interface Position {
 }
 
 /** Elo and playstyle come from the player's profile (SPEC_V2 §4.3). */
+export type Platform = 'lichess' | 'chesscom'
+
+/** Where an imported game came from, so it's never added twice (SPEC_V3 §10). */
+export interface ExternalRef {
+  platform: Platform
+  external_id: string
+}
+
 export interface CreateGameRequest {
   pgn: string
   /** Left out: the backend finds the player's own username in the PGN (else a 422). */
   user_color?: Color
+  external?: ExternalRef
+}
+
+/** POST /api/import: the player's recent games on one platform (SPEC_V3 §10). */
+export interface ImportRequest {
+  platform: Platform
+  max?: number
+  tc?: TimeControl | null
+  since?: string | null // YYYY-MM-DD
+}
+
+export interface ImportRow {
+  index: number
+  platform: Platform
+  external_id: string
+  url: string | null
+  /** The cleaned PGN to add; null when it can't be analyzed (see `error`). */
+  pgn: string | null
+  white: string | null
+  black: string | null
+  result: string | null
+  date: string | null
+  time_control: string | null
+  category: TimeControl | null
+  /** The side the player's own username played, if found. */
+  user_color: Color | null
+  already_imported: boolean
+  error: { code: string; message: string; move_number: number | null } | null
+}
+
+export interface ImportResponse {
+  platform: Platform
+  username: string
+  games: ImportRow[]
 }
 
 export type TimeControl = 'bullet' | 'blitz' | 'rapid' | 'classical'
@@ -430,6 +472,7 @@ export interface SubmitGame {
   pgn: string
   user_color: Color
   time_control_category?: TimeControl | null
+  external?: ExternalRef
 }
 
 export interface SubmitResponse {

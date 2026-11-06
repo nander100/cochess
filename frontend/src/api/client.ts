@@ -1,5 +1,7 @@
 import { type CoachEvent, readCoachEvents } from './sse'
 import type {
+  ImportRequest,
+  ImportResponse,
   AttemptRequest,
   BaselineReport,
   ChatRequest,
@@ -102,6 +104,8 @@ export interface ApiClient {
   momentWrapUp(gameId: string, onEvent: (event: CoachEvent) => void): Promise<void>
   /** The dashboard (SPEC_V3 §8.1), filtered. */
   dashboard(filters: DashboardFilters): Promise<Dashboard>
+  /** The player's recent games on Lichess or Chess.com, as a review table (SPEC_V3 §10). */
+  importGames(body: ImportRequest): Promise<ImportResponse>
   /** Where a linked line's playback stops (SPEC_V3 §9.6), from the browser's scans of it. */
   playback(lineId: string, stepResults: EngineResult[]): Promise<Playback>
   /** A line walkthrough (SPEC_V3 §7): a 428 error means the line's positions must be scanned. */
@@ -219,6 +223,7 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
       if (color) query.set('color', color)
       return request(`/api/dashboard?${query.toString()}`)
     },
+    importGames: (body) => post('/api/import', body),
     playback: (lineId, stepResults) => post(`/api/lines/${lineId}/playback`, { step_results: stepResults }),
     onboardingParse: (pgnText, choices) => post('/api/onboarding/parse', { pgn_text: pgnText, choices }),
     onboardingSubmit: (games) => post('/api/onboarding/submit', { games }),

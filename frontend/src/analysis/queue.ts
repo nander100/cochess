@@ -37,6 +37,31 @@ export async function runOnboardingQueue(
   }
 }
 
+/**
+ * Analyze the given games one after another (imported games, SPEC_V3 §10), skipping any already
+ * analyzed. Like the onboarding queue, each game's progress is kept by the server, so a game
+ * left half-done is resumed. Resolves with how many games were analyzed.
+ */
+export async function runGamesQueue(
+  deps: PipelineDeps,
+  gameIds: readonly string[],
+  onProgress: (progress: QueueProgress) => void,
+): Promise<number> {
+  let config: EngineConfig | null = null
+  let analyzed = 0
+  for (const [index, id] of gameIds.entries()) {
+    const total = gameIds.length
+    onProgress({ game: index + 1, total, status: { phase: 'starting' } })
+    const detail = await deps.api.getGame(id)
+    if (detail.status !== 'analyzed') {
+      config ??= await deps.api.engineConfig()
+      await resumeGame(deps, detail, config, (game) => onProgress({ game: index + 1, total, status: game }))
+    }
+    analyzed += 1
+  }
+  return analyzed
+}
+
 /** "Game 3 of 12 — move 14 of 38". */
 export function queueLabel({ game, total, status }: QueueProgress): string {
   const prefix = `Game ${game} of ${total}`

@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from 'vitest'
 import App from '../App'
 import type { PipelineDeps } from '../analysis/pipeline'
 import type { GameChoice, OnboardingGame, OnboardingStatus, ParsedRow, ParseResponse } from '../api/types'
-import { DEFAULT_SETTINGS, DETAIL, EMPTY_ONBOARDING, EMPTY_SLOTS, REPORT_TEXT, fakeDeps } from '../test/fakes'
+import { DEFAULT_SETTINGS, DETAIL, EMPTY_ONBOARDING, EMPTY_SLOTS, REPORT_TEXT, fakeDeps, importRow } from '../test/fakes'
 
 vi.mock('../board/Board', () => ({ Board: () => <div data-testid="board" /> }))
 
@@ -71,6 +71,39 @@ describe('adding games', () => {
     expect(within(table).getAllByText('From your username')).toHaveLength(2)
     expect(within(table).getByLabelText('Your color in game 2')).toHaveValue('black')
     expect(screen.getByRole('button', { name: 'Add 2 games' })).toBeEnabled()
+  })
+
+  test('importing fills the paste box, checks it, and adds games with their platform ids', async () => {
+    const imported = importRow(0, { pgn: '[White "nander100"]\n\n1. e4 e5 1-0' })
+    const deps = fakeDeps({
+      settings: vi.fn(async () => ({ ...DEFAULT_SETTINGS, chesscom_username: 'nander100' })),
+      importGames: vi.fn(async () => ({
+        platform: 'chesscom' as const, username: 'nander100',
+        games: [imported, importRow(1, { already_imported: true })],
+      })), // prettier-ignore
+      onboardingParse: vi.fn(async () => ({
+        primary_time_control: 'rapid' as const,
+        slots: EMPTY_SLOTS,
+        games: [row(0, { pgn: imported.pgn, color_detected: true })],
+      })),
+      onboardingSubmit: vi.fn(async () => ({
+        results: [{ index: 0, slot: 'white_win' as const, reason: null, game_id: 'new-1' }],
+        slots: EMPTY_SLOTS,
+      })),
+    })
+    renderAt(deps, '/onboarding')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Import from Chess.com' }))
+
+    await screen.findByRole('table')
+    expect(deps.api.importGames).toHaveBeenCalledWith({ platform: 'chesscom', max: 50 })
+    expect(vi.mocked(deps.api.onboardingParse).mock.calls[0][0]).toBe(imported.pgn) // the added one is left out
+    fireEvent.click(screen.getByRole('button', { name: 'Add 1 game' }))
+    await screen.findByText('Added 1 game.')
+    expect(vi.mocked(deps.api.onboardingSubmit).mock.calls[0][0][0].external).toEqual({
+      platform: 'chesscom',
+      external_id: '1000',
+    })
   })
 
   test('without a username, the form points to the profile', async () => {

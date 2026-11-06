@@ -7,6 +7,7 @@ move validation and the test can tell which call it got.
 
 import json
 
+import httpx
 from anthropic.types import ContentBlock, TextBlock, ToolUseBlock
 from fastapi import FastAPI
 
@@ -75,10 +76,46 @@ def _task(request: CoachRequest) -> Task:
     return next((t for t in TASKS if system_prompt(t) == prompt), "chat")
 
 
+# Faked Chess.com for the import flow: every player has one archive with two games, the first
+# with that player as White (the e2e HUNG_KNIGHT game), the second against someone else.
+IMPORT_PGN = (
+    '[Event "Imported"]\n[White "{white}"]\n[Black "{black}"]\n[Result "0-1"]\n'
+    '[Date "2026.10.0{day}"]\n[TimeControl "600"]\n\n{moves}'
+)
+IMPORT_MOVES = (
+    "1. e4 e5 2. Nf3 Nc6 3. Ng5 Qxg5 4. Nc3 Nf6 5. d3 Qg6 6. Be2 Bc5 0-1",
+    "1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 0-1",
+)
+
+
+def _fake_chesscom(request: httpx.Request) -> httpx.Response:
+    parts = request.url.path.split("/")  # /pub/player/{name}/games/...
+    name = parts[3]
+    base = f"https://api.chess.com/pub/player/{name}/games"
+    if request.url.path.endswith("/archives"):
+        return httpx.Response(200, json={"archives": [f"{base}/2026/10"]})
+    games = [
+        {
+            "url": f"https://www.chess.com/game/live/{900 + i}",
+            "pgn": IMPORT_PGN.format(
+                white=name if i == 0 else "Somebody", black=f"Rival{i}", day=i + 1, moves=moves
+            ),
+            "time_class": "rapid",
+            "rules": "chess",
+            "end_time": 1_790_900_000 + i,
+        }
+        for i, moves in enumerate(IMPORT_MOVES)
+    ]
+    return httpx.Response(200, json={"games": games})
+
+
 def make() -> FastAPI:
     settings = get_settings()
+    settings.imports.cooldown_seconds = 0
     # The scripted engine reports full depth at once: searches only need their minimum time.
     engine = settings.engine
     for tier, ms in ((engine.scan, 10), (engine.verify, 20), (engine.deep, 20)):
         tier.min_time_ms = ms
-    return create_app(settings, ScriptedCoach())
+    app = create_app(settings, ScriptedCoach())
+    app.state.import_transport = httpx.MockTransport(_fake_chesscom)
+    return app
