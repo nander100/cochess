@@ -62,3 +62,33 @@ test('the assessment imports games from Lichess into the paste table', async ({ 
   await panel.getByRole('button', { name: 'Fetch games' }).click()
   await expect(panel.getByRole('table', { name: 'Fetched games' }).getByText('Already added')).toHaveCount(1)
 })
+
+// Owner request 2026-11-06: "Just played a game?" is the first thing on the home page. One click
+// fetches the newest game (Chess.com faked), analyzes it and opens it; the next click opens it again.
+test('the latest game is analyzed in one click from the home page', async ({ page }) => {
+  const name = `e2e_latest_${Date.now()}`
+  await logInWithProfile(page, newLoginLink(`Latest ${name}`), 1200)
+  await page.goto('/profile')
+  const accounts = page.getByRole('form', { name: 'Your online accounts' })
+  await accounts.getByLabel('Chess.com username').fill(name)
+  await accounts.getByRole('button', { name: 'Save usernames' }).click()
+  await expect(accounts.getByRole('status')).toHaveText('Saved')
+
+  await page.getByRole('link', { name: 'Games', exact: true }).click()
+  const card = page.getByRole('region', { name: 'Just played a game?' })
+  await expect(card).toBeVisible()
+  // It comes before everything else on the page.
+  const first = await page.locator('.games-page > *').first().getAttribute('aria-labelledby')
+  expect(first).toBe('latest-game-title')
+  await card.getByRole('button', { name: 'Analyze my latest game' }).click()
+
+  await expect(page).toHaveURL(/\/games\/[0-9a-f-]+$/, { timeout: 60_000 })
+  const gameUrl = page.url()
+  await expect(page.locator('.game-heading')).toContainText('you played white')
+  await expect(page.getByRole('region', { name: 'Unfinished analysis' })).toBeHidden({ timeout: 60_000 })
+
+  await page.getByRole('link', { name: 'Games', exact: true }).click()
+  await card.getByRole('button', { name: 'Analyze my latest game' }).click()
+  await expect(page).toHaveURL(gameUrl)
+  await expect(page.getByText(/is already here/)).toBeVisible()
+})

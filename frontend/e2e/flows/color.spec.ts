@@ -51,7 +51,7 @@ test('a username in the profile lets the site find the color', async ({ page }) 
   await page.getByRole('link', { name: 'Games', exact: true }).click()
   await expect(page.getByText("Or leave it: we'll find player in the game.")).toBeVisible()
   await page.getByLabel(/your game/i).fill(HUNG_KNIGHT)
-  await page.getByRole('button', { name: 'Analyze' }).click()
+  await page.getByRole('button', { name: 'Analyze game', exact: true }).click()
 
   await expect(page).toHaveURL(/\/games\/[0-9a-f-]+$/, { timeout: 60_000 })
   await expect(page.locator('.game-heading')).toContainText('you played white')

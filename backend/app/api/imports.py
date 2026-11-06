@@ -3,7 +3,7 @@ review table. Nothing is stored here: games are added through the usual upload o
 routes, which parse and check them again."""
 
 import time
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -19,7 +19,7 @@ from app.api.games import games_left_today
 from app.api.schemas import PgnErrorDetail, Platform, TimeControl
 from app.auth.deps import CurrentUser
 from app.config import Settings
-from app.db.games import game_fingerprint
+from app.db.games import find_duplicate, find_external, game_fingerprint
 from app.db.models import Game, UserSettingsRow
 from app.db.user_settings import usernames_for
 from app.importers.base import PLATFORM_NAME, ImportedGame, ImportFailure, ImportQuery
@@ -94,6 +94,71 @@ def import_games(
         games=rows,
         games_left_today=games_left_today(session, user.id, settings),
     )
+
+
+class LatestGame(BaseModel):
+    """The player's newest game across their linked platforms (owner request 2026-11-06)."""
+
+    game: ImportRow
+    # Set when the player already has this game: the page opens it instead of adding it again.
+    existing_game_id: str | None
+
+
+@router.post("/latest")
+def latest_game(
+    request: Request, user: CurrentUser, session: SessionDep, settings: SettingsDep
+) -> LatestGame:
+    """One click from the home page: the newest game the player finished on Chess.com or
+    Lichess (whichever is newer when both are linked), ready to add and analyze."""
+    linked = _linked(session, user.id)
+    if not linked:
+        detail = "Add your Chess.com or Lichess username on your profile first."
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=detail)
+    _cool_down(request, user.id, settings)
+    transport = getattr(request.app.state, "import_transport", None)
+    found: list[ImportedGame] = []
+    failures: list[ImportFailure] = []
+    for platform, username in linked:
+        try:
+            found += fetch_games(platform, ImportQuery(username, 1), settings.imports, transport)
+        except ImportFailure as failure:
+            failures.append(failure)  # the other platform may still have the game
+    if not found:
+        if failures:
+            first = failures[0]
+            raise HTTPException(FAILURE_STATUS[first.kind], detail=str(first))
+        names = " or ".join(f"{PLATFORM_NAME[p]} ({u})" for p, u in linked)
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"No games found on {names}.")
+    newest = max(found, key=lambda game: game.played_at or datetime.min.replace(tzinfo=UTC))
+    known_ids, known_prints = _known(session, user.id, newest.platform)
+    row = _row(0, newest, settings, usernames_for(session, user.id), known_ids, known_prints)
+    existing = _existing(session, user.id, newest, row, settings)
+    return LatestGame(game=row, existing_game_id=existing)
+
+
+def _linked(session: Session, user_id: str) -> list[tuple[Platform, str]]:
+    row = session.get(UserSettingsRow, user_id)
+    if row is None:
+        return []
+    pairs: list[tuple[Platform, str | None]] = [
+        ("chesscom", row.chesscom_username),
+        ("lichess", row.lichess_username),
+    ]
+    return [(platform, name) for platform, name in pairs if name]
+
+
+def _existing(
+    session: Session, user_id: str, game: ImportedGame, row: ImportRow, settings: Settings
+) -> str | None:
+    """The player's stored copy of this game: same platform id, else the same moves."""
+    if not row.already_imported:
+        return None
+    match = find_external(session, user_id, game.platform, game.external_id)
+    if match is None and row.pgn is not None:
+        limits = settings.limits
+        parsed = parse_pgn(row.pgn, max_chars=limits.max_pgn_chars, max_plies=limits.max_plies)
+        match = find_duplicate(session, user_id, game_fingerprint(parsed))
+    return match.id if match else None
 
 
 def fetch_recent(

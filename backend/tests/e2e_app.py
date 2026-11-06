@@ -76,8 +76,8 @@ def _task(request: CoachRequest) -> Task:
     return next((t for t in TASKS if system_prompt(t) == prompt), "chat")
 
 
-# Faked Chess.com and Lichess for the import flows: every player has two games, the first with
-# that player as White (the e2e HUNG_KNIGHT game), the second between two other players.
+# Faked Chess.com and Lichess for the import flows: every player has two games, the newest with
+# that player as White (the e2e HUNG_KNIGHT game), an older one between two other players.
 IMPORT_PGN = (
     '[Event "Imported"]\n[White "{white}"]\n[Black "{black}"]\n[Result "0-1"]\n'
     '[Date "2026.10.0{day}"]\n[TimeControl "600"]\n\n{moves}'
@@ -102,7 +102,7 @@ def _fake_lichess(request: httpx.Request) -> httpx.Response:
             {
                 "id": f"e2eLc{i:03}",
                 "variant": "standard",
-                "lastMoveAt": 1_790_900_000_000 + i,
+                "lastMoveAt": 1_790_900_000_000 - i,  # the player's game (i = 0) is newest
                 "pgn": IMPORT_PGN.format(
                     white=name if i == 0 else "Somebody", black=f"Rival{i}", day=i + 1, moves=moves
                 ),
@@ -127,11 +127,11 @@ def _fake_chesscom(request: httpx.Request) -> httpx.Response:
             ),
             "time_class": "rapid",
             "rules": "chess",
-            "end_time": 1_790_900_000 + i,
+            "end_time": 1_790_900_000 - i,
         }
         for i, moves in enumerate(IMPORT_MOVES)
     ]
-    return httpx.Response(200, json={"games": games})
+    return httpx.Response(200, json={"games": games[::-1]})  # oldest first, as Chess.com sends
 
 
 def make() -> FastAPI:

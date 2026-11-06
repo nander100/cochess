@@ -65,6 +65,13 @@ export interface AssessmentImport {
   missing: { slot: Slot; count: number }[]
 }
 
+/** POST /api/import/latest: the player's newest game on their linked platforms. */
+export interface LatestGame {
+  game: ImportRow
+  /** The player's stored copy, when they've added this game before. */
+  existing_game_id: string | null
+}
+
 export interface ImportResponse {
   platform: Platform
   username: string

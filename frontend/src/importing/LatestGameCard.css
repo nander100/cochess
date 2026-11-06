@@ -1,0 +1,46 @@
+/* "Just played a game?" at the top of the Games page. Tokens only. */
+.latest-game.ui-feature-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-3) var(--space-6);
+  padding: var(--space-6);
+}
+
+.latest-game-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.latest-game-title {
+  margin: 0;
+  font: var(--text-section);
+}
+
+.latest-game-lead {
+  margin: 0;
+}
+
+.latest-game a {
+  color: var(--header-accent);
+}
+
+.latest-game .ui-progress,
+.latest-game-error {
+  grid-column: 1 / -1;
+}
+
+/* The error sits on the dark card: readable text with the accent, not the red used on light. */
+.latest-game .latest-game-error {
+  margin: 0;
+  color: var(--color-feature-fg);
+  border-left: var(--space-1) solid var(--header-accent);
+  padding-left: var(--space-3);
+}
+
+/* The page's main action, on the dark card: the header's accent stands out in both themes. */
+.latest-game .latest-game-button {
+  background: var(--header-accent);
+  color: var(--header-accent-fg);
+}

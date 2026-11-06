@@ -1,5 +1,7 @@
 """POST /api/import (SPEC_V3 §10): recent games as a review table, against faked platforms."""
 
+from typing import Any
+
 import httpx
 import pytest
 from fastapi import FastAPI
@@ -155,3 +157,88 @@ def test_bad_requests_are_rejected(client: TestClient) -> None:
 
 def test_importing_needs_a_login(anon_client: TestClient) -> None:
     assert anon_client.post("/api/import", json={"platform": "lichess"}).status_code == 401
+
+
+def both(lichess: httpx.Response | Any, chesscom: Any) -> httpx.MockTransport:
+    """A fake for both platforms: Lichess and Chess.com handlers by host."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        handler = lichess if request.url.host == "lichess.org" else chesscom
+        return handler(request)
+
+    return httpx.MockTransport(handle)
+
+
+def link_both(client: TestClient) -> None:
+    client.patch("/api/settings", json={"lichess_username": "me", "chesscom_username": "me"})
+
+
+def test_the_latest_game_is_the_newest_across_both_platforms(
+    app: FastAPI, client: TestClient
+) -> None:
+    link_both(client)
+    newer = lichess_game(7, lastMoveAt=1_800_000_000_000)  # 2027: newer than the Chess.com game
+    app.state.import_transport = both(
+        lichess_games(newer), chesscom_api({"2026/10": [chesscom_game(1)]})
+    )
+
+    body = client.post("/api/import/latest").json()
+
+    assert (body["game"]["platform"], body["game"]["external_id"]) == ("lichess", "lc000007")
+    assert body["game"]["user_color"] == "white" and body["existing_game_id"] is None
+
+
+def test_a_game_already_added_comes_back_with_its_id(app: FastAPI, client: TestClient) -> None:
+    client.patch("/api/settings", json={"chesscom_username": "me"})
+    fake(app, httpx.MockTransport(chesscom_api({"2026/10": [chesscom_game(1)]})))
+    row = client.post("/api/import/latest").json()["game"]
+    added = client.post(
+        "/api/games",
+        json={"pgn": row["pgn"], "external": {"platform": "chesscom", "external_id": "1001"}},
+    ).json()
+
+    body = client.post("/api/import/latest").json()
+
+    assert body["game"]["already_imported"] and body["existing_game_id"] == added["game_id"]
+
+
+def test_one_platform_down_still_gives_the_other_ones_game(
+    app: FastAPI, client: TestClient
+) -> None:
+    link_both(client)
+    app.state.import_transport = both(
+        lambda request: httpx.Response(503), chesscom_api({"2026/10": [chesscom_game(2)]})
+    )
+
+    body = client.post("/api/import/latest").json()
+
+    assert body["game"]["platform"] == "chesscom"
+
+
+def test_no_games_anywhere_says_where_it_looked(app: FastAPI, client: TestClient) -> None:
+    link_both(client)
+    app.state.import_transport = both(lichess_games(), chesscom_api({}))
+
+    response = client.post("/api/import/latest")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "No games found on Chess.com (me) or Lichess (me)."
+
+
+def test_every_platform_failing_is_explained(app: FastAPI, client: TestClient) -> None:
+    client.patch("/api/settings", json={"lichess_username": "ghost"})
+    fake(app, httpx.MockTransport(lambda request: httpx.Response(404)))
+
+    response = client.post("/api/import/latest")
+
+    assert response.status_code == 404
+    assert "has no player called ghost" in response.json()["detail"]
+
+
+def test_the_latest_game_needs_a_linked_account(client: TestClient) -> None:
+    response = client.post("/api/import/latest")
+
+    assert response.status_code == 409
+    assert (
+        response.json()["detail"] == "Add your Chess.com or Lichess username on your profile first."
+    )

@@ -6,6 +6,7 @@ import type { CreateGameRequest, GameListItem, GameStatus, UserResult } from '..
 import { GameInput } from '../components/GameInput'
 import { DashboardView } from '../dashboard/DashboardView'
 import { ImportPanel } from '../importing/ImportPanel'
+import { LatestGameCard } from '../importing/LatestGameCard'
 import {
   ColorSwatch,
   EmptyState,
@@ -71,6 +72,7 @@ export function GamesPage({ deps, onLoggedOut }: GamesPageProps) {
 
   return (
     <div className="games-page">
+      <LatestGameCard deps={deps} onLoggedOut={onLoggedOut} />
       <section className="games-hero" aria-label="Upload a game">
         <div className="games-hero-text">
           <Eyebrow>Your games</Eyebrow>

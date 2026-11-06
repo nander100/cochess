@@ -1,6 +1,7 @@
 import { type CoachEvent, readCoachEvents } from './sse'
 import type {
   AssessmentImport,
+  LatestGame,
   Platform,
   ImportRequest,
   ImportResponse,
@@ -108,6 +109,8 @@ export interface ApiClient {
   dashboard(filters: DashboardFilters): Promise<Dashboard>
   /** The player's recent games on Lichess or Chess.com, as a review table (SPEC_V3 §10). */
   importGames(body: ImportRequest): Promise<ImportResponse>
+  /** The newest game on the player's linked platforms (whichever is newer). */
+  latestGame(): Promise<LatestGame>
   /** Where a linked line's playback stops (SPEC_V3 §9.6), from the browser's scans of it. */
   playback(lineId: string, stepResults: EngineResult[]): Promise<Playback>
   /** A line walkthrough (SPEC_V3 §7): a 428 error means the line's positions must be scanned. */
@@ -228,6 +231,7 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
       return request(`/api/dashboard?${query.toString()}`)
     },
     importGames: (body) => post('/api/import', body),
+    latestGame: () => post('/api/import/latest', {}),
     playback: (lineId, stepResults) => post(`/api/lines/${lineId}/playback`, { step_results: stepResults }),
     onboardingParse: (pgnText, choices) => post('/api/onboarding/parse', { pgn_text: pgnText, choices }),
     onboardingSubmit: (games) => post('/api/onboarding/submit', { games }),

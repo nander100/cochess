@@ -71,7 +71,7 @@ test('every page, light and dark, 1280 and 1920', async ({ page, browser }) => {
   // Onboarding with a few games checked.
   await page.getByLabel(/rating/i).fill('1200')
   await page.getByLabel('Rapid', { exact: true }).check()
-  await page.getByRole('button', { name: /^Save/ }).click()
+  await page.locator('form[aria-labelledby="profile-about"]').getByRole('button', { name: /^Save/ }).click()
   await page.getByRole('heading', { name: 'Twelve games, one honest picture of your play.' }).waitFor()
   const games = [rapidGame(0, 'white', '1-0'), rapidGame(1, 'black', '0-1'), rapidGame(2, 'white', '0-1')]
   await page.getByLabel(/Paste one or more games/).fill(games.join('\n\n'))
@@ -123,8 +123,20 @@ test('every page, light and dark, 1280 and 1920', async ({ page, browser }) => {
   }
 
   await nav(page, 'Games')
-  await page.locator('table').waitFor()
+  await page.getByRole('table', { name: 'All games' }).waitFor()
+  await page.locator('.dashboard-chart .recharts-surface').last().waitFor()
   await shoot(page, 'games')
+
+  // With a linked account: "Analyze my latest game" and the import form.
+  await page.goto('/profile')
+  const accounts = page.getByRole('form', { name: 'Your online accounts' })
+  await accounts.getByLabel('Chess.com username').fill('e2e_player')
+  await accounts.getByRole('button', { name: 'Save usernames' }).click()
+  await accounts.getByRole('status').waitFor()
+  await nav(page, 'Games')
+  await page.getByRole('button', { name: 'Analyze my latest game' }).waitFor()
+  await page.locator('.dashboard-chart .recharts-surface').last().waitFor()
+  await shoot(page, 'games-linked')
 
   await nav(page, 'Profile')
   await page.waitForLoadState('networkidle')
