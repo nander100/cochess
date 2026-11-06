@@ -47,7 +47,7 @@ from app.auth.deps import CurrentUser
 from app.coach.baseline import BaselineResult, generate_baseline
 from app.coach.markup import MessageTokens, MoveToken
 from app.config import Settings
-from app.db.games import game_fingerprint, new_game
+from app.db.games import find_external, game_fingerprint, new_game
 from app.db.models import BaselineReportRow, Game, User
 from app.db.onboarding import filled_slots, latest_report, onboarding_games, slot_of
 from app.db.user_settings import usernames_for
@@ -119,7 +119,22 @@ def submit(
         game_id = None
         if game is not None and decision.slot is not None and color is not None:
             category = _category(game, choices[i], settings)
-            row = new_game(session, user, game, color, source="onboarding", category=category)
+            ref = body.games[i].external
+            # An external id seen before (same moves, so also a duplicate) is never stored twice.
+            external = (
+                (ref.platform, ref.external_id)
+                if ref and find_external(session, user.id, ref.platform, ref.external_id) is None
+                else None
+            )
+            row = new_game(
+                session,
+                user,
+                game,
+                color,
+                source="onboarding",
+                category=category,
+                external=external,
+            )
             session.flush()
             stored.append(row)
             game_id = row.id

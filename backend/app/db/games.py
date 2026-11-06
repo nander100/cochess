@@ -45,6 +45,7 @@ def new_game(
     *,
     source: str,
     category: str | None = None,
+    external: tuple[str, str] | None = None,
 ) -> Game:
     """Store an uploaded game for `user` (the caller commits). Elo and playstyle are the
     profile's at upload: the Elo at analysis, kept even if the profile changes later."""
@@ -61,6 +62,8 @@ def new_game(
         time_control_category=category,
         source=source,
         fingerprint=game_fingerprint(parsed),
+        external_source=external[0] if external else None,
+        external_id=external[1] if external else None,
         created_at=now,
     )
     session.add(game)
@@ -75,6 +78,19 @@ def find_duplicate(session: Session, user_id: str, key: str) -> Game | None:
     """The player's game with this fingerprint, if they've uploaded it before."""
     return session.scalars(
         select(Game).where(Game.user_id == user_id, Game.fingerprint == key).limit(1)
+    ).first()
+
+
+def find_external(session: Session, user_id: str, platform: str, external_id: str) -> Game | None:
+    """The player's game imported from this platform game, if they've added it before."""
+    return session.scalars(
+        select(Game)
+        .where(
+            Game.user_id == user_id,
+            Game.external_source == platform,
+            Game.external_id == external_id,
+        )
+        .limit(1)
     ).first()
 
 

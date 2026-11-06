@@ -217,6 +217,25 @@ class Limits(BaseModel):
     max_variation_moves: int = 200
 
 
+class ImportSettings(BaseModel):
+    """Game import from Lichess and Chess.com (SPEC_V3 §10). Chess.com asks API clients to name
+    themselves in the User-Agent: the app name and a contact come from env
+    (IMPORTS__APP_NAME, IMPORTS__CONTACT), never from code."""
+
+    app_name: str = "CoChess"
+    contact: str | None = None  # e.g. an email or URL the platforms can reach
+    default_games: int = 20
+    max_games: int = 50
+    timeout_seconds: float = 15
+    cooldown_seconds: float = 10  # per player, between imports
+    chesscom_max_archives: int = 12  # monthly archives walked back, newest first
+    lichess_url: str = "https://lichess.org"
+    chesscom_url: str = "https://api.chess.com"
+
+    def user_agent(self) -> str:
+        return f"{self.app_name} ({self.contact})" if self.contact else self.app_name
+
+
 class AuthSettings(BaseModel):
     """Invite links and login sessions (SPEC_V2 §4.1)."""
 
@@ -254,6 +273,7 @@ class Settings(BaseSettings):
     puzzles: PuzzleSettings = PuzzleSettings()
     tendencies: TendencySettings = TendencySettings()
     onboarding: OnboardingSettings = OnboardingSettings()
+    imports: ImportSettings = ImportSettings()
 
 
 @lru_cache

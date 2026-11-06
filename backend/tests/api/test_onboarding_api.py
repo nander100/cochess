@@ -406,3 +406,18 @@ class TestParseDetectsColors:
         [row] = parse(client, [pgn(0, "white", "1-0")])["games"]
 
         assert (row["user_color"], row["color_detected"]) == (None, False)
+
+
+def test_an_imported_assessment_game_keeps_its_platform_id() -> None:
+    client, _, app = make()
+    game = {"pgn": pgn(0, "white", "1-0"), "user_color": "white",
+            "external": {"platform": "chesscom", "external_id": "1234"}}  # fmt: skip
+
+    [result] = client.post("/api/onboarding/submit", json={"games": [game]}).json()["results"]
+
+    with app.state.session_factory() as session:
+        stored = session.get(Game, result["game_id"])
+    assert stored is not None and (stored.external_source, stored.external_id) == (
+        "chesscom",
+        "1234",
+    )

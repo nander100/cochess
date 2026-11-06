@@ -30,7 +30,7 @@ from app.api.validation import color_needed
 from app.auth.deps import CurrentUser
 from app.config import Settings
 from app.db.game_changes import SlotFullError, change_color, delete_game
-from app.db.games import find_duplicate, game_fingerprint, list_games, new_game
+from app.db.games import find_duplicate, find_external, game_fingerprint, list_games, new_game
 from app.db.models import Game
 from app.db.user_settings import usernames_for
 
@@ -76,9 +76,14 @@ def create_game(
     color = body.user_color or detect_color(parsed, usernames)
     if color is None:
         raise color_needed(bool(usernames))
-    if find_duplicate(session, user.id, game_fingerprint(parsed)) is not None:
+    if find_duplicate(session, user.id, game_fingerprint(parsed)) is not None or (
+        body.external
+        and find_external(session, user.id, body.external.platform, body.external.external_id)
+        is not None
+    ):
         raise HTTPException(status.HTTP_409_CONFLICT, detail=DUPLICATE)
-    game = new_game(session, user, parsed, color, source="single")
+    external = (body.external.platform, body.external.external_id) if body.external else None
+    game = new_game(session, user, parsed, color, source="single", external=external)
     session.commit()
 
     return CreateGameResponse(

@@ -89,6 +89,10 @@ class Game(Base):
     __table_args__ = (
         Index("ix_games_user_id_played_at", "user_id", "played_at"),
         Index("ix_games_user_id_fingerprint", "user_id", "fingerprint"),
+        # SPEC_V3 §11.2: an imported game is stored once per player (NULLs don't collide).
+        UniqueConstraint(
+            "user_id", "external_source", "external_id", name="uq_games_user_external"
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
@@ -107,6 +111,9 @@ class Game(Base):
     # app.analysis.game_info.fingerprint: a player can't upload the same game twice. Null for
     # games uploaded before v2 M5 until `cli backfill`.
     fingerprint: Mapped[str | None] = mapped_column(String(64))
+    # Imported games (SPEC_V3 §10): the platform ("lichess" | "chesscom") and its game id.
+    external_source: Mapped[str | None] = mapped_column(String(10))
+    external_id: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
     # When the player's variations were first saved (SPEC_V3 §5.1). Until then the board seeds
     # finished moments' tries as variations; after, the saved list is the whole truth, so a

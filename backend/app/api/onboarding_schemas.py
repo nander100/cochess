@@ -5,7 +5,14 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.analysis.onboarding import Category, Reason, Slot
-from app.api.schemas import Color, GameStatus, PgnErrorDetail, TimeControl, UserResult
+from app.api.schemas import (
+    Color,
+    ExternalRef,
+    GameStatus,
+    PgnErrorDetail,
+    TimeControl,
+    UserResult,
+)
 from app.coach.markup import MoveToken
 
 MAX_PASTE_GAMES = 40  # mirrors OnboardingSettings.max_paste_games; bounds the request's lists
@@ -62,6 +69,7 @@ class SubmitGame(BaseModel):
     pgn: str = Field(min_length=1)
     # Left out: detected from the player's username in the PGN (else the game needs a color).
     user_color: Color | None = None
+    external: ExternalRef | None = None  # set for a game from POST /api/import
     time_control_category: TimeControl | None = None
 
 

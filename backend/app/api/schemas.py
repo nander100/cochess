@@ -23,12 +23,23 @@ Color = Literal["white", "black"]
 TimeControl = Literal["bullet", "blitz", "rapid", "classical"]
 
 
+Platform = Literal["lichess", "chesscom"]
+
+
+class ExternalRef(BaseModel):
+    """Where an imported game came from (SPEC_V3 §10): stored so it's never imported twice."""
+
+    platform: Platform
+    external_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+
+
 class CreateGameRequest(BaseModel):
     """Elo and playstyle come from the player's profile (SPEC_V2 §4.3)."""
 
     pgn: str = Field(min_length=1)
     # Left out: detected from the player's own username in the PGN, else a 422 asks for it.
     user_color: Color | None = None
+    external: ExternalRef | None = None  # set for a game from POST /api/import
 
 
 class ChangeColorRequest(BaseModel):
