@@ -413,14 +413,14 @@ function AnalysisBoard({
           )}
           {locked ? (
             <p className="engine-locked">The engine is off while you work on this moment.</p>
-          ) : (
+          ) : walking ? null /* its lines would be for the game's position, not the step's */ : (
             <EnginePanel
               fen={node.fen}
               enabled={engineOn}
               onToggle={setEngineOn}
               load={loadEngine}
               onBest={setLive}
-              onWalk={walking ? undefined : (line) => walkFrom(current, line)}
+              onWalk={(line) => walkFrom(current, line)}
             />
           )}
           {!locked && !walking && !engineOn && topLine().length > 0 && (
