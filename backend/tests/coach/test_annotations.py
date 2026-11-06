@@ -9,6 +9,7 @@ from app.coach.annotations import (
     PLACEHOLDER,
     BoardFacts,
     annotate,
+    check_shapes,
     engine_grades,
     plan_moves,
     san_to_keys,
@@ -290,3 +291,16 @@ def test_engine_lines_are_graded_against_the_best_line() -> None:
 
 def test_san_moves_become_keys_when_legal() -> None:
     assert san_to_keys(FEN, ["Nf6", "Bc5", "Qxh7", "nonsense"]) == frozenset({"g8f6", "f8c5"})
+
+
+def test_listed_shapes_follow_the_same_rules_and_a_square_in_the_arrows_list_is_a_square() -> None:
+    annotation, dropped = check_shapes(
+        ["c4f7:red", "f7:yellow", "b7b6:green"], ["e5:blue"], FACTS, LIMITS, label="step 2"
+    )
+    assert annotation is not None
+    assert [f"{a.orig}{a.dest}:{a.color}" for a in annotation.arrows] == ["c4f7:red"]
+    assert [f"{s.square}:{s.color}" for s in annotation.squares] == ["e5:blue", "f7:yellow"]
+    assert [(d.tag, d.shape, d.reason) for d in dropped] == [
+        ("step 2", "b7b6:green", "not_in_data")
+    ]
+    assert check_shapes([], [], FACTS, LIMITS, label="step 1") == (None, [])

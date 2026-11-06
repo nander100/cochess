@@ -33,6 +33,7 @@ class StepFacts(BaseModel):
     from_square: str
     to_square: str
     captured: str | None  # "pawn", or None
+    recapture: bool  # takes back on the square where the line's previous move captured
     check: bool
     checkmate: bool
     # Enemy pieces the move leaves attacked and loose (undefended, or attacked by a cheaper
@@ -41,25 +42,40 @@ class StepFacts(BaseModel):
     # The mover's own pieces that are loose after the move and weren't before (the moved piece
     # counts if it landed en prise).
     left_hanging: list[str]
+    # Every enemy piece the moved piece attacks after the move ("queen on b6"); the king shows
+    # as `check` instead.
+    attacks: list[str]
     material: int  # White's material minus Black's after the move, in pawns
     eval_after: str | None  # "+0.8", "-M2"; None when the step wasn't evaluated
     eval_change: str | None  # White POV, centipawn evals only: "+0.5"
+    # Who the change helped: the side it moved toward by at least the swing threshold; None when
+    # it's smaller, or either eval is a mate or unknown.
+    eval_change_favours: Color | None
 
 
 def step_facts(
-    start_fen: str, line_uci: Sequence[str], evals: Sequence[Evaluation | None]
+    start_fen: str,
+    line_uci: Sequence[str],
+    evals: Sequence[Evaluation | None],
+    swing_cp: int = 30,
 ) -> list[StepFacts]:
     """`evals[0]` is the start position's evaluation, `evals[i]` the one after move i (None when
-    unknown). Raises ValueError on an illegal move: callers replay the line first."""
+    unknown). `swing_cp` is when an eval change favours a side (config:
+    `coach.walkthrough_swing_cp`). Raises ValueError on an illegal move: callers replay the line
+    first."""
     if len(evals) != len(line_uci) + 1:
         raise ValueError("one evaluation per position: the start and after each move")
     board = chess.Board(start_fen)
     facts = []
+    captured_on: chess.Square | None = None  # where the previous move of the line captured
     for index, uci in enumerate(line_uci, start=1):
         move = chess.Move.from_uci(uci)
         if move not in board.legal_moves:
             raise ValueError(f"{uci} is not legal in {board.fen()}")
-        facts.append(_step(board, move, index, evals[index - 1], evals[index]))
+        step = _step(board, move, index, evals[index - 1], evals[index], swing_cp)
+        facts.append(step.model_copy(update={"recapture": step.captured is not None
+                                             and move.to_square == captured_on}))  # fmt: skip
+        captured_on = move.to_square if board.is_capture(move) else None
         board.push(move)
     return facts
 
@@ -70,6 +86,7 @@ def _step(
     index: int,
     before_eval: Evaluation | None,
     after_eval: Evaluation | None,
+    swing_cp: int,
 ) -> StepFacts:
     mover = board.turn
     piece = board.piece_at(move.from_square)
@@ -86,13 +103,16 @@ def _step(
         from_square=chess.square_name(move.from_square),
         to_square=chess.square_name(move.to_square),
         captured=PIECE_NAMES[captured] if captured is not None else None,
+        recapture=False,
         check=after.is_check(),
         checkmate=after.is_checkmate(),
         newly_attacked=_named(after, _loose(after, not mover) - _loose(board, not mover)),
         left_hanging=_named(after, _loose(after, mover) - _loose(board, mover)),
+        attacks=_named(after, _attacked_by(after, move.to_square)),
         material=balance(after, chess.WHITE),
         eval_after=format_eval(after_eval) if after_eval is not None else None,
         eval_change=_change(before_eval, after_eval),
+        eval_change_favours=_favours(before_eval, after_eval, swing_cp),
     )
 
 
@@ -118,6 +138,28 @@ def _named(board: chess.Board, squares: set[chess.Square]) -> list[str]:
         assert piece is not None
         names.append(f"{PIECE_NAMES[piece.piece_type]} on {chess.square_name(square)}")
     return names
+
+
+def _attacked_by(board: chess.Board, square: chess.Square) -> set[chess.Square]:
+    """Enemy pieces (kings aside) the piece on `square` attacks."""
+    piece = board.piece_at(square)
+    assert piece is not None
+    return {
+        target
+        for target in board.attacks(square)
+        if (hit := board.piece_at(target)) is not None
+        and hit.color != piece.color
+        and hit.piece_type != chess.KING
+    }
+
+
+def _favours(before: Evaluation | None, after: Evaluation | None, swing_cp: int) -> Color | None:
+    if before is None or after is None or before.cp is None or after.cp is None:
+        return None
+    change = after.cp - before.cp
+    if abs(change) < swing_cp:
+        return None
+    return "white" if change > 0 else "black"
 
 
 def _change(before: Evaluation | None, after: Evaluation | None) -> str | None:

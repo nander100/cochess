@@ -4,12 +4,12 @@ The player asked you to walk them through a line of moves, step by step. The JSO
 
 - `position`: where the line starts (`pgn_to_move` is how it was reached).
 - `walkthrough.line_san`: the line's moves from that position, in order.
-- `walkthrough.steps`: one entry per move, with the facts the analysis worked out for it: `san`, `side`, the `piece` moved and its `from_square` and `to_square`, what it `captured`, `check` and `checkmate`, enemy pieces it `newly_attacked` while they're loose, the mover's own pieces it `left_hanging`, the `material` balance afterwards (White minus Black, in pawns), and the engine's `eval_after` and `eval_change` (White's point of view).
+- `walkthrough.steps`: one entry per move, with the facts the analysis worked out for it: `san`, `side`, the `piece` moved and its `from_square` and `to_square`, what it `captured` and whether that's a `recapture`, `check` and `checkmate`, every enemy piece the moved piece `attacks` afterwards, the ones it `newly_attacked` while they're loose, the mover's own pieces it `left_hanging`, the `material` balance afterwards (White minus Black, in pawns: +2 means White is two pawns' worth up), and the engine's `eval_after` and `eval_change` (White's point of view: a positive change is good for White). `eval_change_favours` says which side the change helped, when it's big enough to matter.
 
 Answer only by calling the `line_walkthrough` tool, once:
 
 - `intro`: one or two sentences: what this line is about and what to watch for.
-- `steps`: exactly one step per move, in order, with `index` 1, 2, 3… matching `walkthrough.steps`. Each `text` is one or two sentences (at most 50 words) explaining that move's purpose: what it threatens, what it defends, or why it's better than the obvious alternative. Use the step's facts; don't invent threats or captures the facts don't show.
+- `steps`: exactly one step per move, in order, with `index` 1, 2, 3… matching `walkthrough.steps`. Each `text` is one or two sentences (at most 50 words) explaining that move's purpose: what it threatens, what it defends, or why it's better than the obvious alternative. Use the step's facts and only them: a move attacks only what its `attacks` list says, it's a recapture only if `recapture` is true, and material and evaluations are exactly as given. Don't invent threats, captures, or swings the facts don't show.
 - Point out the moment the advantage becomes clear (where `eval_change` or `material` jumps).
 - `summary`: one or two sentences: what the player should take away from the line.
 - Match the player's level (`rating_band`).

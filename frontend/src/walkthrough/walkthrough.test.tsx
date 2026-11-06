@@ -5,7 +5,7 @@ import type { PipelineDeps } from '../analysis/pipeline'
 import type { CoachEvent } from '../api/sse'
 import type { Annotation, WalkthroughRequest } from '../api/types'
 import { SAVE_DELAY_MS } from '../board/useVariationSaver'
-import { DETAIL, fakeDeps, walkthroughFor } from '../test/fakes'
+import { DETAIL, MOMENT, fakeDeps, walkthroughFor } from '../test/fakes'
 
 // SPEC_V3 §7.3 on the analysis board, with a stand-in board that reports what it shows.
 vi.mock('../board/Board', () => ({
@@ -140,4 +140,30 @@ test('the chat, with what was said before, is still there after a walkthrough', 
   expect(screen.getByText('Good question.')).toBeVisible()
   expect(screen.getByText('Is Bc4 good?')).toBeVisible()
   expect(screen.getByLabelText('Moves')).toBeInTheDocument() // the moves panel stayed open
+})
+
+test("once a moment is revealed, its position offers the engine's best line to walk through", async () => {
+  const intro = { role: 'coach' as const, text: 'What would you play instead?', kind: 'intro' }
+  const started = { ...DETAIL, engine_results: [], moments: [{ ...MOMENT, state: 'attempt' as const, messages: [intro] }] }
+  const revealed = {
+    ...DETAIL,
+    engine_results: STORED, // the moment's position: its lines are no longer withheld
+    moments: [{ ...MOMENT, state: 'revealed' as const, messages: [intro], best_san: 'Bc4', best_uci: 'f1c4' }],
+  }
+  const deps = fakeDeps({ getGame: vi.fn().mockResolvedValueOnce(started).mockResolvedValue(revealed) })
+  render(
+    <MemoryRouter initialEntries={['/games/game-1']}>
+      <App deps={deps} />
+    </MemoryRouter>,
+  )
+  fireEvent.click(await screen.findByRole('tab', { name: /Critical moments/ }))
+  expect(screen.queryByRole('button', { name: "Walk me through the engine's line" })).not.toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Show the answer' }))
+
+  fireEvent.click(await screen.findByRole('button', { name: "Walk me through the engine's line" }))
+  await screen.findByRole('region', { name: 'Walkthrough' })
+  expect(deps.api.walkthrough).toHaveBeenCalledWith(
+    'game-1', { start_path_uci: ['e2e4', 'e7e5'], line_uci: LINE, step_results: [] }, expect.any(Function),
+  ) // prettier-ignore
 })

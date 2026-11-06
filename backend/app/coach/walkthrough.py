@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.analysis.engine import EngineResult
 from app.analysis.evals import Evaluation, format_eval, terminal_evaluation, win_percent
 from app.analysis.moments import Grade
-from app.analysis.move_facts import step_facts
+from app.analysis.move_facts import StepFacts, step_facts
 from app.analysis.paths import ResolvedPath
 from app.coach.annotations import (
     Annotation,
@@ -35,7 +35,7 @@ from app.coach.payload import (
     WalkthroughPayload,
     render,
 )
-from app.coach.validate import allowed_moves, find_invalid, strip_moves
+from app.coach.validate import allowed_moves, find_invalid, misnumbered, normalize, strip_moves
 from app.config import Settings
 from app.db.annotations import log_dropped
 from app.db.coach import record_usage
@@ -135,6 +135,8 @@ class WalkthroughCall:
     results: Mapping[str, EngineResult]  # by FEN: the per-step scans
     payload: CoachPayload
     allowed: frozenset[str]
+    # Each move of the game so far and of the line: the (number, white) it really has.
+    numbering: Mapping[str, frozenset[tuple[int, bool]]]
 
 
 def build_call(
@@ -144,6 +146,7 @@ def build_call(
     line_uci: Sequence[str],
     results: Mapping[str, EngineResult],
     player: PlayerPayload,
+    swing_cp: int,
 ) -> WalkthroughCall:
     """The payload for a checked line: `results` hold a search of every position along it that
     isn't checkmate or stalemate (those are scored from the board)."""
@@ -156,7 +159,7 @@ def build_call(
         board.push(move)
         fens.append(board.fen())
     evals = tuple(_evaluation(fen, results) for fen in fens)
-    facts = step_facts(start.fen, line_uci, evals)
+    facts = step_facts(start.fen, line_uci, evals, swing_cp)
     payload = CoachPayload(
         task="walkthrough",
         player=player,
@@ -174,7 +177,19 @@ def build_call(
         results=results,
         payload=payload,
         allowed=frozenset(allowed_moves(payload.model_dump(mode="json"))),
+        numbering=_numbering(start, facts),
     )
+
+
+def _numbering(
+    start: ResolvedPath, facts: Sequence[StepFacts]
+) -> dict[str, frozenset[tuple[int, bool]]]:
+    pairs: dict[str, set[tuple[int, bool]]] = {}
+    for ply, san in enumerate(start.path_san, start=1):
+        pairs.setdefault(normalize(san), set()).add(((ply + 1) // 2, ply % 2 == 1))
+    for fact in facts:
+        pairs.setdefault(normalize(fact.san), set()).add((fact.move_number, fact.side == "white"))
+    return {san: frozenset(numbers) for san, numbers in pairs.items()}
 
 
 def _evaluation(fen: str, results: Mapping[str, EngineResult]) -> Evaluation | None:
@@ -218,13 +233,29 @@ def _check(reply: CoachReply, call: WalkthroughCall) -> tuple[_ToolOutput | None
         return None, ["no line_walkthrough call"]
     try:
         output = _ToolOutput.model_validate(block.input)
-    except ValidationError:
-        return None, ["the tool input doesn't match the schema"]
+    except ValidationError as error:
+        first = error.errors()[0]
+        where = ".".join(str(part) for part in first["loc"])
+        cut = " (the reply was cut off)" if reply.stop_reason == "max_tokens" else ""
+        return None, [f"the tool input doesn't match the schema at {where}: {first['msg']}{cut}"]
     plies = len(call.line_uci)
     if [s.index for s in output.steps] != list(range(1, plies + 1)):
         return None, [f"the steps must be indexed 1 to {plies}, one per move"]
+    problems = []
     invalid = _invalid(output, call)
-    return output, [f"moves not in the data: {', '.join(invalid)}"] if invalid else []
+    if invalid:
+        problems.append(f"moves not in the data: {', '.join(invalid)}")
+    wrong = _misnumbered(output, call)
+    if wrong:
+        problems.append(f"moves written with the wrong move number: {', '.join(wrong)}")
+    return output, problems
+
+
+def _misnumbered(output: _ToolOutput, call: WalkthroughCall) -> list[str]:
+    found: list[str] = []
+    for text in [output.intro, *(s.text for s in output.steps), output.summary]:
+        found += [m for m in misnumbered(text, call.numbering) if m not in found]
+    return found
 
 
 def _invalid(output: _ToolOutput, call: WalkthroughCall) -> list[str]:
@@ -248,7 +279,9 @@ def _retry_turns(reply: CoachReply, problems: list[str], plies: int) -> list[Mes
 def _finish(
     output: _ToolOutput, call: WalkthroughCall, settings: Settings, sessions: sessionmaker[Session]
 ) -> Walkthrough:
+    # Moves outside the data, or written with a number they don't have, are removed.
     invalid = _invalid(output, call)
+    invalid += [m for m in _misnumbered(output, call) if m not in invalid]
     if invalid:
         logger.warning(
             "coach moves removed: game=%s endpoint=walkthrough moves=%s", call.game_id, invalid

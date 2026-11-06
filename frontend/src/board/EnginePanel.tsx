@@ -85,7 +85,8 @@ export function EnginePanel({ fen, enabled, onToggle, load, onBest, onWalk }: En
         <ol className="engine-lines" aria-label="Engine lines">
           {lines.map((line) => (
             <li key={line.rank}>
-              <span className="engine-eval">{line.evalText}</span> {line.text}
+              <span className="engine-eval">{line.evalText}</span>{' '}
+              <span className="engine-line-text">{line.text}</span>
               {onWalk && line.uci.length > 0 && (
                 <Button variant="link" className="engine-walk" onClick={() => onWalk(line.uci)}>
                   Walk me through it

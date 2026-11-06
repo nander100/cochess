@@ -6,6 +6,7 @@ from app.coach.validate import (
     extract_moves,
     find_invalid,
     find_leaks,
+    misnumbered,
     normalize,
     strip_moves,
 )
@@ -113,3 +114,11 @@ def test_moves_that_are_not_banned_are_never_leaks() -> None:
 
 def test_each_leaked_move_is_reported_once() -> None:
     assert find_leaks("Nxe5! Yes, Nxe5.", ["Nxe5"], 14, False) == ["Nxe5"]
+
+
+def test_moves_written_with_a_number_they_dont_have_are_found() -> None:
+    numbering = {"Nf3": {(2, True)}, "Nc6": {(2, False)}, "h4": {(11, True)}}
+    text = "After 2. Nf3 and 2...Nc6, White played 14. h4, then Nf3 again, and 3. Bb5."
+    assert misnumbered(text, numbering) == ["h4"]  # unnumbered and unknown moves aren't judged
+    assert misnumbered("11. h4 was the start.", numbering) == []
+    assert misnumbered("11...h4 is Black's?", numbering) == ["h4"]  # the right number, wrong side

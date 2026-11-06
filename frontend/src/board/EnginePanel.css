@@ -16,10 +16,20 @@
   font: var(--text-ui);
 }
 
+/* Eval, then the line (cut with an ellipsis when long), then "Walk me through it", which never
+ * gets pushed out of view. */
 .engine-lines li {
-  overflow: hidden;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
   padding: var(--space-1) 0;
   border-top: var(--border-width) solid var(--color-row-border);
+}
+
+.engine-line-text {
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-width: 0;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -60,5 +70,5 @@
 }
 
 .engine-walk {
-  margin-left: var(--space-2);
+  flex: none;
 }

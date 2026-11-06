@@ -259,3 +259,15 @@ def test_new_walkthroughs_per_game_are_limited() -> None:
     response = ask(client, game_id)
 
     assert response.status_code == 429 and fake.requests == []
+
+
+def test_a_move_written_with_the_wrong_number_is_regenerated_then_removed() -> None:
+    wrong = tool([{"index": 1, "text": "5. Nf3 attacks e5."}, {"index": 2, "text": "Fine."},
+                  {"index": 3, "text": "Then d4."}])  # fmt: skip
+    client, fake, _, game_id = chat_setup(wrong, wrong)
+
+    walk = walkthrough_of(ask(client, game_id))
+
+    assert "wrong move number: Nf3" in str(fake.requests[1].messages[2]["content"])
+    assert walk["steps"][0]["text"] == "5. [move removed] attacks e5."
+    assert walk["invalid_moves_removed"] == ["Nf3"]

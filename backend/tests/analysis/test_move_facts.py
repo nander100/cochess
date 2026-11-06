@@ -84,3 +84,36 @@ def test_bad_input_is_refused() -> None:
         step_facts(START, ["e2e4"], [CP0])
     with pytest.raises(ValueError, match="not legal"):
         step_facts(START, ["e2e5"], [CP0, CP0])
+
+
+def test_attacks_lists_every_enemy_piece_the_moved_piece_hits() -> None:
+    fen = "r3k3/8/8/3N4/8/8/8/4K3 w - - 0 1"
+    fact = one(fen, "d5c7")  # the fork: the rook, and the king as check
+    assert fact.attacks == ["rook on a8"]
+    assert one(START, "g1f3").attacks == []  # nothing in reach
+
+
+def test_a_defended_piece_is_attacked_but_not_newly_loose() -> None:
+    fen = "4k3/2p5/3p4/8/8/8/8/4B1K1 w - - 0 1"  # the d6 pawn is defended by c7
+    fact = one(fen, "e1b4")
+    assert fact.attacks == ["pawn on d6"]
+    assert fact.newly_attacked == []
+
+
+def test_a_recapture_takes_back_where_the_line_last_captured() -> None:
+    fen = "rnbqkbnr/ppp1pppp/8/3p4/4P3/2N5/PPPP1PPP/R1BQKBNR w KQkq - 1 2"
+    facts = step_facts(fen, ["e4d5", "d8d5", "c3d5"], [None] * 4)
+    assert [(f.san, f.captured, f.recapture) for f in facts] == [
+        ("exd5", "pawn", False), ("Qxd5", "pawn", True), ("Nxd5", "queen", True)
+    ]  # fmt: skip
+    quiet = step_facts(START, ["e2e4", "d7d5", "e4d5"], [None] * 4)
+    assert [f.recapture for f in quiet] == [False, False, False]  # a first capture isn't one
+
+
+def test_the_eval_change_favours_the_side_it_moved_toward() -> None:
+    facts = step_facts(
+        START, ["e2e4", "e7e5", "g1f3"],
+        [Evaluation(cp=0), Evaluation(cp=60), Evaluation(cp=40), Evaluation(cp=-20)],
+    )  # fmt: skip
+    assert [f.eval_change_favours for f in facts] == ["white", None, "black"]
+    assert one(START, "e2e4", CP0, Evaluation(mate=3)).eval_change_favours is None

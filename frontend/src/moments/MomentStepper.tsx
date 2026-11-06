@@ -10,7 +10,7 @@ import {
   tryMove,
 } from '../analysis/moments'
 import { isLoggedOut } from '../api/client'
-import type { MomentInfo, MomentMessage } from '../api/types'
+import type { GameDetail, MomentInfo, MomentMessage } from '../api/types'
 import { errorText } from '../pages/util'
 import { Button, ChatBubble, CoachAvatar, Eyebrow, FeatureCard, StepChips, TintedPanel, Tooltip, TypingIndicator } from '../ui'
 import { CoachText, type ShowTag } from '../components/CoachText'
@@ -49,7 +49,9 @@ interface MomentStepperProps {
   deps: MomentDeps
   searches: BeforeSearches
   /** Fresh moments from the server after each step (the server is the record of progress). */
-  onUpdated: (moments: MomentInfo[]) => void
+  /** The server's record after each step: the moments, and the stored engine lines (a revealed
+   * moment's position gains its lines, e.g. for walking through the best line). */
+  onUpdated: (moments: MomentInfo[], engineResults?: GameDetail['engine_results']) => void
   onLoggedOut: () => void
   /** "← Back to game": leave the moments for the coach view. */
   onBack?: () => void
@@ -89,7 +91,7 @@ export function MomentStepper(props: MomentStepperProps) {
       ])
       const fresh = await deps.api.getGame(gameId)
       setPending([])
-      onUpdated(fresh.moments)
+      onUpdated(fresh.moments, fresh.engine_results)
     } catch (caught) {
       if (isLoggedOut(caught)) onLoggedOut()
       else setError(errorText(caught))

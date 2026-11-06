@@ -217,8 +217,13 @@ def check_shapes(
     """Shapes given as lists ("d1d4:red", "d4:red"), e.g. a walkthrough step's: the same rules
     as a board tag. `label` names their source in the log ("step 3")."""
     dropped: list[Dropped] = []
+    # A lone square in the arrows list ("e5:blue") is a highlight written in the wrong list: it's
+    # checked as a square, by the square rules.
+    arrow_tokens = [a.strip() for a in arrows if not _SQUARE.match(a.strip().lower())]
+    square_tokens = [s.strip() for s in squares]
+    square_tokens += [a.strip() for a in arrows if _SQUARE.match(a.strip().lower())]
     kept_arrows, kept_squares = _check_tokens(
-        label, [a.strip() for a in arrows], [s.strip() for s in squares], facts, limits, dropped
+        label, arrow_tokens, square_tokens, facts, limits, dropped
     )
     if not kept_arrows and not kept_squares:
         return None, dropped

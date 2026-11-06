@@ -6,7 +6,7 @@ number: "14. d4", "14...d5"). Bare squares in prose ("the e4 pawn") are not move
 """
 
 import re
-from collections.abc import Iterable, Iterator
+from collections.abc import Collection, Iterable, Iterator, Mapping
 from typing import Any
 
 _SAN = re.compile(
@@ -121,3 +121,19 @@ def find_leaks(
                 continue
         leaks.append(token)
     return leaks
+
+
+def misnumbered(text: str, numbering: Mapping[str, Collection[tuple[int, bool]]]) -> list[str]:
+    """Moves written with a move number they don't have: `numbering` maps each known move (SAN,
+    normalized) to the (move number, white to move) pairs it really has. Moves written without a
+    number, or not in `numbering`, aren't judged here."""
+    wrong: list[str] = []
+    for start, _, token in _matches(text):
+        known = numbering.get(normalize(token))
+        number = _NUMBER_BEFORE.search(text[max(0, start - 12) : start])
+        if known is None or number is None or token in wrong:
+            continue
+        written = (int(number.group(1)), number.group(2) == ".")
+        if written not in known:
+            wrong.append(token)
+    return wrong

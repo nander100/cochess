@@ -178,7 +178,9 @@ function AnalysisBoard({
   const locked = moment !== null && isUnsolved(moment)
 
   const node = tree.nodes[current]
-  const stored = useMemo(() => storedByPosition(detail), [detail])
+  // Stored engine lines by position; a finished moment adds its position's lines (SPEC_V3 §7.1).
+  const [engineResults, setEngineResults] = useState(detail.engine_results)
+  const stored = useMemo(() => storedByPosition(engineResults), [engineResults])
 
   const [flipped, setFlipped] = useState(false)
   const orientation: 'white' | 'black' = flipped ? (detail.user_color === 'white' ? 'black' : 'white') : detail.user_color
@@ -291,7 +293,8 @@ function AnalysisBoard({
   }
 
   /** The server's record after a step; a moment that just finished puts its lines on the board. */
-  function momentsUpdated(fresh: MomentInfo[]) {
+  function momentsUpdated(fresh: MomentInfo[], results?: GameDetail['engine_results']) {
+    if (results) setEngineResults(results)
     const finished = fresh.filter((m) => !isUnsolved(m) && moments.some((old) => old.index === m.index && isUnsolved(old)))
     setMoments(fresh)
     if (finished.length === 0) return
@@ -710,8 +713,8 @@ function positionKey(fen: string): string {
   return fen.split(' ').slice(0, 4).join(' ')
 }
 
-function storedByPosition(detail: GameDetail): Map<string, GameDetail['engine_results'][number]> {
-  return new Map(detail.engine_results.map((result) => [positionKey(result.fen), result]))
+function storedByPosition(results: GameDetail['engine_results']): Map<string, GameDetail['engine_results'][number]> {
+  return new Map(results.map((result) => [positionKey(result.fen), result]))
 }
 
 /** What the eval bar shows for the position on the board. */

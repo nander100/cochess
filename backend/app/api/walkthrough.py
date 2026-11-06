@@ -84,7 +84,10 @@ def walkthrough(
         )
     results = _checked_results(body.step_results, [start.fen, *fens], settings)
     player = current_player(session, settings, user, game)
-    call = build_call(user.id, game.id, start, body.line_uci, results, player)
+    call = build_call(
+        user.id, game.id, start, body.line_uci, results, player,
+        settings.coach.walkthrough_swing_cp,
+    )  # fmt: skip
     sessions = session_factory(request)
 
     async def work() -> Walkthrough:

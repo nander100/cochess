@@ -108,6 +108,8 @@ class CoachSettings(BaseModel):
     walkthrough_max_tokens: int = 8000
     walkthrough_effort: Effort = "medium"
     walkthrough_max_per_game: int = 30  # new (uncached) walkthroughs per game
+    # An eval change of at least this many centipawns is said to favour one side (move facts).
+    walkthrough_swing_cp: int = 30
     # While the coach is writing (responses are validated before they're sent, PLAN Q22), the
     # SSE stream sends a keepalive comment this often so proxies don't drop the connection.
     keepalive_s: float = 10
