@@ -317,3 +317,23 @@ class AnnotationLogRow(Base):
     shape: Mapped[str | None] = mapped_column(String(32))
     reason: Mapped[str] = mapped_column(String(20))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+
+
+class WalkthroughRow(Base):
+    """A walkthrough the coach wrote (SPEC_V3 §7.2 step 6), cached per player by its start
+    position and line so walking the same line again costs nothing. `game_id` is where it was
+    asked, so deleting (or re-coloring) the game clears it."""
+
+    __tablename__ = "walkthroughs"
+    __table_args__ = (
+        UniqueConstraint("user_id", "start_fen", "line_key", name="uq_walkthroughs_user_line"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), index=True)
+    start_path: Mapped[list[str]] = mapped_column(JSON)
+    start_fen: Mapped[str] = mapped_column(String(100))
+    line_key: Mapped[str] = mapped_column(String(64))  # the line's UCI moves joined by spaces
+    steps: Mapped[dict[str, Any]] = mapped_column(JSON)  # the Walkthrough as returned
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)

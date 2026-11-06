@@ -3,7 +3,7 @@
 import chess
 
 from app.analysis.detectors.types import MoveContext, ThemeFact
-from app.analysis.material import PIECE_VALUES, material_swing, value_at
+from app.analysis.material import is_loose, material_swing, value_at
 
 
 def detect(ctx: MoveContext) -> list[ThemeFact]:
@@ -13,7 +13,7 @@ def detect(ctx: MoveContext) -> list[ThemeFact]:
     loose = [
         square
         for square, piece in board.piece_map().items()
-        if piece.color == user and piece.piece_type != chess.KING and _is_loose(board, square)
+        if piece.color == user and piece.piece_type != chess.KING and is_loose(board, square)
     ]
     if not loose:
         return []
@@ -40,19 +40,6 @@ def detect(ctx: MoveContext) -> list[ThemeFact]:
             },
         )
     ]
-
-
-def _is_loose(board: chess.Board, square: chess.Square) -> bool:
-    """Attacked and undefended, or attacked by a cheaper piece (kings can't take defended men)."""
-    piece = board.piece_at(square)
-    assert piece is not None
-    attackers = board.attackers(not piece.color, square)
-    if not attackers:
-        return False
-    if not board.is_attacked_by(piece.color, square):
-        return True
-    values = [value_at(board, a) for a in attackers if board.piece_type_at(a) != chess.KING]
-    return bool(values) and min(values) < PIECE_VALUES[piece.piece_type]
 
 
 def _capture_of(

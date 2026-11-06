@@ -8,7 +8,7 @@ react-markdown can render it as a board icon without the text being split (PLAN_
 """
 
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -199,9 +199,46 @@ def _check(
     if not _ATTR_LIST.match(inner) or not attrs or set(attrs) - {"arrows", "squares"}:
         dropped.append(Dropped(tag=tag, reason="malformed"))
         return [], []
+    return _check_tokens(
+        tag, _tokens(attrs.get("arrows", "")), _tokens(attrs.get("squares", "")), facts, limits,
+        dropped,
+    )  # fmt: skip
+
+
+def check_shapes(
+    arrows: Sequence[str],
+    squares: Sequence[str],
+    facts: BoardFacts,
+    limits: CoachSettings,
+    *,
+    label: str,
+    tag_index: int = 0,
+) -> tuple[Annotation | None, list[Dropped]]:
+    """Shapes given as lists ("d1d4:red", "d4:red"), e.g. a walkthrough step's: the same rules
+    as a board tag. `label` names their source in the log ("step 3")."""
+    dropped: list[Dropped] = []
+    kept_arrows, kept_squares = _check_tokens(
+        label, [a.strip() for a in arrows], [s.strip() for s in squares], facts, limits, dropped
+    )
+    if not kept_arrows and not kept_squares:
+        return None, dropped
+    annotation = Annotation(
+        tag_index=tag_index, char_offset=0, arrows=kept_arrows, squares=kept_squares
+    )
+    return annotation, dropped
+
+
+def _check_tokens(
+    tag: str,
+    arrow_tokens: Sequence[str],
+    square_tokens: Sequence[str],
+    facts: BoardFacts,
+    limits: CoachSettings,
+    dropped: list[Dropped],
+) -> tuple[list[Arrow], list[SquareMark]]:
     board = chess.Board(facts.fen)
     arrows: list[Arrow] = []
-    for token in _tokens(attrs.get("arrows", "")):
+    for token in arrow_tokens:
         arrow = _parse_arrow(token)
         reason: DropReason | None
         if arrow is None:
@@ -215,7 +252,7 @@ def _check(
         else:
             dropped.append(Dropped(tag=tag, reason=reason or "malformed", shape=token))
     squares: list[SquareMark] = []
-    for token in _tokens(attrs.get("squares", "")):
+    for token in square_tokens:
         mark = _parse_square(token)
         if mark is None:
             reason = "malformed"

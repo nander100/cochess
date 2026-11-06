@@ -33,6 +33,7 @@ from app.coach.chat import (
 )
 from app.coach.client import CoachClient, CoachUnavailableError
 from app.coach.service import SynopsisResult, generate_synopsis
+from app.coach.walkthrough import WalkthroughError
 from app.config import Settings
 from app.db.chat import count_player_messages
 from app.db.engine_results import load_summary
@@ -204,7 +205,7 @@ async def _events[T](
             yield sse.KEEPALIVE
     try:
         result = task.result()
-    except (CoachUnavailableError, ChatLimitError) as error:
+    except (CoachUnavailableError, ChatLimitError, WalkthroughError) as error:
         yield sse.event("error", {"message": error.message})
         return
     except Exception:

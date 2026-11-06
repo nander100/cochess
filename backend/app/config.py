@@ -102,6 +102,12 @@ class CoachSettings(BaseModel):
     annotation_max_tags: int = 3
     annotation_max_arrows: int = 4
     annotation_max_squares: int = 4
+    # Line walkthroughs (SPEC_V3 §7): one forced-tool call for the whole line.
+    walkthrough_max_plies: int = 10
+    walkthrough_step_max_words: int = 50  # asked of the coach; longer steps are only logged
+    walkthrough_max_tokens: int = 8000
+    walkthrough_effort: Effort = "medium"
+    walkthrough_max_per_game: int = 30  # new (uncached) walkthroughs per game
     # While the coach is writing (responses are validated before they're sent, PLAN Q22), the
     # SSE stream sends a keepalive comment this often so proxies don't drop the connection.
     keepalive_s: float = 10

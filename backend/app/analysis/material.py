@@ -33,6 +33,19 @@ def value_at(board: chess.Board, square: chess.Square) -> int:
     return PIECE_VALUES[piece.piece_type] if piece else 0
 
 
+def is_loose(board: chess.Board, square: chess.Square) -> bool:
+    """Attacked and undefended, or attacked by a cheaper piece (kings can't take defended men)."""
+    piece = board.piece_at(square)
+    assert piece is not None
+    attackers = board.attackers(not piece.color, square)
+    if not attackers:
+        return False
+    if not board.is_attacked_by(piece.color, square):
+        return True
+    values = [value_at(board, a) for a in attackers if board.piece_type_at(a) != chess.KING]
+    return bool(values) and min(values) < PIECE_VALUES[piece.piece_type]
+
+
 def material_swing(
     board: chess.Board, moves: Sequence[chess.Move], plies: int, color: chess.Color
 ) -> int:

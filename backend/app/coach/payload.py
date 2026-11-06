@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from app.analysis.evals import Color
 from app.analysis.moments import Hint
+from app.analysis.move_facts import StepFacts
 from app.analysis.pgn import Position
 from app.analysis.phase import Phase
 from app.analysis.summary_models import Counts, GameSummary, KeyMoment, LineSummary, MoveLabel
@@ -15,7 +16,15 @@ from app.analysis.tendencies import Example, TendencyReport, Trend
 from app.config import CoachSettings, TendencySettings
 
 RatingBand = Literal["beginner", "intermediate", "advanced"]
-Task = Literal["synopsis", "chat", "explain", "moment_intro", "moment_feedback", "baseline_report"]
+Task = Literal[
+    "synopsis",
+    "chat",
+    "explain",
+    "moment_intro",
+    "moment_feedback",
+    "baseline_report",
+    "walkthrough",
+]
 
 # PGN-style annotations, so one compact movetext replaces the per-move list (PLAN cost review).
 ANNOTATION: dict[MoveLabel, str] = {
@@ -167,6 +176,14 @@ class BaselinePayload(BaseModel):
     openings: list[OpeningGroup] = []
 
 
+class WalkthroughPayload(BaseModel):
+    """A line to walk through (SPEC_V3 §7.2): from `position`, the moves of `line_san`, with the
+    facts of each step (StepFacts)."""
+
+    line_san: list[str]
+    steps: list[StepFacts]
+
+
 class CoachPayload(BaseModel):
     task: Task
     user_prompt: str | None = None
@@ -177,6 +194,7 @@ class CoachPayload(BaseModel):
     game_summary: GameSummary | None = None
     moment: MomentPayload | None = None
     baseline: BaselinePayload | None = None
+    walkthrough: WalkthroughPayload | None = None
 
 
 # Per-move evals and labels are already in the annotated `pgn_to_move` (PLAN Q28, cost review).

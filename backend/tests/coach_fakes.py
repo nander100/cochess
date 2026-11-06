@@ -14,11 +14,12 @@ FAKE_USAGE = Usage(
 
 @dataclass(frozen=True)
 class ToolCall:
-    """A scripted reply that calls analyze_position."""
+    """A scripted reply that calls a tool: analyze_position unless `name` says otherwise."""
 
     input: dict[str, Any]
     id: str = "toolu_1"
     extra_inputs: list[dict[str, Any]] = field(default_factory=list)  # more calls, same turn
+    name: str = "analyze_position"
 
 
 Reply = str | ToolCall | Exception
@@ -41,7 +42,7 @@ class FakeCoachClient:
             content: list[ContentBlock] = [
                 ToolUseBlock.model_construct(
                     type="tool_use", id=f"{reply.id}_{i}" if i else reply.id,
-                    name="analyze_position", input=call,
+                    name=reply.name, input=call,
                 )
                 for i, call in enumerate(calls)
             ]  # fmt: skip

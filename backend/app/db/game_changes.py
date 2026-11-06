@@ -31,6 +31,7 @@ from app.db.models import (
 from app.db.onboarding import filled_slots, onboarding_games, slot_for
 from app.db.tendencies import refresh_tendencies
 from app.db.variations import delete_variations
+from app.db.walkthroughs import delete_walkthroughs
 
 
 class SlotFullError(Exception):
@@ -80,6 +81,7 @@ def delete_game(session: Session, settings: Settings, game: Game) -> None:
 def _clear_coaching(session: Session, game_id: str) -> None:
     for table in (ChatMessageRow, PendingToolCallRow, MomentProgressRow):
         session.execute(delete(table).where(table.game_id == game_id))
+    delete_walkthroughs(session, game_id)  # written for the old side ("you")
 
 
 def _reanalyze(session: Session, settings: Settings, game: Game) -> None:
