@@ -102,7 +102,10 @@ Set at least:
 ```bash
 ANTHROPIC_API_KEY=<your key>
 PUBLIC_BASE_URL=https://3-141-59-26.sslip.io    # your hostname; login links are built from it
+IMPORTS__CONTACT=<an email or URL>              # Chess.com asks game-import clients for a contact
 ```
+
+Game import calls `lichess.org` and `api.chess.com` from the server over HTTPS; EC2's default outbound rules allow it.
 
 Keep the app off the public interface so only Caddy can reach it:
 
@@ -145,7 +148,7 @@ Replace `/etc/caddy/Caddyfile` (`sudo nano /etc/caddy/Caddyfile`) with your host
 ```bash
 sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile   # must end with "Valid configuration"
 sudo systemctl reload caddy
-curl -s https://3-15-12-174.sslip.io/api/health     # {"ok":true} once the certificate is issued
+curl -s https://3-141-59-26.sslip.io/api/health     # {"ok":true} once the certificate is issued
 ```
 
 The first request can take up to a minute while Caddy gets the certificate. If the reload fails, Caddy keeps its old config and shows its own welcome page: run the `validate` line to see the error (a stray comma or extra text in the site address is common). Manage Caddy with `systemctl` only; `caddy start` fails with "address already in use" because the service is already running. If the page doesn't load, `sudo journalctl -u caddy --no-pager | tail -30` says why; the usual cause is port 80 or 443 missing from the security group. Many people share sslip.io, so Let's Encrypt occasionally refuses it for a while (rate limits); Caddy then gets a certificate from ZeroSSL instead, automatically.
@@ -175,6 +178,24 @@ docker compose up --build -d
 ```
 
 The database lives on the `cochess-data` volume and survives rebuilds, and new migrations run when the backend starts. **Back up the database before updating** (below).
+
+**Upgrading from v2 to v3**: back up the database first (below). Then get the v3 code and add `IMPORTS__CONTACT=<an email or URL>` to `backend/.env`, and rebuild:
+
+```bash
+cd ~/cochess
+docker compose up --build -d
+docker compose logs backend | grep -i -E "alembic|error" | tail     # migrations 0009 to 0018 run once, at startup
+docker compose exec -T backend python -c "import sqlite3; print(sqlite3.connect('/data/cochess.db').execute('select version_num from alembic_version').fetchone())"   # ('0018',)
+```
+
+Nothing else changes on the server: same volume, same Caddy setup, same headers. Then run the checks below as a player:
+
+1. Open a login link, then the Games page: the dashboard loads (with no games, it says how to start).
+2. Profile → *Your online accounts*: save your Chess.com or Lichess username.
+3. Games → *Import recent games* → *Fetch games*: your games appear with your color filled in. Add one; it's analyzed in the browser and shows as Analyzed.
+4. Open it: the board, critical moments and the coach work; *Export PGN* downloads a file with `[%eval]` comments.
+5. Tick "Engine" or open "Engine details": it says `stockfish-19-lite` with more than one thread.
+6. In the browser's developer console, the only expected red lines are a `404` for `/api/onboarding/report` (no baseline report yet) and, on a game page, four "Applying inline style violates … style-src" lines from the board library (harmless; the stylesheet sets the same thing).
 
 **Upgrading from v1**: v1's games have no owner, so nobody sees them until you give them to a player. Back up first, then:
 
@@ -223,6 +244,8 @@ Multiply by the current per-token prices for each model to get the cost.
 - The budget alert from step 1 emails you if spending passes your limit.
 
 ## Limits
+
+- Game import fetches at most 50 games at a time, one import per player every 10 seconds, and imported games count toward the daily limit of new games.
 
 - Login links from the owner only; Google sign-in arrives in v4.
 - At most 10 new games a day per player (onboarding's 12 don't count) and 30 questions per game (see the configuration table in the README to change them).
