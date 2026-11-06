@@ -30,6 +30,7 @@ from app.db.engine_results import load_summary
 from app.db.models import Game, User
 from app.db.onboarding import onboarding_games, save_report
 from app.db.tendencies import latest_tendencies
+from app.db.user_settings import detail_level_for
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ def build_baseline_payload(
     """The profile, tendencies and accuracy, and a compact summary of each game, oldest first."""
     elo = user.elo if user.elo is not None else games[0][0].elo
     player = with_tendencies(
-        profile_player(elo, user.playstyle, None),
+        profile_player(elo, user.playstyle, None, detail_level_for(session, user.id)),
         latest_tendencies(session, user.id),
         settings.tendencies,
     )

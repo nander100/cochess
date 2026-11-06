@@ -7,6 +7,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from tests.auth_helpers import log_in
+from tests.coach.test_chat import chat, payload_of
+from tests.coach.test_chat import setup as chat_setup
 
 DEFAULTS = {
     "theme": "light",
@@ -14,6 +16,9 @@ DEFAULTS = {
     "piece_set": "cburnett",
     "sounds": False,
     "engine_panel": False,
+    "coach_detail_level": "auto",
+    "playback_seconds": 1.5,
+    "effective_detail_level": "standard",  # "auto" for the test player's 1350 (intermediate)
 }
 
 
@@ -40,8 +45,11 @@ def test_only_the_fields_sent_change_and_they_are_kept(client: TestClient) -> No
         {"board_scheme": "brown"},
         {"piece_set": "california"},
         {"sounds": "loud"},
+        {"coach_detail_level": "expert"},
+        {"playback_seconds": 0.5},
+        {"playback_seconds": 3.5},
     ],
-    ids=["theme", "scheme", "pieces", "sounds"],
+    ids=["theme", "scheme", "pieces", "sounds", "detail", "too fast", "too slow"],
 )
 def test_unknown_values_are_rejected(client: TestClient, body: dict[str, Any]) -> None:
     response = client.patch("/api/settings", json=body)
@@ -60,3 +68,36 @@ def test_each_player_has_their_own_settings(app: FastAPI, client: TestClient) ->
 def test_settings_need_a_login(anon_client: TestClient) -> None:
     assert anon_client.get("/api/settings").status_code == 401
     assert anon_client.patch("/api/settings", json={"theme": "dark"}).status_code == 401
+
+
+@pytest.mark.parametrize(
+    ("elo", "level"), [(850, "plain"), (1350, "standard"), (1950, "technical"), (None, "standard")]
+)
+def test_auto_detail_follows_the_rating_band(app: FastAPI, elo: int | None, level: str) -> None:
+    player = log_in(app, f"Rated {elo}", elo=elo)
+
+    assert player.get("/api/settings").json()["effective_detail_level"] == level
+
+
+def test_a_chosen_detail_level_and_speed_are_kept_and_auto_can_come_back(
+    client: TestClient,
+) -> None:
+    chosen = client.patch(
+        "/api/settings", json={"coach_detail_level": "technical", "playback_seconds": 0.75}
+    ).json()
+    assert (chosen["coach_detail_level"], chosen["effective_detail_level"]) == (
+        "technical", "technical"
+    )  # fmt: skip
+    assert chosen["playback_seconds"] == 0.75
+
+    back = client.patch("/api/settings", json={"coach_detail_level": "auto"}).json()
+    assert (back["coach_detail_level"], back["effective_detail_level"]) == ("auto", "standard")
+
+
+def test_the_chosen_detail_level_reaches_the_coach() -> None:
+    client, fake, _, game_id = chat_setup("An answer.")
+    client.patch("/api/settings", json={"coach_detail_level": "plain"})
+
+    chat(client, game_id, "What now?")
+
+    assert payload_of(fake, 0)["player"]["detail_level"] == "plain"

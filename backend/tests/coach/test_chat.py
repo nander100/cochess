@@ -88,6 +88,7 @@ class TestPlainQuestions:
         assert set(payload) == {"task", "user_prompt", "player", "position", "engine_lines"}
         assert (payload["task"], payload["user_prompt"]) == ("chat", "Which move won the game?")
         assert payload["player"] == {"elo": 1350, "color": "white", "rating_band": "intermediate",
+                                     "detail_level": "standard",
                                      "tendencies": [],
                                      # One analyzed game with the fake engine's flat evals.
                                      "accuracy_by_phase": {"opening": 100.0, "middlegame": 100.0,
@@ -346,6 +347,7 @@ class TestPositions:
             "elo": 1750,
             "color": "white",
             "rating_band": "intermediate",
+            "detail_level": "standard",
             "playstyle": "positional",
             "tendencies": [],
             "accuracy_by_phase": {"opening": 100.0, "middlegame": 100.0, "endgame": None},

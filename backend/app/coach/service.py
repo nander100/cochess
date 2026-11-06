@@ -22,6 +22,7 @@ from app.db.coach import load_synopsis, record_usage, save_synopsis
 from app.db.engine_results import load_summary
 from app.db.models import Game
 from app.db.tendencies import latest_tendencies
+from app.db.user_settings import detail_level_for
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,8 @@ async def generate_synopsis(
         if game is None or summary is None:
             raise LookupError(f"game {game_id} has no summary yet")
         report = latest_tendencies(session, game.user_id) if game.user_id else None
-    player = with_tendencies(player_payload(summary), report, settings.tendencies)
+        detail = detail_level_for(session, game.user_id)
+    player = with_tendencies(player_payload(summary, detail), report, settings.tendencies)
     payload = build_synopsis_payload(summary, settings.coach, player)
     allowed = allowed_moves(payload.model_dump(mode="json"))
     messages: list[MessageParam] = [

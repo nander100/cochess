@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     Boolean,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -270,8 +271,8 @@ class BaselineReportRow(Base):
 
 
 class UserSettingsRow(Base):
-    """Per-player settings (SPEC_V3 §4.3). A player without a row has the defaults. Coach detail
-    level and playback speed are added in M5."""
+    """Per-player settings (SPEC_V3 §4.3, §9.3, §9.5). A player without a row has the
+    defaults."""
 
     __tablename__ = "user_settings"
 
@@ -281,6 +282,9 @@ class UserSettingsRow(Base):
     piece_set: Mapped[str] = mapped_column(String(16))  # cburnett | merida
     sounds: Mapped[bool] = mapped_column(Boolean)
     engine_panel: Mapped[bool] = mapped_column(Boolean)  # show the live engine by default
+    # SPEC_V3 §9.3: plain | standard | technical; NULL follows the rating band (PLAN_V3 adj. 5).
+    coach_detail_level: Mapped[str | None] = mapped_column(String(10))
+    playback_seconds: Mapped[float] = mapped_column(Float, default=1.5)  # §9.5, 0.75 to 3
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)
 
 

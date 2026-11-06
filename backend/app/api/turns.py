@@ -18,6 +18,7 @@ from app.config import EngineTier, Settings
 from app.db.engine_results import load_position_result, save_position_result
 from app.db.models import Game, User
 from app.db.tendencies import latest_tendencies
+from app.db.user_settings import detail_level_for
 
 NEEDS_ANALYSIS = "The engine hasn't analyzed this position yet. Analyze it, then ask again."
 
@@ -67,5 +68,6 @@ def current_player(session: Session, settings: Settings, user: User, game: Game)
     """The player as the coach sees them now: the profile as it is today (PLAN_V2 §6 Q5; a v1
     game's owner may not have filled it in yet) and their latest tendencies (SPEC_V2 §9.3)."""
     elo = user.elo if user.elo is not None else game.elo
-    player = profile_player(elo, user.playstyle, cast(Color, game.user_color))
+    detail = detail_level_for(session, user.id)
+    player = profile_player(elo, user.playstyle, cast(Color, game.user_color), detail)
     return with_tendencies(player, latest_tendencies(session, user.id), settings.tendencies)

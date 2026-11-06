@@ -56,6 +56,7 @@ def test_synopsis_payload_has_the_full_game_and_summary_but_no_position() -> Non
         "elo": 1350,
         "color": "white",
         "rating_band": "intermediate",
+        "detail_level": "standard",
         "playstyle": "attacking",
         "tendencies": [],
         "accuracy_by_phase": None,

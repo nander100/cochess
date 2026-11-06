@@ -4,7 +4,7 @@ import json
 from collections.abc import Sequence
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from app.analysis.evals import Color
 from app.analysis.moments import Hint
@@ -16,6 +16,13 @@ from app.analysis.tendencies import Example, TendencyReport, Trend
 from app.config import CoachSettings, TendencySettings
 
 RatingBand = Literal["beginner", "intermediate", "advanced"]
+# How the coach writes moves and evals (SPEC_V3 §9.3); the default follows the rating band.
+DetailLevel = Literal["plain", "standard", "technical"]
+DETAIL_FOR_BAND: dict[RatingBand, DetailLevel] = {
+    "beginner": "plain",
+    "intermediate": "standard",
+    "advanced": "technical",
+}
 Task = Literal[
     "synopsis",
     "chat",
@@ -60,10 +67,18 @@ class PlayerPayload(BaseModel):
     color: Color | None  # the side they played; None for the baseline report (both colors)
     rating_band: RatingBand
     playstyle: str | None
+    # The player's "Coach detail level" setting; left out, it follows the rating band.
+    detail_level: DetailLevel | None = None
     # Across the player's analyzed games (SPEC_V2 §9.3): the top themes, then accuracy.
     tendencies: list[PlayerTendency] = []
     accuracy_by_phase: dict[Phase, float | None] | None = None
     accuracy_by_color: dict[Color, float | None] | None = None
+
+    @model_validator(mode="after")
+    def _detail_from_band(self) -> "PlayerPayload":
+        if self.detail_level is None:
+            self.detail_level = DETAIL_FOR_BAND[self.rating_band]
+        return self
 
 
 class PositionPayload(BaseModel):
@@ -208,17 +223,24 @@ def rating_band(elo: int) -> RatingBand:
     return "intermediate" if elo <= ADVANCED_ABOVE else "advanced"
 
 
-def profile_player(elo: int, playstyle: str | None, color: Color | None) -> PlayerPayload:
+def profile_player(
+    elo: int, playstyle: str | None, color: Color | None, detail: DetailLevel | None = None
+) -> PlayerPayload:
     """The player as their profile says now (PLAN_V2 §6 Q5): chat and Explain talk to who the
-    player is today, not who they were when the game was analyzed."""
-    return PlayerPayload(elo=elo, color=color, rating_band=rating_band(elo), playstyle=playstyle)
+    player is today, not who they were when the game was analyzed. `detail` is their setting
+    (None: from the rating band)."""
+    return PlayerPayload(
+        elo=elo, color=color, rating_band=rating_band(elo), playstyle=playstyle,
+        detail_level=detail,
+    )  # fmt: skip
 
 
-def player_payload(summary: GameSummary) -> PlayerPayload:
+def player_payload(summary: GameSummary, detail: DetailLevel | None = None) -> PlayerPayload:
     user = summary.user
     return PlayerPayload(
-        elo=user.elo, color=user.color, rating_band=rating_band(user.elo), playstyle=user.playstyle
-    )
+        elo=user.elo, color=user.color, rating_band=rating_band(user.elo),
+        playstyle=user.playstyle, detail_level=detail,
+    )  # fmt: skip
 
 
 def with_tendencies(
