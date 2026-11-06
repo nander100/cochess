@@ -91,6 +91,7 @@ v2 is merged and tagged; branch `v3` is clean. SPEC_V3 §12 M0 asks for: `docs/v
 | 2026-11-04 | The Analysis move list stays collapsed by default, leaving room for the coach conversation. | owner |
 | 2026-11-04 | Fonts self-hosted (OFL woff2 from fontsource builds, no npm dependency); pieces: cburnett default + California alternative, licenses checked before adding. | Claude (plan accepted) |
 | 2026-11-05 | M1 accepted ("start m2"). Not yet confirmed explicitly: the chess-meaning colors, Merida as the second piece set, Log out in the header and blunder red for errors. | owner |
+| 2026-11-05 | M2 accepted ("approve M2"): promote semantics, `games.variations_saved_at`, a missed forced mate as `?`, and keeping variations on a color change are confirmed. | owner |
 
 Add decisions made while building below this line, as in PLAN_V2 §7.
 
@@ -105,6 +106,6 @@ Add decisions made while building below this line, as in PLAN_V2 §7.
 | 2026-11-05 | The invite page shows "Invite accepted" with next steps instead of going straight in (Redeem.dc.html); a used link opened while logged in still goes straight in. | Claude |
 | 2026-11-05 | Backend errors from actions show as toasts; refusals about what the player typed (bad PGN, duplicate) stay inline next to the form. | Claude |
 | 2026-11-05 | Saved variations are derived from the board's tree: every explored line that leaves its parent's line is one variation (start path + moves); the list order is the tree order, so display order survives a reload. The browser sends the whole list (debounced 1 s); the backend replays every line and replaces the stored list. | Claude |
-| 2026-11-05 | "Promote to main line of my notes" moves a variation to the front of the lines at its branch point. The game's own move always stays first, so off the game it becomes the first alternative; inside a variation it becomes that line's continuation (as on Lichess). | Claude (owner to confirm at M2) |
-| 2026-11-05 | `games.variations_saved_at` (nullable, migration 0010) marks the first save. Before it, the board seeds finished moments' tries and best move as variations (v2 behavior); after it, the saved list is the whole truth, so a deleted moment line stays deleted. A schema addition beyond SPEC_V3 §11.2. | Claude (owner to confirm at M2) |
+| 2026-11-05 | "Promote to main line of my notes" moves a variation to the front of the lines at its branch point. The game's own move always stays first, so off the game it becomes the first alternative; inside a variation it becomes that line's continuation (as on Lichess). | Claude (owner confirmed at M2) |
+| 2026-11-05 | `games.variations_saved_at` (nullable, migration 0010) marks the first save. Before it, the board seeds finished moments' tries and best move as variations (v2 behavior); after it, the saved list is the whole truth, so a deleted moment line stays deleted. A schema addition beyond SPEC_V3 §11.2. | Claude (owner confirmed at M2) |
 | 2026-11-05 | PGN export: NAGs as `$6`/`$2`/`$4` (?!, ?, ??); a missed forced mate is `?`. Original clocks are kept; `[%eval]` follows each mainline move; an `Annotator "CoChess"` header is added if missing. "Export PGN" sits with the game options and saves any waiting variations first. Changing color keeps variations; deleting the game deletes them. | Claude |
