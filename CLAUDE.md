@@ -79,6 +79,8 @@ cochess/
 │   │   │   ├── prompts/         # coach_system.md (shared) + one file per task
 │   │   │   ├── annotations.py   # + tag parsing and validation
 │   │   │   ├── walkthrough.py   # + forced-tool walkthrough call
+│   │   │   ├── markup.py        # + one pass over move tags, line links, board tags
+│   │   │   ├── lines.py         # + line-link resolution from payload data
 │   │   │   └── validate.py      # move validation + leak check (text, tags, annotations)
 │   │   ├── importers/           # + lichess.py (Chess.com on hold)
 │   │   └── db/                  # models, session, persistence helpers per area
