@@ -1,6 +1,6 @@
 // Server-sent events over fetch (EventSource can't POST). Coach endpoints always stream SSE.
 
-import type { Annotation, AnnotationColor, LineLink, MoveToken, Walkthrough } from './types'
+import type { Annotation, AnnotationColor, LineLink, MoveToken, PuzzleToken, Walkthrough } from './types'
 
 export type CoachEvent =
   | { type: 'status'; message: string }
@@ -15,6 +15,8 @@ export type CoachEvent =
   /** A move tag and a line link of the reply (SPEC_V3 §9.4), sent after the text. */
   | { type: 'move'; move: MoveToken }
   | { type: 'line_link'; link: LineLink }
+  /** A recommended puzzle theme (SPEC_V3 §8.2). */
+  | { type: 'puzzle'; puzzle: PuzzleToken }
   /** A finished line walkthrough (SPEC_V3 §7), checked by the backend. */
   | { type: 'walkthrough'; walkthrough: Walkthrough }
 
@@ -94,6 +96,11 @@ function toCoachEvent(name: string, payload: unknown): CoachEvent | null {
     case 'line_link':
       return typeof record.line_id === 'string' && Array.isArray(record.moves_uci) && typeof record.index === 'number'
         ? { type: 'line_link', link: record as unknown as LineLink }
+        : null
+    case 'puzzle':
+      return typeof record.url === 'string' && record.url.startsWith('https://lichess.org/training/') &&
+        typeof record.label === 'string' && typeof record.index === 'number'
+        ? { type: 'puzzle', puzzle: record as unknown as PuzzleToken }
         : null
     case 'walkthrough':
       return isWalkthrough(record) ? { type: 'walkthrough', walkthrough: record } : null

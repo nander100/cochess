@@ -57,3 +57,20 @@ button.coach-line:hover,
 button.coach-line:focus-visible {
   background: var(--color-tint);
 }
+
+/* A puzzle-theme chip (SPEC_V3 §8.2): opens that theme in Lichess's puzzle trainer. */
+.coach-puzzle {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-pill);
+  color: inherit;
+  font: var(--text-chip);
+  text-decoration: none;
+}
+
+.coach-puzzle:hover,
+.coach-puzzle:focus-visible {
+  background: var(--color-tint);
+}

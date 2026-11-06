@@ -1,6 +1,8 @@
 import type { ApiClient } from '../api/client'
 import type { CoachEvent, EnginePositionRequest } from '../api/sse'
-import type { Annotation, ChatRequest, CoachReply, EngineResult, LineLink, MoveToken, PositionRequest } from '../api/types'
+import type {
+  Annotation, ChatRequest, CoachReply, EngineResult, LineLink, MoveToken, PositionRequest, PuzzleToken,
+} from '../api/types' // prettier-ignore
 
 /** looking: the engine analyzes the board position first; writing: the coach is answering;
  * thinking: the coach asked the engine for a deeper look (a deep-dive). */
@@ -63,6 +65,7 @@ async function collect(
     annotations: Annotation[]
     moves: MoveToken[]
     links: LineLink[]
+    puzzles: PuzzleToken[]
     outcome: Outcome | null
     error: string | null
   } = {
@@ -70,6 +73,7 @@ async function collect(
     annotations: [],
     moves: [],
     links: [],
+    puzzles: [],
     outcome: null,
     error: null,
   }
@@ -78,8 +82,12 @@ async function collect(
     else if (event.type === 'annotation') state.annotations.push(event.annotation)
     else if (event.type === 'move') state.moves.push(event.move)
     else if (event.type === 'line_link') state.links.push(event.link)
+    else if (event.type === 'puzzle') state.puzzles.push(event.puzzle)
     else if (event.type === 'done') {
-      const reply = { text: state.text, annotations: state.annotations, moves: state.moves, line_links: state.links }
+      const reply = {
+        text: state.text, annotations: state.annotations, moves: state.moves, line_links: state.links,
+        puzzles: state.puzzles,
+      } // prettier-ignore
       state.outcome = { kind: 'text', reply }
     }
     else if (event.type === 'error') state.error = event.message

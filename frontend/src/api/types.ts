@@ -248,11 +248,21 @@ export interface LineLink {
   moves_uci: string[]
 }
 
+/** A recommended puzzle theme (SPEC_V3 §8.2): a chip linking to Lichess's puzzle trainer. */
+export interface PuzzleToken {
+  index: number
+  char_offset: number
+  theme: string
+  label: string
+  url: string
+}
+
 /** A coach message's structured parts, tied to `cc:` placeholders in its text. */
 export interface MessageTokens {
   moves?: MoveToken[]
   line_links?: LineLink[]
   annotations?: Annotation[]
+  puzzles?: PuzzleToken[]
 }
 
 /** A coach answer: its text (tags as `cc:` placeholder links) and their tokens. */
@@ -491,4 +501,63 @@ export interface UserSettings {
   effective_detail_level: DetailLevel
   /** Line playback: one move every this many seconds, 0.75 to 3 (SPEC_V3 §9.5). */
   playback_seconds: number
+}
+
+/** The dashboard (SPEC_V3 §8.1), one response from GET /api/dashboard. */
+export type DashboardRange = '10' | '25' | 'all'
+
+export interface DashboardFilters {
+  tc: TimeControl | null
+  color: Color | null
+  range: DashboardRange
+}
+
+export interface PuzzleLink {
+  theme: string
+  label: string
+  url: string
+}
+
+export interface FocusArea {
+  theme: string
+  label: string
+  trend: 'improving' | 'worsening' | 'steady' | null
+  rate_per_game: number
+  games_seen: number
+  example_game_id: string | null
+  example_move: string | null
+  example_ply: number | null
+  puzzles: PuzzleLink[]
+}
+
+export interface Dashboard {
+  games: number
+  focus_areas: FocusArea[]
+  continue_games: { game_id: string; opponent: string; played_at: string; moments_total: number; moments_done: number }[]
+  mistake_trend: {
+    themes: { theme: string; label: string }[]
+    points: { games_analyzed: number; date: string; rates: Record<string, number> }[]
+  }
+  accuracy: {
+    points: {
+      game_id: string
+      played_at: string
+      color: Color
+      result: UserResult | null
+      accuracy: number
+      rolling: number
+    }[]
+    by_phase: Record<'opening' | 'middlegame' | 'endgame', number | null>
+  }
+  recent: {
+    game_id: string
+    played_at: string
+    opponent: string
+    color: Color
+    result: UserResult | null
+    accuracy: number | null
+    moments_total: number
+    moments_done: number
+  }[]
+  onboarding: { complete: boolean; analyzed: number; total: number; has_report: boolean }
 }

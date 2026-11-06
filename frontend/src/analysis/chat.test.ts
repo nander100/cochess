@@ -22,7 +22,7 @@ test('a plain question returns the coach text', async () => {
 
   const reply = await askCoach(deps, 'g1', ASK, (p) => progress.push(p))
 
-  expect(reply).toEqual({ text: 'Good question.', annotations: [], moves: [], line_links: [] })
+  expect(reply).toEqual({ text: 'Good question.', annotations: [], moves: [], line_links: [], puzzles: [] })
   expect(deps.api.sendChat).toHaveBeenCalledWith('g1', ASK, expect.any(Function))
   expect(deps.analyzeDeep).not.toHaveBeenCalled()
   expect(progress).toEqual(['writing'])
@@ -46,7 +46,7 @@ test('an engine request runs the deep dive and sends the results back', async ()
 
   const reply = await askCoach({ api, analyzeDeep }, 'g1', ASK, (p) => progress.push(p))
 
-  expect(reply).toEqual({ text: 'With 14. Nxe5 you win a pawn.', annotations: [], moves: [], line_links: [] })
+  expect(reply).toEqual({ text: 'With 14. Nxe5 you win a pawn.', annotations: [], moves: [], line_links: [], puzzles: [] })
   expect(analyzeDeep).toHaveBeenCalledWith(POSITIONS)
   expect(api.submitEngineResult).toHaveBeenCalledWith(
     'g1',
@@ -83,7 +83,7 @@ test('explain sends the board position and returns the coach text', async () => 
 
   const reply = await explainPosition(deps, 'g1', position, () => {})
 
-  expect(reply).toEqual({ text: 'Here is the position.', annotations: [], moves: [], line_links: [] })
+  expect(reply).toEqual({ text: 'Here is the position.', annotations: [], moves: [], line_links: [], puzzles: [] })
   expect(deps.api.explain).toHaveBeenCalledWith('g1', position, expect.any(Function))
 })
 
@@ -104,5 +104,5 @@ test('board tags arrive as annotation events and come back with the text', async
 
   const reply = await askCoach({ api, analyzeDeep: vi.fn() }, 'g1', ASK, () => {})
 
-  expect(reply).toEqual({ text: 'See [board](cc:board/0).', annotations: [annotation], moves: [], line_links: [] })
+  expect(reply).toEqual({ text: 'See [board](cc:board/0).', annotations: [annotation], moves: [], line_links: [], puzzles: [] })
 })

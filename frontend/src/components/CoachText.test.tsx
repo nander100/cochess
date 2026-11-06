@@ -61,3 +61,13 @@ test('words that begin a sentence are capitalized', () => {
   )
   expect(screen.getByText('Queen takes on d4')).toBeInTheDocument()
 })
+
+test('a puzzle tag is a chip that opens the theme on Lichess', () => {
+  const puzzle = { index: 0, char_offset: 9, theme: 'fork', label: 'Fork', url: 'https://lichess.org/training/fork' }
+  render(<CoachText text="Practice [Fork](cc:puzzle/0) puzzles." tokens={{ puzzles: [puzzle] }} />)
+
+  const chip = screen.getByRole('link', { name: 'Fork' })
+  expect(chip).toHaveAttribute('href', 'https://lichess.org/training/fork')
+  expect(chip).toHaveAttribute('target', '_blank')
+  expect(chip).toHaveAttribute('rel', 'noopener noreferrer')
+})

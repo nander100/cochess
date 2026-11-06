@@ -102,3 +102,13 @@ test('move and line_link events are parsed', async () => {
     { type: 'line_link', link },
   ])
 })
+
+test('a puzzle event is kept only for a Lichess puzzle-trainer link', async () => {
+  const good = { index: 0, char_offset: 0, theme: 'fork', label: 'Fork', url: 'https://lichess.org/training/fork' }
+  const events = await collect(
+    `event: puzzle\ndata: ${JSON.stringify(good)}\n\n`,
+    `event: puzzle\ndata: ${JSON.stringify({ ...good, url: 'https://example.com/x' })}\n\n`,
+  )
+
+  expect(events).toEqual([{ type: 'puzzle', puzzle: good }])
+})

@@ -2,15 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { type AnalysisStatus, type PipelineDeps, runAnalysis, statusLabel } from '../analysis/pipeline'
 import { ApiError, isLoggedOut } from '../api/client'
-import type { CreateGameRequest, GameListItem, GameStatus, TendencyReport, UserResult } from '../api/types'
+import type { CreateGameRequest, GameListItem, GameStatus, UserResult } from '../api/types'
 import { GameInput } from '../components/GameInput'
+import { DashboardView } from '../dashboard/DashboardView'
 import {
-  Card,
   ColorSwatch,
   EmptyState,
   ErrorState,
   Eyebrow,
-  FeatureCard,
   Pill,
   type PillTone,
   ProgressBar,
@@ -43,19 +42,17 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: 'bullet', label: 'Bullet' },
 ]
 
-/** The Games page (Main.dc.html): upload a game, what keeps coming up, and recent games. */
+/** The Games page and home (Main.dc.html): upload a game, the dashboard (SPEC_V3 §8.1), and all games. */
 export function GamesPage({ deps, onLoggedOut }: GamesPageProps) {
   const { api } = deps
   const [games, setGames] = useState<GameListItem[] | null>(null)
-  const [report, setReport] = useState<TendencyReport | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(
     () =>
-      Promise.all([api.listGames(), api.tendencies()]).then(
-        ([list, tendencies]) => {
+      api.listGames().then(
+        (list) => {
           setGames(list)
-          setReport(tendencies)
           setError(null)
         },
         (caught: unknown) => {
@@ -85,7 +82,7 @@ export function GamesPage({ deps, onLoggedOut }: GamesPageProps) {
       </section>
       {error && <ErrorState message={`Your games couldn't be loaded. ${error}`} onRetry={() => void load()} />}
       {!error && games === null && <Skeleton lines={4} label="Loading games…" />}
-      {games !== null && games.length > 0 && <ComingUp games={games} report={report} />}
+      <DashboardView api={api} onLoggedOut={onLoggedOut} />
       {games !== null && <RecentGames games={games} />}
     </div>
   )
@@ -133,42 +130,6 @@ function aboutTheGame(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 422 || error.status === 409)
 }
 
-function ComingUp({ games, report }: { games: GameListItem[]; report: TendencyReport | null }) {
-  const [top, second] = report?.tendencies ?? []
-  const waiting = games.reduce((sum, game) => sum + Math.max(0, game.moments_total - game.moments_done), 0)
-  const analyzed = report?.games_analyzed ?? 0
-  return (
-    <section className="games-coming-up" aria-labelledby="games-coming-up">
-      <h2 id="games-coming-up" className="games-section-title">
-        What keeps coming up
-      </h2>
-      <FeatureCard>
-        <span className="ui-card-label">Top tendency</span>
-        <span className="ui-card-value">{top ? top.label : 'Nothing yet'}</span>
-        <span className="ui-card-body">
-          {top ? `Seen in ${top.games_seen} of your last ${analyzed} games` : 'Analyze a few games to see your patterns.'}
-        </span>
-      </FeatureCard>
-      <Card>
-        <span className="ui-card-label games-muted-label">Second</span>
-        <span className="ui-card-value">{second ? second.label : '—'}</span>
-        <span className="games-muted">{second ? `Seen in ${second.games_seen} games` : 'Needs more games'}</span>
-      </Card>
-      <Card>
-        <span className="ui-card-label games-muted-label">Moments to practice</span>
-        <span className="ui-card-value">{waiting} waiting</span>
-        {waiting > 0 ? (
-          <Link to="/moments" className="games-link">
-            Start practicing →
-          </Link>
-        ) : (
-          <span className="games-muted">All caught up.</span>
-        )}
-      </Card>
-    </section>
-  )
-}
-
 function RecentGames({ games }: { games: GameListItem[] }) {
   const [filter, setFilter] = useState<Filter>('all')
   const shown = filter === 'all' ? games : games.filter((game) => game.time_control_category === filter)
@@ -176,7 +137,7 @@ function RecentGames({ games }: { games: GameListItem[] }) {
     <section className="games-recent" aria-labelledby="games-recent">
       <div className="games-recent-head">
         <h2 id="games-recent" className="games-section-title">
-          Recent games
+          All games
         </h2>
         {games.length > 0 && (
           <label className="games-filter">
@@ -200,7 +161,7 @@ function RecentGames({ games }: { games: GameListItem[] }) {
           <p>Choose another time control above.</p>
         </EmptyState>
       ) : (
-        <Table aria-label="Recent games">
+        <Table aria-label="All games">
           <thead>
             <tr>
               <th scope="col">Opponent</th>

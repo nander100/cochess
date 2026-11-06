@@ -5,6 +5,8 @@ import type {
   ChatRequest,
   Color,
   CreateGameRequest,
+  Dashboard,
+  DashboardFilters,
   CreateGameResponse,
   EngineConfig,
   EngineResult,
@@ -98,6 +100,8 @@ export interface ApiClient {
   ): Promise<void>
   momentAsk(gameId: string, index: number, message: string, onEvent: (event: CoachEvent) => void): Promise<void>
   momentWrapUp(gameId: string, onEvent: (event: CoachEvent) => void): Promise<void>
+  /** The dashboard (SPEC_V3 §8.1), filtered. */
+  dashboard(filters: DashboardFilters): Promise<Dashboard>
   /** Where a linked line's playback stops (SPEC_V3 §9.6), from the browser's scans of it. */
   playback(lineId: string, stepResults: EngineResult[]): Promise<Playback>
   /** A line walkthrough (SPEC_V3 §7): a 428 error means the line's positions must be scanned. */
@@ -209,6 +213,12 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
       stream(`/api/games/${gameId}/moments/${index}/ask`, { message }, onEvent),
     momentWrapUp: (gameId, onEvent) => stream(`/api/games/${gameId}/moments/wrap_up`, null, onEvent),
     walkthrough: (gameId, body, onEvent) => stream(`/api/games/${gameId}/walkthrough`, body, onEvent),
+    dashboard: ({ tc, color, range }) => {
+      const query = new URLSearchParams({ range })
+      if (tc) query.set('tc', tc)
+      if (color) query.set('color', color)
+      return request(`/api/dashboard?${query.toString()}`)
+    },
     playback: (lineId, stepResults) => post(`/api/lines/${lineId}/playback`, { step_results: stepResults }),
     onboardingParse: (pgnText, choices) => post('/api/onboarding/parse', { pgn_text: pgnText, choices }),
     onboardingSubmit: (games) => post('/api/onboarding/submit', { games }),

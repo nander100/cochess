@@ -1,11 +1,11 @@
 import { createContext, useContext } from 'react'
 import Markdown, { type Components, defaultUrlTransform } from 'react-markdown'
-import type { Annotation, LineLink, MessageTokens, MoveToken } from '../api/types'
+import type { Annotation, LineLink, MessageTokens, MoveToken, PuzzleToken } from '../api/types'
 import { useSettings } from '../settings/settingsContext'
 import { BoardArrowIcon, PlayIcon } from '../ui'
 import './CoachText.css'
 
-const CC_LINK = /^cc:(board|move|line)\/(\d+)$/
+const CC_LINK = /^cc:(board|move|line|puzzle)\/(\d+)$/
 const NONE: readonly Annotation[] = []
 
 /** hover: show only this tag while the pointer or focus is on it; click: show it (and go to its
@@ -29,13 +29,15 @@ interface TagContext {
   annotations: readonly Annotation[]
   moves: readonly MoveToken[]
   links: readonly LineLink[]
+  puzzles: readonly PuzzleToken[]
   onShowTag?: ShowTag
   onPlayLine?: PlayLine
 }
 
 const NO_MOVES: readonly MoveToken[] = []
 const NO_LINKS: readonly LineLink[] = []
-const Tags = createContext<TagContext>({ annotations: [], moves: [], links: [] })
+const NO_PUZZLES: readonly PuzzleToken[] = []
+const Tags = createContext<TagContext>({ annotations: [], moves: [], links: [], puzzles: [] })
 
 /** A stable link renderer (a new one each render would remount the icons under the pointer and
  * lose hover and focus); it reads the message's tags from context. */
@@ -52,6 +54,7 @@ const COMPONENTS: Components = {
     const index = Number(match[2])
     if (match[1] === 'move') return <MoveTag index={index} />
     if (match[1] === 'line') return <LineTag index={index} />
+    if (match[1] === 'puzzle') return <PuzzleTag index={index} />
     return <BoardTag index={index} />
   },
 }
@@ -64,6 +67,7 @@ export function CoachText({ text, tokens, annotations = NONE, onShowTag, onPlayL
     annotations: tokens?.annotations ?? annotations,
     moves: tokens?.moves ?? NO_MOVES,
     links: tokens?.line_links ?? NO_LINKS,
+    puzzles: tokens?.puzzles ?? NO_PUZZLES,
     onShowTag,
     onPlayLine,
   }
@@ -104,6 +108,18 @@ function MoveTag({ index }: { index: number }) {
     <span className="coach-move" title={level === 'standard' ? notation(move) : undefined}>
       {words}
     </span>
+  )
+}
+
+/** A recommended puzzle theme (SPEC_V3 §8.2): a chip that opens it in Lichess's trainer. */
+function PuzzleTag({ index }: { index: number }) {
+  const { puzzles } = useContext(Tags)
+  const puzzle = puzzles.find((p) => p.index === index)
+  if (!puzzle) return null
+  return (
+    <a className="coach-puzzle" href={puzzle.url} target="_blank" rel="noopener noreferrer">
+      {puzzle.label}
+    </a>
   )
 }
 

@@ -83,6 +83,7 @@ export function GamePage({ deps, onLoggedOut }: GamePageProps) {
   const [params, setParams] = useSearchParams()
   const initialTab: Tab = params.get('view') === 'moments' ? 'moments' : 'coach'
   const initialMoment = Number(params.get('moment')) || null
+  const initialPly = Number(params.get('ply')) || null
   const showTab = useCallback(
     (tab: Tab) => setParams(tab === 'moments' ? { view: 'moments' } : {}, { replace: true, state: location.state }),
     [setParams, location.state],
@@ -124,6 +125,7 @@ export function GamePage({ deps, onLoggedOut }: GamePageProps) {
       fresh={fresh}
       initialTab={initialTab}
       initialMoment={initialMoment}
+      initialPly={initialPly}
       onTabChange={showTab}
       onLoggedOut={onLoggedOut}
       onAnalyzed={reload}
@@ -146,6 +148,8 @@ interface AnalysisBoardProps {
   autoResume: boolean
   initialTab: Tab
   initialMoment: number | null
+  /** Open on the position after this ply (the dashboard's "See an example"). */
+  initialPly?: number | null
   onTabChange: (tab: Tab) => void
   onColorChanged: (detail: GameDetail) => void
   onDeleted: () => void
@@ -157,7 +161,7 @@ const NO_SHAPES: readonly Annotation[] = []
 
 function AnalysisBoard({
   detail, deps, fresh, onLoggedOut, onAnalyzed, autoResume, onColorChanged, onDeleted,
-  initialTab, initialMoment, onTabChange,
+  initialTab, initialMoment, initialPly, onTabChange,
 }: AnalysisBoardProps) {
   const [tree, setTree] = useState<GameTree>(() => initialTree(detail))
   // The player's variations save themselves (SPEC_V3 §5.1); every change to the tree goes
@@ -172,7 +176,8 @@ function AnalysisBoard({
   // Opening on a finished moment shows its position, as choosing it in the moments list does.
   const [current, setCurrent] = useState(() => {
     const opened = initialTab === 'moments' ? detail.moments.find((m) => m.index === initialMoment) : undefined
-    return opened && !isUnsolved(opened) ? mainlineNode(tree, opened.ply - 1) : ROOT
+    if (opened && !isUnsolved(opened)) return mainlineNode(tree, opened.ply - 1)
+    return initialPly ? mainlineNode(tree, initialPly) : ROOT
   })
 
   // Critical moments (SPEC_V2 §8.2). While the one on screen is unsolved, the board shows its
@@ -674,7 +679,11 @@ function Coach({
     setSynopsis({ status: 'writing', text: '', error: null })
     let text = ''
     let finished = false
-    const tokens: Required<Pick<MessageTokens, 'moves' | 'line_links'>> = { moves: [], line_links: [] }
+    const tokens: Required<Pick<MessageTokens, 'moves' | 'line_links' | 'puzzles'>> = {
+      moves: [],
+      line_links: [],
+      puzzles: [],
+    }
     try {
       await deps.api.streamSynopsis(detail.id, (event) => {
         if (event.type === 'text') {
@@ -682,6 +691,7 @@ function Coach({
           setSynopsis({ status: 'writing', text, error: null })
         } else if (event.type === 'move') tokens.moves.push(event.move)
         else if (event.type === 'line_link') tokens.line_links.push(event.link)
+        else if (event.type === 'puzzle') tokens.puzzles.push(event.puzzle)
         else if (event.type === 'done' || event.type === 'error') {
           finished = true
           const error = event.type === 'error' ? event.message : null

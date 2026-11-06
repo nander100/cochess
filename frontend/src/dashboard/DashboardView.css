@@ -1,0 +1,219 @@
+/* The dashboard (SPEC_V3 §8.1) on the Games page. Tokens only. */
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.dashboard-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dashboard-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.dashboard-subtitle {
+  margin: 0 0 var(--space-2);
+  font: var(--text-panel);
+}
+
+.dashboard-note {
+  margin: 0 0 var(--space-3);
+  color: var(--color-muted);
+  font: var(--text-small);
+}
+
+.dashboard-focus {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--side-panel), 1fr));
+  gap: var(--space-4);
+}
+
+.dashboard-focus-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.dashboard-focus-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--text-small);
+}
+
+.dashboard-puzzles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.dashboard-continue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dashboard-continue-link {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-box);
+  color: var(--color-fg);
+  font: var(--text-ui-strong);
+  text-decoration: none;
+}
+
+.dashboard-continue-link:hover,
+.dashboard-continue-link:focus-visible {
+  background: var(--color-tint);
+}
+
+.dashboard-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--board-max), 1fr));
+  gap: var(--space-4);
+}
+
+.dashboard-chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.dashboard-caption {
+  color: var(--color-muted);
+  font: var(--text-small);
+}
+
+.dashboard-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.dashboard-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-fg);
+  font: var(--text-chip);
+  cursor: pointer;
+}
+
+.dashboard-legend-item[aria-pressed='false'] {
+  color: var(--color-muted);
+  text-decoration: line-through;
+}
+
+.dashboard-swatch {
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: var(--radius-swatch);
+}
+
+.dashboard-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: var(--text-small);
+}
+
+.dashboard-key li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dashboard-marker {
+  display: inline-block;
+  width: var(--space-2);
+  height: var(--space-2);
+}
+
+.dashboard-marker-win {
+  border-radius: var(--radius-pill);
+  background: var(--chess-good);
+}
+
+.dashboard-marker-loss {
+  background: var(--chess-blunder);
+  clip-path: polygon(20% 0, 50% 30%, 80% 0, 100% 20%, 70% 50%, 100% 80%, 80% 100%, 50% 70%, 20% 100%, 0 80%, 30% 50%, 0 20%);
+}
+
+.dashboard-marker-draw {
+  background: var(--color-muted);
+}
+
+.dashboard-marker-line {
+  width: var(--space-4);
+  height: var(--border-width);
+  border-top: var(--space-1) solid var(--color-fg);
+}
+
+.dashboard-phases {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.dashboard-phase {
+  display: grid;
+  grid-template-columns: var(--space-16) 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  font: var(--text-small);
+}
+
+.dashboard-phase dt {
+  margin: 0;
+}
+
+.dashboard-phase dd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.dashboard-phase-track {
+  flex: 1 1 auto;
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-tint);
+  overflow: hidden;
+}
+
+.dashboard-phase-bar {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+}
+
+.dashboard-assessment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}

@@ -5,6 +5,7 @@ import { Chess } from 'chess.js'
 import type {
   Color,
   CreateGameResponse,
+  Dashboard,
   EngineConfig,
   EngineResult,
   MomentInfo,
@@ -181,6 +182,17 @@ export function walkthroughFor(body: WalkthroughRequest): Walkthrough {
   } // prettier-ignore
 }
 
+/** A new player's dashboard: nothing analyzed yet. */
+export const EMPTY_DASHBOARD: Dashboard = {
+  games: 0,
+  focus_areas: [],
+  continue_games: [],
+  mistake_trend: { themes: [], points: [] },
+  accuracy: { points: [], by_phase: { opening: null, middlegame: null, endgame: null } },
+  recent: [],
+  onboarding: { complete: false, analyzed: 0, total: 12, has_report: false },
+}
+
 export function fakeEngine(): EngineHandle {
   return {
     build: 'stockfish-19-lite',
@@ -256,6 +268,7 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     momentReveal: vi.fn(coachSays('The move was 2. d4.', { grade: null, state: 'revealed' })),
     momentAsk: vi.fn(coachSays('Think about the centre.')),
     momentWrapUp: vi.fn(coachSays('Well done.')),
+    dashboard: vi.fn(async () => EMPTY_DASHBOARD),
     playback: vi.fn(async (lineId: string) => ({
       line_id: lineId, start_fen: '', moves_uci: [], moves_san: [], evals: [], win_pcts: [], settle_ply: 2,
       caption: 'White has won a knight.',

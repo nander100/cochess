@@ -180,6 +180,13 @@
   color-scheme: light;
   --color-bg: #ffffff;
   --color-fg: #0a0a0a;
+  /* Dashboard chart series (SPEC_V3 §8.1): the dataviz reference categorical order, slots 1-5,
+   validated on this surface (adjacent CVD ΔE >= 9.1; three hues below 3:1, so lines are labeled). */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
   --color-muted: #3f4652;
   --color-border: #d5e3f0;
   --color-row-border: #e6eef6;
@@ -219,6 +226,12 @@
   color-scheme: dark;
   --color-bg: #0a0a0a;
   --color-fg: #ffffff;
+  /* The same hues stepped for the dark surface, validated as a set (all >= 3:1). */
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
   --color-muted: #b8c2ce;
   --color-border: #26303d;
   --color-row-border: #1c2430;

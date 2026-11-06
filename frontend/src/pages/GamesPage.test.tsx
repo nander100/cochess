@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import type { GameListItem } from '../api/types'
+import type { Dashboard, GameListItem } from '../api/types'
 import { ApiError } from '../api/client'
-import { EMPTY_TENDENCIES, fakeDeps } from '../test/fakes'
+import { EMPTY_DASHBOARD, EMPTY_TENDENCIES, fakeDeps } from '../test/fakes'
 import { ToastProvider } from '../ui'
 import { GamesPage } from './GamesPage'
 
@@ -35,8 +35,12 @@ const TENDENCIES = {
   ],
 }  // prettier-ignore
 
-function renderPage(games: GameListItem[], tendencies = TENDENCIES) {
-  const deps = fakeDeps({ listGames: vi.fn(async () => games), tendencies: vi.fn(async () => tendencies) })
+function renderPage(games: GameListItem[], tendencies = TENDENCIES, dashboard: Dashboard = EMPTY_DASHBOARD) {
+  const deps = fakeDeps({
+    listGames: vi.fn(async () => games),
+    tendencies: vi.fn(async () => tendencies),
+    dashboard: vi.fn(async () => dashboard),
+  })
   render(
     <MemoryRouter>
       <ToastProvider>
@@ -63,25 +67,69 @@ test('the upload form sits in the hero, with the color first', async () => {
   expect(await screen.findByRole('heading', { name: 'No games yet' })).toBeInTheDocument()
 })
 
-test('what keeps coming up: the top two tendencies and moments waiting', async () => {
-  renderPage([game('a'), game('b', { moments_total: 2, moments_done: 2 })])
+const DASHBOARD: Dashboard = {
+  ...EMPTY_DASHBOARD,
+  games: 2,
+  focus_areas: [
+    {
+      theme: 'hung_piece', label: 'Leaving pieces undefended', trend: 'improving', rate_per_game: 1.2,
+      games_seen: 4, example_game_id: 'a', example_move: '9. Nf3', example_ply: 17,
+      puzzles: [{ theme: 'hangingPiece', label: 'Hanging piece', url: 'https://lichess.org/training/hangingPiece' }],
+    },
+  ],
+  continue_games: [{ game_id: 'a', opponent: 'Rival a', played_at: '2026-10-01T18:04:05Z', moments_total: 3, moments_done: 1 }],
+  recent: [
+    { game_id: 'a', played_at: '2026-10-01T18:04:05Z', opponent: 'Rival a', color: 'white', result: 'win',
+      accuracy: 80, moments_total: 3, moments_done: 1 },
+  ],
+  onboarding: { complete: false, analyzed: 5, total: 12, has_report: false },
+} // prettier-ignore
 
-  const section = await screen.findByRole('region', { name: 'What keeps coming up' })
-  expect(within(section).getByText('Leaving pieces undefended')).toBeInTheDocument()
-  expect(within(section).getByText('Seen in 4 of your last 6 games')).toBeInTheDocument()
-  expect(within(section).getByText('Missing tactics')).toBeInTheDocument()
-  expect(within(section).getByText('2 waiting')).toBeInTheDocument()
-  expect(within(section).getByRole('link', { name: 'Start practicing →' })).toHaveAttribute('href', '/moments')
+test('the dashboard shows focus areas, games to continue, recent games and the assessment', async () => {
+  const deps = renderPage([game('a')], TENDENCIES, DASHBOARD)
+
+  const focus = await screen.findByRole('article', { name: 'Leaving pieces undefended' })
+  expect(within(focus).getByText('↓ Improving')).toBeInTheDocument()
+  expect(within(focus).getByRole('link', { name: /See an example \(9\. Nf3\)/ })).toHaveAttribute('href', '/games/a?ply=17')
+  expect(within(focus).getByRole('link', { name: 'Hanging piece' })).toHaveAttribute(
+    'href', 'https://lichess.org/training/hangingPiece',
+  ) // prettier-ignore
+  const resume = screen.getByRole('region', { name: 'Continue where you left off' })
+  expect(within(resume).getByRole('link', { name: /vs Rival a/ })).toHaveAttribute('href', '/games/a?view=moments')
+  expect(within(screen.getByRole('table', { name: 'Recent analyzed games' })).getByText('1/3')).toBeInTheDocument()
+  expect(screen.getByText(/5 of 12 games analyzed/)).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Continue the assessment →' })).toHaveAttribute('href', '/onboarding')
+  expect(deps.api.dashboard).toHaveBeenCalledWith({ tc: null, color: null, range: 'all' })
 })
 
-test('recent games filter by time control', async () => {
+test('the dashboard filters ask again with the time control, color and range', async () => {
+  const deps = renderPage([game('a')], TENDENCIES, DASHBOARD)
+  await screen.findByRole('article', { name: 'Leaving pieces undefended' })
+
+  fireEvent.change(screen.getByLabelText('Time control'), { target: { value: 'blitz' } })
+  fireEvent.change(screen.getByLabelText('Color'), { target: { value: 'black' } })
+  fireEvent.change(screen.getByLabelText('Range'), { target: { value: '10' } })
+
+  await vi.waitFor(() =>
+    expect(deps.api.dashboard).toHaveBeenLastCalledWith({ tc: 'blitz', color: 'black', range: '10' }),
+  )
+})
+
+test('a new player is told how to get started', async () => {
+  renderPage([])
+
+  expect(await screen.findByRole('heading', { name: 'Nothing to show yet' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'start your 12-game assessment' })).toHaveAttribute('href', '/onboarding')
+})
+
+test('all games filter by time control', async () => {
   renderPage([game('a'), game('b', { time_control_category: 'blitz', opponent: 'Blitz rival' })])
-  const table = await screen.findByRole('table', { name: 'Recent games' })
+  const table = await screen.findByRole('table', { name: 'All games' })
   expect(within(table).getAllByRole('row')).toHaveLength(3)
 
   fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'blitz' } })
 
-  expect(within(screen.getByRole('table', { name: 'Recent games' })).getByText('Blitz rival')).toBeInTheDocument()
+  expect(within(screen.getByRole('table', { name: 'All games' })).getByText('Blitz rival')).toBeInTheDocument()
   expect(screen.queryByText('Rival a')).not.toBeInTheDocument()
   fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'classical' } })
   expect(screen.getByRole('heading', { name: 'No games in this time control' })).toBeInTheDocument()
