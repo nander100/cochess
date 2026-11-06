@@ -7,8 +7,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.coach.markup import MessageTokens
 from app.db.chat import save_turn
-from app.db.coach import save_synopsis
+from app.db.coach import StoredText, save_synopsis
 from app.db.engine_results import load_summary, save_summary
 from app.db.models import Game, GameSummaryRow, MomentProgressRow
 from tests.analysis_flow import analyzed_game
@@ -178,7 +179,8 @@ class TestGameDetail:
         self, client: TestClient, db_session: Session
     ) -> None:
         game_id = analyzed_game(client, "white")
-        save_synopsis(db_session, game_id, "### Overall\nA tidy game.", ["Nf9"])
+        text = "### Overall\nA tidy game."
+        save_synopsis(db_session, game_id, StoredText(text, text, ["Nf9"], MessageTokens()))
         payload = {"task": "chat", "user_prompt": "What if I take on e5?"}
         rendered = f"The player's new chat message, as JSON.\n\n{json.dumps(payload)}"
         turns: list[tuple[str, list[dict[str, Any]]]] = [
@@ -198,6 +200,9 @@ class TestGameDetail:
         assert detail["synopsis"] == {
             "text": "### Overall\nA tidy game.",
             "invalid_moves_removed": ["Nf9"],
+            "moves": [],
+            "line_links": [],
+            "annotations": [],
         }
         assert detail["chat"] == [  # a v1 conversation: no board positions were recorded
             {
@@ -206,6 +211,8 @@ class TestGameDetail:
                 "where": None,
                 "annotations": [],
                 "path_uci": None,
+                "moves": [],
+                "line_links": [],
             },
             {
                 "role": "coach",
@@ -213,6 +220,8 @@ class TestGameDetail:
                 "where": None,
                 "annotations": [],
                 "path_uci": None,
+                "moves": [],
+                "line_links": [],
             },
         ]
 

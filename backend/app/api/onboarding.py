@@ -44,6 +44,7 @@ from app.api.profile import is_complete
 from app.api.schemas import GameStatus, PgnErrorDetail, PgnErrorResponse, TimeControl
 from app.auth.deps import CurrentUser
 from app.coach.baseline import BaselineResult, generate_baseline
+from app.coach.markup import MessageTokens, MoveToken
 from app.config import Settings
 from app.db.games import game_fingerprint, new_game
 from app.db.models import BaselineReportRow, Game, User
@@ -165,7 +166,10 @@ def write_report(
         raise HTTPException(status.HTTP_409_CONFLICT, detail=NOT_READY)
     stored = latest_report(session, user.id)
     if stored is not None and stored.game_ids == [game.id for game in games]:
-        result = BaselineResult(stored.text, list(stored.invalid_moves_removed), stored.game_ids)
+        moves = [MoveToken.model_validate(m) for m in stored.moves or []]
+        result = BaselineResult(
+            stored.text, list(stored.invalid_moves_removed), stored.game_ids, moves
+        )
         return stream_coach(_ready(result), _events, settings, "baseline")
     work = generate_baseline(client, settings, session_factory(request), user.id)
     return stream_coach(work, _events, settings, "baseline")
@@ -176,7 +180,7 @@ async def _ready(result: BaselineResult) -> BaselineResult:
 
 
 def _events(result: BaselineResult) -> list[str]:
-    return text_events(result.text, result.invalid_moves_removed)
+    return text_events(result.text, result.invalid_moves_removed, MessageTokens(moves=result.moves))
 
 
 def _primary(user: User) -> TimeControl:
@@ -296,4 +300,5 @@ def _report(row: BaselineReportRow) -> BaselineReport:
         invalid_moves_removed=list(row.invalid_moves_removed),
         game_ids=list(row.game_ids),
         created_at=row.created_at,
+        moves=[MoveToken.model_validate(m) for m in row.moves or []],
     )

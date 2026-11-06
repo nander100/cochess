@@ -4,7 +4,7 @@ validation (PLAN Q22)."""
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Callable, Coroutine, Sequence
+from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -19,7 +19,6 @@ from app.api.deps import get_app_settings, get_session
 from app.api.scoping import OwnedGame
 from app.api.turns import prepare_turn
 from app.auth.deps import CurrentUser
-from app.coach.annotations import Annotation
 from app.coach.chat import (
     ChatLimitError,
     ChatOutcome,
@@ -32,6 +31,7 @@ from app.coach.chat import (
     submit_engine_results,
 )
 from app.coach.client import CoachClient, CoachUnavailableError
+from app.coach.markup import MessageTokens
 from app.coach.service import SynopsisResult, generate_synopsis
 from app.coach.walkthrough import WalkthroughError
 from app.config import Settings
@@ -216,20 +216,25 @@ async def _events[T](
         yield event
 
 
-def text_events(text: str, removed: list[str], annotations: Sequence[Annotation] = ()) -> list[str]:
-    """The checked text in chunks, then each board tag's shapes (SPEC_V3 §11.1: `annotation`,
-    tied by `char_offset` to its placeholder in the text), then `done`."""
+def text_events(text: str, removed: list[str], tokens: MessageTokens | None = None) -> list[str]:
+    """The checked text in chunks, then its tokens (SPEC_V3 §11.1: `move`, `line_link`,
+    `annotation`, each tied by `char_offset` to its placeholder in the text), then `done`."""
     pieces = [sse.event("text", {"text": piece}) for piece in sse.chunks(text)]
-    tags = [sse.event("annotation", a.model_dump()) for a in annotations]
+    parts = tokens or MessageTokens()
+    tags = [
+        *(sse.event("move", m.model_dump()) for m in parts.moves),
+        *(sse.event("line_link", link.model_dump()) for link in parts.line_links),
+        *(sse.event("annotation", a.model_dump()) for a in parts.annotations),
+    ]
     return [*pieces, *tags, sse.event("done", {"invalid_moves_removed": removed})]
 
 
 def _synopsis_events(result: SynopsisResult) -> list[str]:
-    return text_events(result.text, result.invalid_moves_removed)
+    return text_events(result.text, result.invalid_moves_removed, result.tokens)
 
 
 def _answer_events(answer: FinalAnswer) -> list[str]:
-    return text_events(answer.text, answer.invalid_moves_removed, answer.annotations)
+    return text_events(answer.text, answer.invalid_moves_removed, answer.tokens)
 
 
 def _chat_events(outcome: ChatOutcome) -> list[str]:
@@ -237,4 +242,4 @@ def _chat_events(outcome: ChatOutcome) -> list[str]:
         positions = [p.model_dump() for p in outcome.positions]
         data = {"request_id": outcome.request_id, "tier": "deep", "positions": positions}
         return [sse.event("engine_request", data)]
-    return text_events(outcome.text, outcome.invalid_moves_removed, outcome.annotations)
+    return text_events(outcome.text, outcome.invalid_moves_removed, outcome.tokens)

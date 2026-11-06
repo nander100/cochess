@@ -67,12 +67,12 @@ def last_user_blocks(fake: FakeCoachClient, call: int) -> list[dict[str, Any]]:
 
 class TestPlainQuestions:
     def test_answers_with_the_game_in_cached_context(self) -> None:
-        client, fake, app, game_id = setup("Your 13. Rxd7 was the key sacrifice.")
+        client, fake, app, game_id = setup("Your {{move:13.Rxd7}} was the key sacrifice.")
 
         events = chat(client, game_id, "Which move won the game?")
 
         assert events[0][0] == "status"
-        assert text_of(events) == "Your 13. Rxd7 was the key sacrifice."
+        assert text_of(events) == "Your [rook takes on d7](cc:move/0) was the key sacrifice."
         [request] = fake.requests
         assert request.model == "claude-haiku-5-5"
         assert [t["name"] for t in request.tools] == ["analyze_position"]
@@ -120,11 +120,13 @@ class TestPlainQuestions:
         assert "The synopsis you already wrote" in fake.requests[1].system[1]["text"]
 
     def test_invented_moves_trigger_a_rewrite_without_tools(self) -> None:
-        client, fake, _, game_id = setup("Try 5. Ka8 instead.", "The engine prefers 13. Rxd7.")
+        client, fake, _, game_id = setup(
+            "Try {{move:5.Ka8}} instead.", "The engine prefers {{move:13.Rxd7}}."
+        )
 
         events = chat(client, game_id, "What should I have played?")
 
-        assert text_of(events) == "The engine prefers 13. Rxd7."
+        assert text_of(events) == "The engine prefers [rook takes on d7](cc:move/0)."
         assert fake.requests[1].tool_choice == {"type": "none"}
 
 
@@ -132,7 +134,7 @@ class TestWhatIf:
     def test_round_trip_through_the_browser_engine(self) -> None:
         client, fake, app, game_id = setup(
             ToolCall(WHAT_IF),
-            "Taking back with 5. gxf3 is playable, but it weakens your king.",
+            "Taking back with {{move:5.gxf3}} is playable, but it weakens your king.",
         )
 
         request = engine_request(chat(client, game_id, "What if I had played gxf3 on move 5?"))
@@ -147,7 +149,7 @@ class TestWhatIf:
         assert resumed.status_code == 200
         # gxf3 is nowhere in the game data; it's allowed because the engine analyzed it.
         assert text_of(sse_events(resumed.text)) == (
-            "Taking back with 5. gxf3 is playable, but it weakens your king."
+            "Taking back with [pawn takes on f3](cc:move/0) is playable, but it weakens your king."
         )
         with app.state.session_factory() as session:
             assert session.query(PendingToolCallRow).count() == 0
@@ -160,7 +162,7 @@ class TestWhatIf:
     def test_an_illegal_candidate_goes_back_to_the_coach_as_an_error(self) -> None:
         client, fake, _, game_id = setup(
             ToolCall({"ply": 9, "candidate_move_san": "Nxe5"}),
-            "Nxe5 isn't possible there: your knight was already gone.",
+            "{{move:Nxe5}} isn't possible there: your knight was already gone.",
         )
 
         events = chat(client, game_id, "What about Nxe5 on move 5?")
@@ -257,7 +259,9 @@ def payload_of(fake: FakeCoachClient, call: int) -> Any:
 
 class TestPositions:
     def test_a_question_from_a_variation_carries_the_position_and_its_engine_lines(self) -> None:
-        client, fake, _, game_id = setup("In your line, 3...a6 asks the bishop a question.")
+        client, fake, _, game_id = setup(
+            "In your line, {{move:3...a6}} asks the bishop a question."
+        )
         result = fake_result(VARIATION_FEN, "verify", cp=25, lines=4, plies=12)
 
         response = ask(client, game_id, "Is Bb5 good here?", VARIATION, result)
@@ -283,6 +287,8 @@ class TestPositions:
             "where": "after 3. Bb5, in your line",
             "annotations": [],
             "path_uci": VARIATION,
+            "moves": [],
+            "line_links": [],
         }
         assert any(r["fen"] == VARIATION_FEN for r in detail["engine_results"])
 
@@ -326,7 +332,8 @@ class TestPositions:
 
     def test_a_tool_call_without_a_ply_analyzes_the_board_position(self) -> None:
         client, _, _, game_id = setup(
-            ToolCall({"candidate_moves_san": ["a6"]}), "After 3...a6 the bishop has to decide."
+            ToolCall({"candidate_moves_san": ["a6"]}),
+            "After {{move:3...a6}} the bishop has to decide.",
         )
         result = fake_result(VARIATION_FEN, "verify", lines=4, plies=10)
 
@@ -335,7 +342,10 @@ class TestPositions:
         resumed = answer(client, game_id, request)
 
         assert request["positions"][0]["fen"] == VARIATION_FEN
-        assert text_of(sse_events(resumed.text)) == "After 3...a6 the bishop has to decide."
+        assert (
+            text_of(sse_events(resumed.text))
+            == "After [pawn to a6](cc:move/0) the bishop has to decide."
+        )
 
     def test_the_player_is_their_profile_today(self) -> None:
         client, fake, _, game_id = setup("Sure.")
@@ -367,12 +377,14 @@ class TestPositions:
     def test_moves_shown_in_an_earlier_turn_stay_valid(self) -> None:
         result = fake_result(VARIATION_FEN, "verify", lines=4, plies=10)
         first_line_move = "a6"  # fake_result's first legal move in UCI order from VARIATION_FEN
-        client, fake, _, game_id = setup("Look at that.", f"Like I said, 3...{first_line_move}.")
+        client, fake, _, game_id = setup(
+            "Look at that.", f"Like I said, {{{{move:3...{first_line_move}}}}}."
+        )
         ask(client, game_id, "Is Bb5 good?", VARIATION, result)
 
         events = sse_events(ask(client, game_id, "Remind me?", []).text)
 
-        assert first_line_move in text_of(events)
+        assert [d["san"] for n, d in events if n == "move"] == [first_line_move]
         assert len(fake.requests) == 2  # no rewrite was needed
 
 
@@ -403,6 +415,8 @@ class TestExplain:
                 "where": "the start",
                 "annotations": [],
                 "path_uci": [],
+                "moves": [],
+                "line_links": [],
             },
             {
                 "role": "coach",
@@ -410,6 +424,8 @@ class TestExplain:
                 "where": None,
                 "annotations": [],
                 "path_uci": [],
+                "moves": [],
+                "line_links": [],
             },
         ]
         with app.state.session_factory() as session:
@@ -417,13 +433,14 @@ class TestExplain:
 
     def test_moves_shown_by_explain_stay_valid_in_later_answers(self) -> None:
         result = fake_result(VARIATION_FEN, "verify", lines=4, plies=10)
-        client, fake, _, game_id = setup("Here it is.", "As I said, 3...a6 is the line.")
+        client, fake, _, game_id = setup("Here it is.", "As I said, {{move:3...a6}} is the line.")
         body = {"path_uci": VARIATION, "engine_result": result}
         assert client.post(f"/api/games/{game_id}/explain", json=body).status_code == 200
 
         events = sse_events(ask(client, game_id, "Remind me?", []).text)
 
-        assert "3...a6" in text_of(events)  # a6 was only in the Explain payload's engine lines
+        # a6 was only in the Explain payload's engine lines
+        assert [d["san"] for n, d in events if n == "move"] == ["a6"]
         assert len(fake.requests) == 2  # no rewrite
 
     def test_needs_an_analyzed_position(self) -> None:

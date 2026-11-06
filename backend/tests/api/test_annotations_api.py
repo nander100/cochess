@@ -8,7 +8,7 @@ from fastapi import FastAPI
 
 from app.db.chat import load_messages
 from app.db.models import AnnotationLogRow
-from tests.api.test_moments_api import INTRO, post, progress, store_before, text_of
+from tests.api.test_moments_api import INTRO, INTRO_SHOWN, post, progress, store_before, text_of
 from tests.api.test_moments_api import setup as moment_setup
 from tests.coach.test_chat import chat
 from tests.coach.test_chat import setup as chat_setup
@@ -81,10 +81,10 @@ class TestMoments:
 
         events = post(client, f"/api/games/{gid}/moments/1/start")
 
-        assert text_of(events) == INTRO
+        assert text_of(events) == INTRO_SHOWN
         assert len(fake.requests) == 2
         note = fake.requests[1].messages[-1]["content"]
-        assert isinstance(note, str) and "marking those squares" in note
+        assert isinstance(note, str) and "mark its squares" in note
         assert log(app) == [("moment_intro", "f3:green", "moment_leak", 1)]
         assert progress(app).leaks == 0
 

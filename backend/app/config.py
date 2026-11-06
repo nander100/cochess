@@ -102,6 +102,7 @@ class CoachSettings(BaseModel):
     annotation_max_tags: int = 3
     annotation_max_arrows: int = 4
     annotation_max_squares: int = 4
+    line_link_max_plies: int = 10  # a linked line is played and scanned this far (§9.5, §9.6)
     # Line walkthroughs (SPEC_V3 §7): one forced-tool call for the whole line.
     walkthrough_max_plies: int = 10
     walkthrough_step_max_words: int = 50  # asked of the coach; longer steps are only logged

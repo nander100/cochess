@@ -10,6 +10,7 @@ from app.analysis.pgn import PgnErrorCode, Position
 from app.analysis.summary_models import Accuracy, Counts, GameInfo, MoveLabel
 from app.analysis.variations import SavedVariation
 from app.coach.annotations import Annotation
+from app.coach.markup import LineLink, MessageTokens, MoveToken
 from app.db.chat import ChatEntry
 
 # Profile input rules from SPEC_V2 §4.3, not tunable thresholds.
@@ -152,7 +153,7 @@ class StoredEngineResult(BaseModel):
     lines: list[StoredLine]
 
 
-class StoredSynopsis(BaseModel):
+class StoredSynopsis(MessageTokens):
     text: str
     invalid_moves_removed: list[str]
 
@@ -170,7 +171,10 @@ class MomentMessage(BaseModel):
     role: Literal["coach", "player"]
     text: str
     kind: str
-    annotations: list[Annotation] = []  # a coach message's board tags (SPEC_V3 §6)
+    # A coach message's tokens (SPEC_V3 §6, §9.4): board tags, move tags, line links.
+    annotations: list[Annotation] = []
+    moves: list[MoveToken] = []
+    line_links: list[LineLink] = []
 
 
 class MomentInfo(BaseModel):

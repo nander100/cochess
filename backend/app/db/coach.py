@@ -1,11 +1,13 @@
 """Persistence for the coach: the stored synopsis and per-call token usage."""
 
+from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.coach.client import Usage
+from app.coach.markup import MessageTokens
 from app.db.models import ChatMessageRow, Game, LlmUsageRow
 
 SYNOPSIS = "synopsis"
@@ -38,22 +40,45 @@ def record_usage(
     session.commit()
 
 
-def save_synopsis(session: Session, game_id: str, text: str, removed: list[str]) -> None:
-    content = {"type": SYNOPSIS, "text": text, "invalid_moves_removed": removed}
+@dataclass(frozen=True)
+class StoredText:
+    """A stored coach text: as the player sees it (`text`, with placeholders), as the coach wrote
+    it (`raw`, valid tags as markup, for later prompts), and its tokens (SPEC_V3 §11.2)."""
+
+    text: str
+    raw: str
+    invalid_moves_removed: list[str]
+    tokens: MessageTokens
+
+
+def save_synopsis(session: Session, game_id: str, stored: StoredText) -> None:
+    content = {
+        "type": SYNOPSIS,
+        "text": stored.text,
+        "raw": stored.raw,
+        "invalid_moves_removed": stored.invalid_moves_removed,
+        **stored.tokens.model_dump(mode="json"),
+    }
     session.add(ChatMessageRow(game_id=game_id, role="assistant", content=content))
     session.commit()
 
 
-def load_synopsis(session: Session, game_id: str) -> tuple[str, list[str]] | None:
-    """(text, moves removed) of the stored synopsis, if there is one."""
+def load_synopsis(session: Session, game_id: str) -> StoredText | None:
+    """The stored synopsis, if there is one (v2 synopses have no raw text or tokens)."""
     rows = session.scalars(
         select(ChatMessageRow)
         .where(ChatMessageRow.game_id == game_id, ChatMessageRow.role == "assistant")
         .order_by(ChatMessageRow.id)
     )
     for row in rows:
-        if row.content.get("type") == SYNOPSIS:
-            return str(row.content["text"]), list(row.content.get("invalid_moves_removed", []))
+        content = row.content
+        if content.get("type") == SYNOPSIS:
+            return StoredText(
+                text=str(content["text"]),
+                raw=str(content.get("raw", content["text"])),
+                invalid_moves_removed=list(content.get("invalid_moves_removed", [])),
+                tokens=MessageTokens.model_validate(content),
+            )
     return None
 
 

@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.analysis.onboarding import Category, Reason, Slot
 from app.api.schemas import Color, GameStatus, PgnErrorDetail, TimeControl, UserResult
+from app.coach.markup import MoveToken
 
 MAX_PASTE_GAMES = 40  # mirrors OnboardingSettings.max_paste_games; bounds the request's lists
 
@@ -91,6 +92,7 @@ class BaselineReport(BaseModel):
     invalid_moves_removed: list[str]
     game_ids: list[str]
     created_at: datetime
+    moves: list[MoveToken] = []  # the text's move tags (SPEC_V3 §9.4)
 
 
 class OnboardingStatus(BaseModel):

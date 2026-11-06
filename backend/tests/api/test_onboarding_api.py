@@ -291,7 +291,13 @@ class TestStatus:
         assert submit(other, [pgn(0, "white", "1-0")], ["white"])["results"][0]["slot"]
 
 
-REPORT = "### Overview\nYou played 1. e4 as White. Your win against Opponent 0 on 2026-10-01."
+REPORT = (
+    "### Overview\nYou played {{move:1.e4}} as White. Your win against Opponent 0 on 2026-10-01."
+)
+REPORT_SHOWN = (
+    "### Overview\nYou played [pawn to e4](cc:move/0) as White. Your win against Opponent 0 on "
+    "2026-10-01."
+)
 
 
 class TestReport:
@@ -310,7 +316,7 @@ class TestReport:
 
         events = sse_events(client.post("/api/onboarding/report").text)
 
-        assert report_text(events) == REPORT
+        assert report_text(events) == REPORT_SHOWN
         assert events[-1] == ("done", {"invalid_moves_removed": []})
         (request,) = coach.requests
         assert "the baseline report" in request.system[0]["text"]
@@ -321,7 +327,7 @@ class TestReport:
         assert "color" not in payload["player"]
         assert [g["number"] for g in payload["baseline"]["games"]] == list(range(1, 13))
         stored = client.get("/api/onboarding/report").json()
-        assert stored["text"] == REPORT
+        assert stored["text"] == REPORT_SHOWN
         assert len(stored["game_ids"]) == 12
         with app.state.session_factory() as session:
             usage = session.scalars(select(LlmUsageRow)).one()
@@ -336,8 +342,8 @@ class TestReport:
         again = sse_events(client.post("/api/onboarding/report").text)
 
         assert len(coach.requests) == 1
-        assert report_text(again) == REPORT
-        assert client.get("/api/onboarding/status").json()["report"]["text"] == REPORT
+        assert report_text(again) == REPORT_SHOWN
+        assert client.get("/api/onboarding/status").json()["report"]["text"] == REPORT_SHOWN
 
     def test_moves_not_in_the_data_are_regenerated_then_removed(self) -> None:
         client, coach, app = make("Try 1. h4 next time.", "Still 1. h4.")

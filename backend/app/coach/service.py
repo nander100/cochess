@@ -1,13 +1,15 @@
 """Coach orchestration: generate, validate, and store the synopsis (SPEC §7)."""
 
 import logging
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 from anthropic.types import MessageParam
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.coach.annotations import annotate
+from app.analysis.pgn import parse_pgn
 from app.coach.client import CoachClient, CoachReply, CoachRequest, system_blocks
+from app.coach.lines import key_moment_lines
+from app.coach.markup import MessageTokens, Rules, note, process
 from app.coach.payload import (
     SYNOPSIS_INSTRUCTION,
     build_synopsis_payload,
@@ -15,11 +17,12 @@ from app.coach.payload import (
     render,
     with_tendencies,
 )
-from app.coach.validate import allowed_moves, find_invalid, strip_moves
+from app.coach.validate import allowed_moves
 from app.config import Settings
 from app.db.annotations import log_dropped
-from app.db.coach import load_synopsis, record_usage, save_synopsis
+from app.db.coach import StoredText, load_synopsis, record_usage, save_synopsis
 from app.db.engine_results import load_summary
+from app.db.line_links import save_line_links
 from app.db.models import Game
 from app.db.tendencies import latest_tendencies
 from app.db.user_settings import detail_level_for
@@ -37,6 +40,7 @@ REGENERATE_NOTE = (
 class SynopsisResult:
     text: str
     invalid_moves_removed: list[str]
+    tokens: MessageTokens = field(default_factory=MessageTokens)
 
 
 async def generate_synopsis(
@@ -47,13 +51,18 @@ async def generate_synopsis(
     with sessions() as session:
         stored = load_synopsis(session, game_id)
         if stored is not None:
-            return SynopsisResult(*stored)
+            return SynopsisResult(stored.text, stored.invalid_moves_removed, stored.tokens)
         game = session.get(Game, game_id)
         summary = load_summary(session, game_id)
         if game is None or summary is None:
             raise LookupError(f"game {game_id} has no summary yet")
         report = latest_tendencies(session, game.user_id) if game.user_id else None
         detail = detail_level_for(session, game.user_id)
+        user_id = game.user_id
+        parsed = parse_pgn(
+            game.pgn, max_chars=settings.limits.max_pgn_chars, max_plies=settings.limits.max_plies
+        )
+    lines = key_moment_lines(parsed, summary, settings.coach.line_link_max_plies)
     player = with_tendencies(player_payload(summary, detail), report, settings.tendencies)
     payload = build_synopsis_payload(summary, settings.coach, player)
     allowed = allowed_moves(payload.model_dump(mode="json"))
@@ -68,39 +77,37 @@ async def generate_synopsis(
         effort=settings.coach.synopsis_effort,
     )
 
+    # The synopsis is about the whole game, not one board position: no board tags. Its line
+    # links name the key moments (km<N>).
+    rules = Rules(allowed=frozenset(allowed), limits=settings.coach, lines=lines)
     reply = await _call(client, request, sessions, game_id)
-    invalid = find_invalid(reply.text, allowed)
-    if invalid:
+    done = process(reply.text, rules)
+    if done.problems.any:
         retry: list[MessageParam] = [
             *messages,
             {"role": "assistant", "content": reply.text},
-            {"role": "user", "content": REGENERATE_NOTE.format(moves=", ".join(invalid))},
+            {"role": "user", "content": note(done.problems)},
         ]
         reply = await _call(client, replace(request, messages=retry), sessions, game_id)
-        invalid = find_invalid(reply.text, allowed)
-
-    text = reply.text
-    if invalid:
-        text = strip_moves(text, invalid)
-        logger.warning("coach moves removed: game=%s endpoint=synopsis moves=%s", game_id, invalid)
-    words = len(text.split())
+        done = process(reply.text, rules)
+    if done.removed:
+        logger.warning(
+            "coach moves removed: game=%s endpoint=synopsis moves=%s", game_id, done.removed
+        )
+    words = len(done.text.split())
     if words > settings.coach.synopsis_max_words:
         logger.warning("synopsis too long: game=%s words=%d", game_id, words)
-    with sessions() as session:
-        # The synopsis is about the whole game, not one board position: no board tags.
-        text = _without_tags(session, settings, game_id, text)
-        save_synopsis(session, game_id, text, invalid)
-    return SynopsisResult(text=text, invalid_moves_removed=invalid)
-
-
-def _without_tags(session: Session, settings: Settings, game_id: str, text: str) -> str:
-    game = session.get(Game, game_id)
-    stripped = annotate(text, None, settings.coach)
-    user_id = game.user_id if game is not None else None
-    log_dropped(
-        session, user_id=user_id, game_id=game_id, task="synopsis", dropped=stripped.dropped
+    stored = StoredText(
+        text=done.text, raw=done.raw, invalid_moves_removed=done.removed, tokens=done.tokens
     )
-    return stripped.text
+    with sessions() as session:
+        log_dropped(
+            session, user_id=user_id, game_id=game_id, task="synopsis", dropped=done.dropped
+        )
+        if user_id is not None:
+            save_line_links(session, user_id, game_id, "synopsis", done.line_links)
+        save_synopsis(session, game_id, stored)
+    return SynopsisResult(text=done.text, invalid_moves_removed=done.removed, tokens=done.tokens)
 
 
 async def _call(

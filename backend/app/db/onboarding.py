@@ -42,10 +42,15 @@ def filled_slots(games: Sequence[Game]) -> Counter[Slot]:
 
 
 def save_report(
-    session: Session, user_id: str, text: str, removed: list[str], game_ids: list[str]
+    session: Session,
+    user_id: str,
+    text: str,
+    removed: list[str],
+    game_ids: list[str],
+    moves: list[dict[str, object]] | None = None,
 ) -> BaselineReportRow:
     row = BaselineReportRow(
-        user_id=user_id, text=text, invalid_moves_removed=removed, game_ids=game_ids
+        user_id=user_id, text=text, invalid_moves_removed=removed, game_ids=game_ids, moves=moves
     )
     session.add(row)
     session.commit()

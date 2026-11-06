@@ -21,9 +21,22 @@ from tests.engine_fakes import fake_result, legal_line
 from tests.pgn_fixtures import read_pgn
 
 MOMENT_FEN = "rn1qkbnr/ppp2ppp/3p4/4P3/4P3/5b2/PPP2PPP/RNBQKB1R w KQkq - 0 5"
-INTRO = "You played 5. Qxf3 and went from equal to -3.0. What would you play instead, and why?"
-FEEDBACK = "After 5. a3 the engine shows you end up worse. Look again at what your queen does."
-SOLVED = "Yes! 5. gxf3 keeps the material balance."
+# Scripted replies write moves as move tags (SPEC_V3 §9.4); the player sees the words.
+INTRO = (
+    "You played {{move:5.Qxf3}} and went from equal to -3.0. What would you play instead, and why?"
+)
+INTRO_SHOWN = (
+    "You played [queen takes on f3](cc:move/0) and went from equal to -3.0. What would you play "
+    "instead, and why?"
+)
+INTRO_MOVES = [
+    {"index": 0, "char_offset": 11, "san": "Qxf3", "words": "queen takes on f3", "move_number": 5,
+     "white": True},
+]  # fmt: skip
+FEEDBACK = (
+    "After {{move:5.a3}} the engine shows you end up worse. Look again at what your queen does."
+)
+SOLVED = "Yes! {{move:5.gxf3}} keeps the material balance."
 
 
 def deep(fen: str, *lines: tuple[str, int]) -> dict[str, Any]:
@@ -120,7 +133,7 @@ class TestStart:
 
         events = post(client, f"/api/games/{gid}/moments/1/start")
 
-        assert text_of(events) == INTRO
+        assert text_of(events) == INTRO_SHOWN
         sent = payload(fake)
         assert sent["task"] == "moment_intro"
         moment = sent["moment"]
@@ -140,7 +153,7 @@ class TestStart:
 
         events = post(client, f"/api/games/{gid}/moments/1/start")
 
-        assert text_of(events) == INTRO and len(fake.requests) == 1
+        assert text_of(events) == INTRO_SHOWN and len(fake.requests) == 1
 
     def test_a_moment_that_doesnt_exist_is_not_found(self) -> None:
         client, _, _, gid = setup()
@@ -155,7 +168,7 @@ class TestLeaks:
 
         events = post(client, f"/api/games/{gid}/moments/1/start")
 
-        assert text_of(events) == INTRO
+        assert text_of(events) == INTRO_SHOWN
         assert len(fake.requests) == 2
         note = fake.requests[1].messages[-1]["content"]
         assert isinstance(note, str) and "gxf3" not in note  # the retry doesn't name it either
@@ -171,12 +184,12 @@ class TestLeaks:
         assert progress(app).leaks == 1
 
     def test_the_same_move_for_another_turn_is_not_a_leak(self) -> None:
-        client, fake, app, gid = setup("Remember 2. Nf3 from earlier.")
+        client, fake, app, gid = setup("Remember {{move:2.Nf3}} from earlier.")
         store_before(app, gid)
 
         events = post(client, f"/api/games/{gid}/moments/1/start")
 
-        assert "Nf3" in text_of(events) and len(fake.requests) == 1
+        assert "knight to f3" in text_of(events) and len(fake.requests) == 1
 
 
 class TestAttempts:
@@ -199,7 +212,7 @@ class TestAttempts:
         assert progress(app).state == "attempt"
 
     def test_the_last_failed_attempt_reveals_the_answer(self) -> None:
-        client, fake, _, gid = setup(INTRO, FEEDBACK, "The move was 5. gxf3.")
+        client, fake, _, gid = setup(INTRO, FEEDBACK, "The move was {{move:5.gxf3}}.")
         post(client, f"/api/games/{gid}/moments/1/start")
         attempt(client, gid, "a2a3", -300)
 
@@ -208,7 +221,9 @@ class TestAttempts:
         assert moment_event(events) == {"grade": "blunder", "state": "revealed"}
         moment = payload(fake)["moment"]
         assert moment["reveal"] is True and moment["best"]["san"] == "gxf3"
-        assert text_of(events) == "The move was 5. gxf3."  # allowed now: nothing is withheld
+        assert (
+            text_of(events) == "The move was [pawn takes on f3](cc:move/0)."
+        )  # allowed now: nothing is withheld
         [info] = client.get(f"/api/games/{gid}").json()["moments"]
         assert (info["state"], info["best_san"], info["best_uci"]) == ("revealed", "gxf3", "g2f3")
         assert info["attempts"] == [
@@ -267,7 +282,7 @@ def progress_count(client: TestClient, gid: str) -> int:
 
 class TestDetail:
     def test_the_moments_position_has_no_engine_lines_until_revealed(self) -> None:
-        client, _, _, gid = setup(INTRO, "Here's 5. gxf3.")
+        client, _, _, gid = setup(INTRO, "Here's {{move:5.gxf3}}.")
         post(client, f"/api/games/{gid}/moments/1/start")
 
         before = client.get(f"/api/games/{gid}").json()
@@ -278,7 +293,14 @@ class TestDetail:
         [info] = before["moments"]
         assert (info["state"], info["best_san"], info["san"]) == ("intro", None, "Qxf3")
         assert info["messages"] == [
-            {"role": "coach", "text": INTRO, "kind": "intro", "annotations": []}
+            {
+                "role": "coach",
+                "text": INTRO_SHOWN,
+                "kind": "intro",
+                "annotations": [],
+                "moves": INTRO_MOVES,
+                "line_links": [],
+            }
         ]
         assert info["max_attempts"] == 2  # the "Tries left" dots (config moments.max_attempts)
         assert MOMENT_FEN in [r["fen"] for r in revealed["engine_results"]]

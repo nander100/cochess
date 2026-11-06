@@ -16,8 +16,16 @@ from tests.analysis_flow import analyzed_game
 from tests.auth_helpers import log_in
 from tests.coach_fakes import FakeCoachClient
 
-VALID = "### Overall\nA classic: 13. Rxd7 Rxd7 and 17. Rd8# finished it."
-INVALID = "### Overall\nYou could have played 9. Ka8 or Qh5 instead."
+# Moves as move tags, one at a time (SPEC_V3 §9.4); the player sees the backend's words.
+VALID = (
+    "### Overall\nA classic: the sacrifice {{move:13.Rxd7}} opened the king, and "
+    "{{move:17.Rd8#}} ended it."
+)
+VALID_SHOWN = (
+    "### Overall\nA classic: the sacrifice [rook takes on d7](cc:move/0) opened the king, and "
+    "[rook to d8, checkmate](cc:move/1) ended it."
+)
+INVALID = "### Overall\nYou could have played {{move:9.Ka8}} or {{move:Qh5}} instead."
 
 
 def make(*replies: str | Exception) -> tuple[TestClient, FakeCoachClient, FastAPI]:
@@ -47,7 +55,8 @@ class TestService:
 
         result = await synopsis_for(coach, app, game_id)
 
-        assert (result.text, result.invalid_moves_removed) == (VALID, [])
+        assert (result.text, result.invalid_moves_removed) == (VALID_SHOWN, [])
+        assert [m.san for m in result.tokens.moves] == ["Rxd7", "Rd8#"]
         [request] = coach.requests
         assert request.model == "claude-sonnet-5-5"
         assert (request.max_tokens, request.effort) == (8000, "low")
@@ -68,7 +77,7 @@ class TestService:
 
         result = await synopsis_for(coach, app, game_id)
 
-        assert result.text == VALID
+        assert result.text == VALID_SHOWN
         retry = coach.requests[1].messages
         assert [m["role"] for m in retry] == ["user", "assistant", "user"]
         assert "Ka8, Qh5" in str(retry[2]["content"])
@@ -85,25 +94,23 @@ class TestService:
             result = await synopsis_for(coach, app, game_id)
 
         assert result.invalid_moves_removed == ["Ka8", "Qh5"]
-        assert (
-            result.text == f"### Overall\nYou could have played 9. {REMOVED} or {REMOVED} instead."
-        )
+        assert result.text == f"### Overall\nYou could have played {REMOVED} or {REMOVED} instead."
         assert "coach moves removed" in caplog.text
 
     async def test_a_stored_synopsis_is_reused_without_calling_claude(self) -> None:
         client, coach, app = make(VALID)
         game_id = analyzed_game(client, "white")
-        await synopsis_for(coach, app, game_id)
+        first = await synopsis_for(coach, app, game_id)
 
         again = await synopsis_for(coach, app, game_id)
 
-        assert again.text == VALID
+        assert (again.text, again.tokens) == (VALID_SHOWN, first.tokens)
         assert len(coach.requests) == 1
         with app.state.session_factory() as session:
             assert session.query(ChatMessageRow).count() == 1
 
     async def test_an_overlong_synopsis_is_logged(self, caplog: pytest.LogCaptureFixture) -> None:
-        long_text = VALID + " word" * 400
+        long_text = "### Overall\nA long one." + " word" * 400
         client, coach, app = make(long_text)
         game_id = analyzed_game(client, "white")
 
@@ -125,7 +132,11 @@ class TestEndpoint:
         assert response.headers["content-type"].startswith("text/event-stream")
         events = sse_events(response.text)
         assert events[0] == ("status", {"message": "Coach is writing…"})
-        assert "".join(data["text"] for name, data in events if name == "text") == VALID
+        assert "".join(data["text"] for name, data in events if name == "text") == VALID_SHOWN
+        moves = [data for name, data in events if name == "move"]
+        assert [(m["san"], m["words"]) for m in moves] == [
+            ("Rxd7", "rook takes on d7"), ("Rd8#", "rook to d8, checkmate")
+        ]  # fmt: skip
         assert events[-1] == ("done", {"invalid_moves_removed": []})
 
     def test_an_api_failure_becomes_an_error_event(self) -> None:

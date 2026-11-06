@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.coach.annotations import Annotation
+from app.coach.markup import LineLink, MessageTokens, MoveToken
 from app.db.models import ChatMessageRow, PendingToolCallRow
 
 CHAT = "chat"
@@ -27,17 +28,17 @@ def save_turn(
     display: str | None = None,
     where: str | None = None,
     path_uci: list[str] | None = None,
-    annotations: list[dict[str, Any]] | None = None,
+    tokens: MessageTokens | None = None,
 ) -> None:
     """Store one turn. A player's turn also keeps the plain message (`display`), where on the board
     it was asked (`where`, e.g. "after 14. Nf3"), and that position's path. A coach answer keeps
-    the text the player sees (`display`, with board-tag placeholders) and its checked
-    annotations (SPEC_V3 §11.2), so they redraw when the chat is reloaded."""
+    the text the player sees (`display`, with placeholders) and its checked moves, line links
+    and annotations (SPEC_V3 §11.2), so it shows the same when the chat is reloaded."""
     content: dict[str, Any] = {"type": CHAT, "blocks": blocks}
     if display is not None:
         content["display"] = display
-    if annotations:
-        content["annotations"] = annotations
+    if tokens is not None:
+        content |= {k: v for k, v in tokens.model_dump(mode="json").items() if v}
     if where is not None:
         content["where"] = where
     session.add(ChatMessageRow(game_id=game_id, role=role, content=content, path_uci=path_uci))
@@ -71,6 +72,8 @@ class ChatEntry(BaseModel):
     # That position's path (UCI); a coach answer has its question's path. None for v1 chats.
     path_uci: list[str] | None = None
     annotations: list[Annotation] = []  # a coach answer's board tags (SPEC_V3 §6)
+    moves: list[MoveToken] = []  # its move tags (SPEC_V3 §9.4)
+    line_links: list[LineLink] = []
 
 
 def chat_history(session: Session, game_id: str) -> list[ChatEntry]:
@@ -95,10 +98,8 @@ def chat_history(session: Session, game_id: str) -> list[ChatEntry]:
                 entries.append(ChatEntry(role="player", text=prompt, where=where, path_uci=path))
         elif not any(b.get("type") == "tool_use" for b in blocks):
             text = row.content.get("display") or "".join(texts)
-            annotations = [Annotation.model_validate(a) for a in row.content.get("annotations", [])]
-            entries.append(
-                ChatEntry(role="coach", text=text, annotations=annotations, path_uci=path)
-            )
+            tokens = MessageTokens.model_validate(row.content)  # absent keys: no tokens
+            entries.append(ChatEntry(role="coach", text=text, path_uci=path, **dict(tokens)))
     return entries
 
 

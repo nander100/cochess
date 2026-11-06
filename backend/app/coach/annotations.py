@@ -32,9 +32,11 @@ DropReason = Literal[
     "not_in_data",  # neither a move from the data, a threat, nor a plan the engine plays
     "wrong_color",  # a move from the data, in a color its grade doesn't allow
     "moment_leak",  # points out a move the player is meant to find
+    "unknown_line",  # a line link that names no line in the data (SPEC_V3 §9.4)
+    "too_many_links",
 ]
 
-_TAG = re.compile(r"<\s*/?\s*board\b[^<>]*>", re.IGNORECASE)
+BOARD_TAG = re.compile(r"<\s*/?\s*board\b[^<>]*>", re.IGNORECASE)
 _OPEN = re.compile(r"^<\s*board\b", re.IGNORECASE)
 _ATTR = re.compile(r'(\w+)\s*=\s*"([^"]*)"')
 _ATTR_LIST = re.compile(r'^\s*(?:\w+\s*=\s*"[^"]*"\s*)*/?\s*$')
@@ -153,11 +155,11 @@ def annotate(text: str, facts: BoardFacts | None, limits: CoachSettings) -> Anno
     annotations: list[Annotation] = []
     dropped: list[Dropped] = []
     last = 0
-    for match in _TAG.finditer(text):
+    for match in BOARD_TAG.finditer(text):
         tag = match.group(0)
         before = text[last : match.start()]
         last = match.end()
-        arrows, squares = _check(tag, facts, limits, len(annotations), dropped)
+        arrows, squares = check_tag(tag, facts, limits, len(annotations), dropped)
         if arrows or squares:
             index = len(annotations)
             pieces.append(before)
@@ -167,9 +169,9 @@ def annotate(text: str, facts: BoardFacts | None, limits: CoachSettings) -> Anno
                 Annotation(tag_index=index, char_offset=offset, arrows=arrows, squares=squares)
             )
             pieces.append(PLACEHOLDER.format(index=index))
-            raw_pieces.append(_serialize(arrows, squares))
+            raw_pieces.append(serialize(arrows, squares))
         else:
-            trimmed = _trim_before(before, text[match.end() : match.end() + 1])
+            trimmed = trim_before(before, text[match.end() : match.end() + 1])
             pieces.append(trimmed)
             raw_pieces.append(trimmed)
     pieces.append(text[last:])
@@ -179,7 +181,7 @@ def annotate(text: str, facts: BoardFacts | None, limits: CoachSettings) -> Anno
     )
 
 
-def _check(
+def check_tag(
     tag: str,
     facts: BoardFacts | None,
     limits: CoachSettings,
@@ -349,7 +351,7 @@ def _move_color_ok(color: str, grade: Grade | None, is_game_mistake: bool) -> bo
     return grade == "inaccuracy"  # yellow
 
 
-def _serialize(arrows: list[Arrow], squares: list[SquareMark]) -> str:
+def serialize(arrows: list[Arrow], squares: list[SquareMark]) -> str:
     attrs = []
     if arrows:
         attrs.append(f'arrows="{",".join(f"{a.orig}{a.dest}:{a.color}" for a in arrows)}"')
@@ -358,7 +360,7 @@ def _serialize(arrows: list[Arrow], squares: list[SquareMark]) -> str:
     return f"<board {' '.join(attrs)}/>"
 
 
-def _trim_before(before: str, after: str) -> str:
+def trim_before(before: str, after: str) -> str:
     """Drop the space before a removed tag when the tag was followed by a space, punctuation or
     the end, so "gone <board .../>, so" reads "gone, so"."""
     if before.endswith(" ") and (not after or after in " ,.;:!?)\n"):

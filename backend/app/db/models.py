@@ -267,6 +267,8 @@ class BaselineReportRow(Base):
     text: Mapped[str] = mapped_column(Text)
     invalid_moves_removed: Mapped[list[str]] = mapped_column(JSON)
     game_ids: Mapped[list[str]] = mapped_column(JSON)  # the onboarding games it covers
+    # The text's move tags (SPEC_V3 §9.4), so they show as words or notation again.
+    moves: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
 
 
@@ -340,4 +342,28 @@ class WalkthroughRow(Base):
     start_fen: Mapped[str] = mapped_column(String(100))
     line_key: Mapped[str] = mapped_column(String(64))  # the line's UCI moves joined by spaces
     steps: Mapped[dict[str, Any]] = mapped_column(JSON)  # the Walkthrough as returned
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+
+
+class LineLinkRow(Base):
+    """A line a coach message links to (SPEC_V3 §9.4, §11.2): resolved from the data when the
+    message was written. Playback fills in the step evaluations, the settle ply and the caption
+    (§9.6). `message` says where it was written: "chat", "moment:3", "synopsis"."""
+
+    __tablename__ = "line_links"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), index=True)
+    message: Mapped[str] = mapped_column(String(20))
+    source: Mapped[str] = mapped_column(String(32))  # "km2.refutation"
+    kind: Mapped[str] = mapped_column(
+        String(12)
+    )  # engine | refutation | candidate | best | variation
+    label: Mapped[str] = mapped_column(Text)
+    start_path: Mapped[list[str]] = mapped_column(JSON)
+    moves: Mapped[list[str]] = mapped_column(JSON)
+    step_evals: Mapped[list[str | None] | None] = mapped_column(JSON)
+    settle_ply: Mapped[int | None] = mapped_column(Integer)
+    caption: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)

@@ -2,7 +2,7 @@
 against the moves in that data, then stored for the profile."""
 
 import logging
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import cast
 
 from anthropic.types import MessageParam
@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.analysis.evals import Color
 from app.analysis.summary_models import GameSummary, KeyMoment
-from app.coach.annotations import annotate
 from app.coach.client import CoachClient, CoachReply, CoachRequest, system_blocks
+from app.coach.markup import MoveToken, Rules, note, process
 from app.coach.payload import (
     BaselineGame,
     BaselinePayload,
@@ -22,7 +22,7 @@ from app.coach.payload import (
     render,
     with_tendencies,
 )
-from app.coach.validate import allowed_moves, find_invalid, strip_moves
+from app.coach.validate import allowed_moves
 from app.config import Settings
 from app.db.annotations import log_dropped
 from app.db.coach import record_usage
@@ -51,6 +51,7 @@ class BaselineResult:
     text: str
     invalid_moves_removed: list[str]
     game_ids: list[str]
+    moves: list[MoveToken] = field(default_factory=list)  # the text's move tags (§9.4)
 
 
 def build_baseline_payload(
@@ -154,34 +155,35 @@ async def generate_baseline(
         effort=settings.coach.baseline_effort,
     )
 
+    # The report covers several games, not one board position: no board tags or line links.
+    rules = Rules(allowed=frozenset(allowed), limits=settings.coach)
     reply = await _call(client, request, sessions, user_id)
-    invalid = find_invalid(reply.text, allowed)
-    if invalid:
+    done = process(reply.text, rules)
+    if done.problems.any:
         retry: list[MessageParam] = [
             *messages,
             {"role": "assistant", "content": reply.text},
-            {"role": "user", "content": REGENERATE_NOTE.format(moves=", ".join(invalid))},
+            {"role": "user", "content": note(done.problems)},
         ]
         reply = await _call(client, replace(request, messages=retry), sessions, user_id)
-        invalid = find_invalid(reply.text, allowed)
-
-    text = reply.text
-    if invalid:
-        text = strip_moves(text, invalid)
-        logger.warning("coach moves removed: user=%s endpoint=baseline moves=%s", user_id, invalid)
-    words = len(text.split())
+        done = process(reply.text, rules)
+    if done.removed:
+        logger.warning(
+            "coach moves removed: user=%s endpoint=baseline moves=%s", user_id, done.removed
+        )
+    words = len(done.text.split())
     if words > settings.coach.baseline_max_words:
         logger.warning("baseline report too long: user=%s words=%d", user_id, words)
     game_ids = [game.id for game, _ in games]
+    moves = [m.model_dump(mode="json") for m in done.moves]
     with sessions() as session:
-        # The report covers several games, not one board position: no board tags.
-        stripped = annotate(text, None, settings.coach)
         log_dropped(
-            session, user_id=user_id, game_id=None, task="baseline_report", dropped=stripped.dropped
+            session, user_id=user_id, game_id=None, task="baseline_report", dropped=done.dropped
         )
-        text = stripped.text
-        save_report(session, user_id, text, invalid, game_ids)
-    return BaselineResult(text=text, invalid_moves_removed=invalid, game_ids=game_ids)
+        save_report(session, user_id, done.text, done.removed, game_ids, moves)
+    return BaselineResult(
+        text=done.text, invalid_moves_removed=done.removed, game_ids=game_ids, moves=done.moves
+    )
 
 
 async def _call(

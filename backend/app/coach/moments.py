@@ -6,6 +6,7 @@ answer away (PLAN_V2 §6 Q2): withhold, don't instruct.
 
 import json
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal, cast
 
@@ -28,15 +29,14 @@ from app.analysis.paths import ResolvedPath, resolve_path
 from app.analysis.pgn import parse_pgn
 from app.analysis.summary_models import GameSummary, Moment
 from app.coach.annotations import (
-    AnnotatedText,
-    Annotation,
     BoardFacts,
-    annotate,
     engine_grades,
     plan_moves,
     san_to_keys,
 )
 from app.coach.client import CoachClient, CoachRequest, system_blocks
+from app.coach.lines import moment_lines
+from app.coach.markup import MessageTokens, Processed, ResolvedLine, Rules, note, process
 from app.coach.payload import (
     CoachPayload,
     MomentAttempt,
@@ -52,11 +52,12 @@ from app.coach.payload import (
     render,
 )
 from app.coach.tools import line_summaries
-from app.coach.validate import allowed_moves, find_invalid, find_leaks, normalize, strip_moves
+from app.coach.validate import allowed_moves, normalize
 from app.config import EngineTier, Settings
 from app.db.annotations import log_dropped
 from app.db.coach import record_usage
 from app.db.engine_results import load_position_result, load_summary, save_position_result
+from app.db.line_links import save_line_links
 from app.db.models import Game, MomentProgressRow
 from app.db.moments import load_progress, progress_for
 
@@ -112,6 +113,9 @@ class MomentCall:
     move_number: int
     white_to_move: bool
     facts: BoardFacts  # what board tags may show (SPEC_V3 §6.2), leak check included
+    # The line links that resolve (SPEC_V3 §9.4), and those that would reveal the answer.
+    lines: Mapping[str, ResolvedLine] = field(default_factory=dict)
+    withheld: frozenset[str] = frozenset()
     meta: dict[str, str] | None = None
 
 
@@ -120,8 +124,8 @@ class MomentAnswer:
     text: str
     invalid_moves_removed: list[str]
     meta: dict[str, str] | None = None
-    leaked: list[str] = field(default_factory=list)
-    annotations: list[Annotation] = field(default_factory=list)
+    leaked: bool = False
+    tokens: MessageTokens = field(default_factory=MessageTokens)
 
 
 @dataclass(frozen=True)
@@ -339,10 +343,8 @@ def prepare_wrap_up(
 
 
 def _stored(message: dict[str, Any]) -> MomentAnswer:
-    annotations = [Annotation.model_validate(a) for a in message.get("annotations", [])]
-    return MomentAnswer(
-        text=str(message["text"]), invalid_moves_removed=[], annotations=annotations
-    )
+    tokens = MessageTokens.model_validate(message)  # absent keys: no tokens
+    return MomentAnswer(text=str(message["text"]), invalid_moves_removed=[], tokens=tokens)
 
 
 # --- The coach call ---
@@ -363,54 +365,62 @@ async def answer(
         max_tokens=settings.coach.chat_max_tokens,
         effort=settings.coach.chat_effort,
     )
+    rules = _rules(call, settings)
     text = await _complete(client, request, sessions, call)
-    invalid, leaks, drawn = _problems(text, call, settings)
-    if invalid or leaks or drawn.leaked:
-        if drawn.leaked:  # the leak is logged even though the retry replaces this answer
-            _log_leaks(sessions, call, drawn)
-        notes = ([LEAK_NOTE] if leaks or drawn.leaked else []) + (
-            [INVALID_NOTE.format(moves=", ".join(invalid))] if invalid else []
-        )
+    done = process(text, rules)
+    if done.problems.any:
+        if done.problems.leaked:  # logged even though the retry replaces this answer
+            _log_leaks(sessions, call, done)
         retry: list[MessageParam] = [
             *messages,
             {"role": "assistant", "content": text},
-            {"role": "user", "content": " ".join(notes)},
+            {"role": "user", "content": note(done.problems)},
         ]
         text = await _complete(client, replace(request, messages=retry), sessions, call)
-        invalid, leaks, drawn = _problems(text, call, settings)
-    if leaks:
-        text = strip_moves(text, leaks)
-        logger.warning("moment_leak: game=%s moment=%s moves=%s", call.game_id, call.index, leaks)
-    if invalid:
-        text = strip_moves(text, invalid)
+        done = process(text, rules)
+    leaked = done.problems.leaked
+    if leaked:
+        logger.warning("moment_leak: game=%s moment=%s", call.game_id, call.index)
+    if done.removed:
         logger.warning(
-            "coach moves removed: game=%s endpoint=moment moves=%s", call.game_id, invalid
+            "coach moves removed: game=%s endpoint=moment moves=%s", call.game_id, done.removed
         )
-    # Tags are checked on the final text (moves removed above never sit inside a tag).
-    drawn = annotate(text, call.facts, settings.coach)
-    if drawn.leaked:
-        logger.warning("moment_leak: game=%s moment=%s via annotation", call.game_id, call.index)
-    annotations = [a.model_dump() for a in drawn.annotations]
     with sessions() as session:
         log_dropped(
             session,
             user_id=call.user_id,
             game_id=call.game_id,
             task=call.task,
-            dropped=drawn.dropped,
+            dropped=done.dropped,
             moment_index=call.index,
         )
+        save_line_links(
+            session, call.user_id, call.game_id, f"moment:{call.index}", done.line_links
+        )
         row = progress_for(session, call.user_id, call.game_id, call.index)
-        message = {"role": "coach", "text": drawn.text, "kind": call.kind}
-        row.messages = [*row.messages, {**message, "annotations": annotations}]
-        row.leaks += 1 if leaks or drawn.leaked else 0
+        message = {"role": "coach", "text": done.text, "kind": call.kind}
+        row.messages = [*row.messages, {**message, **done.tokens.model_dump(mode="json")}]
+        row.leaks += 1 if leaked else 0
         session.commit()
     return MomentAnswer(
-        text=drawn.text,
-        invalid_moves_removed=invalid,
+        text=done.text,
+        invalid_moves_removed=done.removed,
         meta=call.meta,
-        leaked=leaks,
-        annotations=drawn.annotations,
+        leaked=leaked,
+        tokens=done.tokens,
+    )
+
+
+def _rules(call: MomentCall, settings: Settings) -> Rules:
+    return Rules(
+        allowed=call.allowed,
+        limits=settings.coach,
+        banned=frozenset(normalize(move) for move in call.banned),
+        move_number=call.move_number,
+        white_to_move=call.white_to_move,
+        facts=call.facts,
+        lines=call.lines,
+        withheld=call.withheld,
     )
 
 
@@ -423,8 +433,8 @@ async def _complete(
     return reply.text
 
 
-def _log_leaks(sessions: sessionmaker[Session], call: MomentCall, drawn: AnnotatedText) -> None:
-    logger.warning("moment_leak: game=%s moment=%s via annotation", call.game_id, call.index)
+def _log_leaks(sessions: sessionmaker[Session], call: MomentCall, drawn: Processed) -> None:
+    logger.warning("moment_leak: game=%s moment=%s (regenerating)", call.game_id, call.index)
     with sessions() as session:
         log_dropped(
             session,
@@ -435,15 +445,6 @@ def _log_leaks(sessions: sessionmaker[Session], call: MomentCall, drawn: Annotat
             moment_index=call.index,
         )
         session.commit()
-
-
-def _problems(
-    text: str, call: MomentCall, settings: Settings
-) -> tuple[list[str], list[str], AnnotatedText]:
-    leaks = find_leaks(text, call.banned, call.move_number, call.white_to_move)
-    # A leaked move isn't in the data either; report it once, as a leak.
-    invalid = [m for m in find_invalid(text, set(call.allowed)) if m not in leaks]
-    return invalid, leaks, annotate(text, call.facts, settings.coach)
 
 
 # --- Building the payload ---
@@ -529,6 +530,13 @@ def _call(
         moment=payload_moment,
     )
     context_block, context_data = _context(data)
+    links, withheld = moment_lines(
+        data.position.path_uci,
+        moment.fen_before,
+        moment.uci,
+        payload_moment,
+        settings.coach.line_link_max_plies,
+    )
     allowed = allowed_moves(context_data) | allowed_moves(payload.model_dump(mode="json"))
     session.commit()
     return MomentCall(
@@ -544,6 +552,8 @@ def _call(
         move_number=moment.move_number,
         white_to_move=moment.side == "white",
         facts=_board_facts(data, row, before if row.revealed else None, banned, settings),
+        lines=links,
+        withheld=withheld,
         meta=meta,
     )
 

@@ -17,6 +17,7 @@ from app.analysis.summary_models import UserInfo
 from app.config import Settings
 from app.db.engine_results import load_results
 from app.db.games import pending_verify_fens, record_analysis
+from app.db.line_links import delete_line_links
 from app.db.models import (
     AnnotationLogRow,
     ChatMessageRow,
@@ -82,6 +83,7 @@ def _clear_coaching(session: Session, game_id: str) -> None:
     for table in (ChatMessageRow, PendingToolCallRow, MomentProgressRow):
         session.execute(delete(table).where(table.game_id == game_id))
     delete_walkthroughs(session, game_id)  # written for the old side ("you")
+    delete_line_links(session, game_id)  # they belong to messages that are gone
 
 
 def _reanalyze(session: Session, settings: Settings, game: Game) -> None:

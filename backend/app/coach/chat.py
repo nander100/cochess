@@ -21,9 +21,7 @@ from app.analysis.paths import ResolvedPath, resolve_path
 from app.analysis.pgn import ParsedGame, parse_pgn
 from app.analysis.summary_models import GameSummary, LineSummary
 from app.coach.annotations import (
-    Annotation,
     BoardFacts,
-    annotate,
     engine_grades,
     plan_moves,
     san_to_keys,
@@ -36,6 +34,8 @@ from app.coach.client import (
     system_blocks,
     task_instructions,
 )
+from app.coach.lines import chat_lines
+from app.coach.markup import MessageTokens, Rules, note, process
 from app.coach.payload import (
     COACH_EXCLUDE,
     CoachPayload,
@@ -55,7 +55,7 @@ from app.coach.tools import (
     build_tool_result,
     parse_tool_input,
 )
-from app.coach.validate import allowed_moves, find_invalid, strip_moves
+from app.coach.validate import allowed_moves
 from app.config import Settings
 from app.db.annotations import log_dropped
 from app.db.chat import (
@@ -71,6 +71,7 @@ from app.db.chat import (
 )
 from app.db.coach import load_synopsis, record_usage
 from app.db.engine_results import load_position_result, load_summary, save_results
+from app.db.line_links import save_line_links
 from app.db.models import Game, PendingToolCallRow
 
 logger = logging.getLogger(__name__)
@@ -116,7 +117,7 @@ class Turn:
 class FinalAnswer:
     text: str
     invalid_moves_removed: list[str]
-    annotations: list[Annotation] = field(default_factory=list)
+    tokens: MessageTokens = field(default_factory=MessageTokens)
 
 
 @dataclass(frozen=True)
@@ -320,21 +321,18 @@ async def _finish(
     reply: CoachReply,
     task: Task,
 ) -> FinalAnswer:
-    """Validate the text answer, regenerating once and then removing invalid moves; then check
-    its board tags against the position the message was sent from (SPEC_V3 §6.2)."""
+    """Check the answer's markup (SPEC_V3 §9.4): moves only as tags and from the data, one at a
+    time, line links that resolve, board tags valid on the position the message was sent from.
+    Anything wrong regenerates once; then invalid moves are removed and bad tags dropped."""
     with sessions() as session:
-        allowed = set(context.allowed)
-        allowed |= _moves_in_tool_results(tool_results(session, context.game_id))
-        for payload in user_payloads(session, context.game_id):
-            allowed |= allowed_moves(payload)  # moves shown in this or earlier turns
+        rules = _rules(session, settings, context, board)
         messages = load_messages(session, context.game_id)
-    invalid = find_invalid(reply.text, allowed)
-    if invalid:
-        note = REGENERATE_NOTE.format(moves=", ".join(invalid))
+    done = process(reply.text, rules)
+    if done.problems.any:
         retry: list[MessageParam] = [
             *messages,
             cast(MessageParam, {"role": "assistant", "content": _dump(reply.content)}),
-            {"role": "user", "content": note},
+            {"role": "user", "content": note(done.problems)},
         ]
         request = replace(
             _request(settings, sessions, context, task, 0),
@@ -342,34 +340,53 @@ async def _finish(
             tool_choice={"type": "none"},
         )
         reply = await _call(client, request, sessions, context.game_id, task)
-        invalid = find_invalid(reply.text, allowed)
-    text = reply.text
-    if invalid:
-        text = strip_moves(text, invalid)
+        done = process(reply.text, rules)
+    if done.removed:
         logger.warning(
-            "coach moves removed: game=%s endpoint=%s moves=%s", context.game_id, task, invalid
+            "coach moves removed: game=%s endpoint=%s moves=%s", context.game_id, task, done.removed
         )
     with sessions() as session:
-        facts = board_facts(session, settings, context, board)
-        annotated = annotate(text, facts, settings.coach)
         log_dropped(
-            session,
-            user_id=context.user_id,
-            game_id=context.game_id,
-            task=task,
-            dropped=annotated.dropped,
-        )
+            session, user_id=context.user_id, game_id=context.game_id, task=task,
+            dropped=done.dropped,
+        )  # fmt: skip
+        if context.user_id is not None:
+            save_line_links(session, context.user_id, context.game_id, "chat", done.line_links)
         # Claude's history keeps the valid tags as markup; the player sees placeholders.
         save_turn(
             session,
             context.game_id,
             "assistant",
-            [_text(annotated.raw)],
-            display=annotated.text,
-            annotations=[a.model_dump() for a in annotated.annotations],
+            [_text(done.raw)],
+            display=done.text,
+            tokens=done.tokens,
         )
-    return FinalAnswer(
-        text=annotated.text, invalid_moves_removed=invalid, annotations=annotated.annotations
+    return FinalAnswer(text=done.text, invalid_moves_removed=done.removed, tokens=done.tokens)
+
+
+def _rules(session: Session, settings: Settings, context: _Context, board: ResolvedPath) -> Rules:
+    """What a chat or Explain answer may contain: moves from the game, the analysis, the
+    engine's answers and earlier turns; lines from the board's position and the key moments."""
+    allowed = set(context.allowed)
+    allowed |= _moves_in_tool_results(tool_results(session, context.game_id))
+    for payload in user_payloads(session, context.game_id):
+        allowed |= allowed_moves(payload)  # moves shown in this or earlier turns
+    here = load_position_result(session, context.game_id, board.fen)
+    after = None
+    game = context.game
+    if board.on_mainline and board.ply < len(game.positions):
+        fen_after = (
+            game.positions[board.ply + 1].fen_before
+            if board.ply + 1 < len(game.positions)
+            else game.final_fen
+        )
+        after = load_position_result(session, context.game_id, fen_after)
+    plies = settings.coach.line_link_max_plies
+    return Rules(
+        allowed=frozenset(allowed),
+        limits=settings.coach,
+        facts=board_facts(session, settings, context, board),
+        lines=chat_lines(game, context.summary, board, here, after, plies),
     )
 
 
@@ -477,7 +494,7 @@ def _load_context(session: Session, settings: Settings, game_id: str) -> _Contex
     synopsis = load_synopsis(session, game_id)
     block = f"{CONTEXT_INTRO}\n\n{json.dumps(data, separators=(',', ':'))}"
     if synopsis is not None:
-        block += f"\n\nThe synopsis you already wrote for the player:\n\n{synopsis[0]}"
+        block += f"\n\nThe synopsis you already wrote for the player:\n\n{synopsis.raw}"
     allowed = frozenset(allowed_moves(data))
     return _Context(game_id, game.user_id, parsed, summary, block, allowed)
 

@@ -86,7 +86,11 @@ def build_detail(session: Session, game: Game, settings: Settings) -> GameDetail
             _stored(result) for fen, result in best_by_fen(results).items() if fen not in hidden
         ],
         verify_fens=_pending_verify(parsed, results, user_color, settings, status),
-        synopsis=StoredSynopsis(text=synopsis[0], invalid_moves_removed=synopsis[1])
+        synopsis=StoredSynopsis(
+            text=synopsis.text,
+            invalid_moves_removed=synopsis.invalid_moves_removed,
+            **dict(synopsis.tokens),
+        )
         if synopsis
         else None,
         chat=chat_history(session, game.id),

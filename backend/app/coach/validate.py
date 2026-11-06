@@ -34,7 +34,7 @@ _MOVE_NUMBER = re.compile(r"^\d+\.+")
 _ANNOTATION = re.compile(r"[!?]+$")  # "Bb5??" in the annotated movetext
 
 
-def _matches(text: str) -> Iterator[tuple[int, int, str]]:
+def move_tokens(text: str) -> Iterator[tuple[int, int, str]]:
     """(start, end, token) for every move-like token, spanning only the move itself."""
     for match in _SAN.finditer(text):
         group = next(name for name, value in match.groupdict().items() if value)
@@ -47,7 +47,7 @@ def normalize(token: str) -> str:
 
 
 def extract_moves(text: str) -> list[str]:
-    return [token for _, _, token in _matches(text)]
+    return [token for _, _, token in move_tokens(text)]
 
 
 def allowed_moves(data: Any, *, skip_keys: Iterable[str] = ("user_prompt",)) -> set[str]:
@@ -87,7 +87,7 @@ def strip_moves(text: str, invalid: Iterable[str]) -> str:
     """Replace each invalid move with a visible placeholder."""
     bad = {normalize(token) for token in invalid}
     pieces, last = [], 0
-    for start, end, token in _matches(text):
+    for start, end, token in move_tokens(text):
         if normalize(token) in bad:
             pieces.append(text[last:start])
             pieces.append(REMOVED)
@@ -96,7 +96,7 @@ def strip_moves(text: str, invalid: Iterable[str]) -> str:
     return "".join(pieces)
 
 
-_NUMBER_BEFORE = re.compile(r"(\d+)\s*(\.{1,3}|…)\s*$")
+NUMBER_BEFORE = re.compile(r"(\d+)\s*(\.{1,3}|…)\s*$")
 
 
 def find_leaks(
@@ -110,10 +110,10 @@ def find_leaks(
     """
     targets = {normalize(move) for move in banned}
     leaks: list[str] = []
-    for start, _, token in _matches(text):
+    for start, _, token in move_tokens(text):
         if normalize(token) not in targets or token in leaks:
             continue
-        number = _NUMBER_BEFORE.search(text[max(0, start - 12) : start])
+        number = NUMBER_BEFORE.search(text[max(0, start - 12) : start])
         if number is not None:
             same_move = int(number.group(1)) == move_number
             same_side = (number.group(2) == ".") == white_to_move
@@ -128,9 +128,9 @@ def misnumbered(text: str, numbering: Mapping[str, Collection[tuple[int, bool]]]
     normalized) to the (move number, white to move) pairs it really has. Moves written without a
     number, or not in `numbering`, aren't judged here."""
     wrong: list[str] = []
-    for start, _, token in _matches(text):
+    for start, _, token in move_tokens(text):
         known = numbering.get(normalize(token))
-        number = _NUMBER_BEFORE.search(text[max(0, start - 12) : start])
+        number = NUMBER_BEFORE.search(text[max(0, start - 12) : start])
         if known is None or number is None or token in wrong:
             continue
         written = (int(number.group(1)), number.group(2) == ".")
