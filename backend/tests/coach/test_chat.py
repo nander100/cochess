@@ -280,6 +280,7 @@ class TestPositions:
             "role": "player",
             "text": "Is Bb5 good here?",
             "where": "after 3. Bb5, in your line",
+            "annotations": [],
         }
         assert any(r["fen"] == VARIATION_FEN for r in detail["engine_results"])
 
@@ -393,8 +394,18 @@ class TestExplain:
         assert (payload["task"], payload.get("user_prompt")) == ("explain", None)
         assert payload["position"]["ply"] == 0 and len(payload["engine_lines"]) == 4
         assert client.get(f"/api/games/{game_id}").json()["chat"] == [
-            {"role": "player", "text": "Explain this position", "where": "the start"},
-            {"role": "coach", "text": "### What has happened\nA calm start.", "where": None},
+            {
+                "role": "player",
+                "text": "Explain this position",
+                "where": "the start",
+                "annotations": [],
+            },
+            {
+                "role": "coach",
+                "text": "### What has happened\nA calm start.",
+                "where": None,
+                "annotations": [],
+            },
         ]
         with app.state.session_factory() as session:
             assert session.query(LlmUsageRow).one().task == "explain"

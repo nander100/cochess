@@ -98,6 +98,10 @@ class CoachSettings(BaseModel):
     chat_max_messages: int = 30  # per game (PLAN Q27)
     chat_max_message_chars: int = 2000
     chat_max_tool_calls: int = 2  # analyze_position calls per user message (SPEC §8.3)
+    # Board tags in a coach reply (SPEC_V3 §6.1): per message, and arrows/squares per tag.
+    annotation_max_tags: int = 3
+    annotation_max_arrows: int = 4
+    annotation_max_squares: int = 4
     # While the coach is writing (responses are validated before they're sent, PLAN Q22), the
     # SSE stream sends a keepalive comment this often so proxies don't drop the connection.
     keepalive_s: float = 10

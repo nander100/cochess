@@ -200,8 +200,13 @@ class TestGameDetail:
             "invalid_moves_removed": ["Nf9"],
         }
         assert detail["chat"] == [  # a v1 conversation: no board positions were recorded
-            {"role": "player", "text": "What if I take on e5?", "where": None},
-            {"role": "coach", "text": "The engine says it loses a pawn.", "where": None},
+            {"role": "player", "text": "What if I take on e5?", "where": None, "annotations": []},
+            {
+                "role": "coach",
+                "text": "The engine says it loses a pawn.",
+                "where": None,
+                "annotations": [],
+            },
         ]
 
     def test_needs_a_login_and_the_owner(self, app: FastAPI, client: TestClient) -> None:

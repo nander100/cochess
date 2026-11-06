@@ -9,6 +9,7 @@ from app.analysis.engine import EngineResult, Tier
 from app.analysis.pgn import PgnErrorCode, Position
 from app.analysis.summary_models import Accuracy, Counts, GameInfo, MoveLabel
 from app.analysis.variations import SavedVariation
+from app.coach.annotations import Annotation
 from app.db.chat import ChatEntry
 
 # Profile input rules from SPEC_V2 §4.3, not tunable thresholds.
@@ -169,6 +170,7 @@ class MomentMessage(BaseModel):
     role: Literal["coach", "player"]
     text: str
     kind: str
+    annotations: list[Annotation] = []  # a coach message's board tags (SPEC_V3 §6)
 
 
 class MomentInfo(BaseModel):

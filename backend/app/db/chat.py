@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.coach.annotations import Annotation
 from app.db.models import ChatMessageRow, PendingToolCallRow
 
 CHAT = "chat"
@@ -26,12 +27,17 @@ def save_turn(
     display: str | None = None,
     where: str | None = None,
     path_uci: list[str] | None = None,
+    annotations: list[dict[str, Any]] | None = None,
 ) -> None:
     """Store one turn. A player's turn also keeps the plain message (`display`), where on the board
-    it was asked (`where`, e.g. "after 14. Nf3"), and that position's path."""
+    it was asked (`where`, e.g. "after 14. Nf3"), and that position's path. A coach answer keeps
+    the text the player sees (`display`, with board-tag placeholders) and its checked
+    annotations (SPEC_V3 §11.2), so they redraw when the chat is reloaded."""
     content: dict[str, Any] = {"type": CHAT, "blocks": blocks}
     if display is not None:
         content["display"] = display
+    if annotations:
+        content["annotations"] = annotations
     if where is not None:
         content["where"] = where
     session.add(ChatMessageRow(game_id=game_id, role=role, content=content, path_uci=path_uci))
@@ -62,6 +68,7 @@ class ChatEntry(BaseModel):
     role: Literal["player", "coach"]
     text: str
     where: str | None = None  # the board position a player's message was sent from
+    annotations: list[Annotation] = []  # a coach answer's board tags (SPEC_V3 §6)
 
 
 def chat_history(session: Session, game_id: str) -> list[ChatEntry]:
@@ -83,7 +90,9 @@ def chat_history(session: Session, game_id: str) -> list[ChatEntry]:
                 where = row.content.get("where")
                 entries.append(ChatEntry(role="player", text=prompt, where=where))
         elif not any(b.get("type") == "tool_use" for b in blocks):
-            entries.append(ChatEntry(role="coach", text="".join(texts)))
+            text = row.content.get("display") or "".join(texts)
+            annotations = [Annotation.model_validate(a) for a in row.content.get("annotations", [])]
+            entries.append(ChatEntry(role="coach", text=text, annotations=annotations))
     return entries
 
 

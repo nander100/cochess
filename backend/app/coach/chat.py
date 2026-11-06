@@ -7,16 +7,27 @@ import json
 import logging
 import uuid
 from collections.abc import Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any, cast
 
+import chess
 from anthropic.types import ContentBlock, MessageParam
+from pydantic import ValidationError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.analysis.engine import EngineResult, best_by_fen, check_batch
+from app.analysis.moments import Grade
 from app.analysis.paths import ResolvedPath, resolve_path
 from app.analysis.pgn import ParsedGame, parse_pgn
 from app.analysis.summary_models import GameSummary, LineSummary
+from app.coach.annotations import (
+    Annotation,
+    BoardFacts,
+    annotate,
+    engine_grades,
+    plan_moves,
+    san_to_keys,
+)
 from app.coach.client import (
     CoachClient,
     CoachReply,
@@ -37,6 +48,7 @@ from app.coach.payload import (
 )
 from app.coach.tools import (
     ANALYZE_POSITION,
+    AnalysisToolResult,
     EnginePosition,
     PositionRequest,
     ToolInputError,
@@ -45,6 +57,7 @@ from app.coach.tools import (
 )
 from app.coach.validate import allowed_moves, find_invalid, strip_moves
 from app.config import Settings
+from app.db.annotations import log_dropped
 from app.db.chat import (
     count_player_messages,
     delete_pending,
@@ -57,7 +70,7 @@ from app.db.chat import (
     user_payloads,
 )
 from app.db.coach import load_synopsis, record_usage
-from app.db.engine_results import load_summary, save_results
+from app.db.engine_results import load_position_result, load_summary, save_results
 from app.db.models import Game, PendingToolCallRow
 
 logger = logging.getLogger(__name__)
@@ -103,6 +116,7 @@ class Turn:
 class FinalAnswer:
     text: str
     invalid_moves_removed: list[str]
+    annotations: list[Annotation] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -117,6 +131,7 @@ ChatOutcome = FinalAnswer | EngineRequest
 @dataclass(frozen=True)
 class _Context:
     game_id: str
+    user_id: str | None
     game: ParsedGame
     summary: GameSummary
     context_block: str
@@ -158,7 +173,7 @@ async def explain(
         _save_player_turn(session, game_id, "explain", turn, "Explain this position")
     request = _request(settings, sessions, context, "explain", tool_calls_used=0)
     reply = await _call(client, request, sessions, context.game_id, "explain")
-    return await _finish(client, settings, sessions, context, reply, "explain")
+    return await _finish(client, settings, sessions, context, turn.position, reply, "explain")
 
 
 def check_engine_results(
@@ -225,7 +240,7 @@ async def _loop(
         reply = await _call(client, request, sessions, context.game_id, "chat")
         tool_uses = [block for block in reply.content if block.type == "tool_use"]
         if reply.stop_reason != "tool_use" or not tool_uses:
-            return await _finish(client, settings, sessions, context, reply, "chat")
+            return await _finish(client, settings, sessions, context, board, reply, "chat")
 
         tool_calls_used += len(tool_uses)
         with sessions() as session:
@@ -301,10 +316,12 @@ async def _finish(
     settings: Settings,
     sessions: sessionmaker[Session],
     context: _Context,
+    board: ResolvedPath,
     reply: CoachReply,
     task: Task,
 ) -> FinalAnswer:
-    """Validate the text answer, regenerating once and then removing invalid moves."""
+    """Validate the text answer, regenerating once and then removing invalid moves; then check
+    its board tags against the position the message was sent from (SPEC_V3 §6.2)."""
     with sessions() as session:
         allowed = set(context.allowed)
         allowed |= _moves_in_tool_results(tool_results(session, context.game_id))
@@ -333,8 +350,72 @@ async def _finish(
             "coach moves removed: game=%s endpoint=%s moves=%s", context.game_id, task, invalid
         )
     with sessions() as session:
-        save_turn(session, context.game_id, "assistant", [_text(text)])
-    return FinalAnswer(text=text, invalid_moves_removed=invalid)
+        facts = board_facts(session, settings, context, board)
+        annotated = annotate(text, facts, settings.coach)
+        log_dropped(
+            session,
+            user_id=context.user_id,
+            game_id=context.game_id,
+            task=task,
+            dropped=annotated.dropped,
+        )
+        # Claude's history keeps the valid tags as markup; the player sees placeholders.
+        save_turn(
+            session,
+            context.game_id,
+            "assistant",
+            [_text(annotated.raw)],
+            display=annotated.text,
+            annotations=[a.model_dump() for a in annotated.annotations],
+        )
+    return FinalAnswer(
+        text=annotated.text, invalid_moves_removed=invalid, annotations=annotated.annotations
+    )
+
+
+def board_facts(
+    session: Session, settings: Settings, context: _Context, board: ResolvedPath
+) -> BoardFacts:
+    """What the coach was given about the position a message was sent from: the engine lines
+    there, the game's move from there, and any move the coach had analyzed there."""
+    stored = load_position_result(session, context.game_id, board.fen)
+    position = chess.Board(board.fen)
+    graded: dict[str, Grade | None] = {}
+    if stored is not None:
+        graded |= engine_grades(position, stored, settings.thresholds, settings.moments.best_margin)
+    mistake = None
+    if board.on_mainline and board.ply < len(context.game.positions):
+        key = context.game.positions[board.ply].uci[:4]
+        entry = next((m for m in context.summary.move_list if m.ply == board.ply + 1), None)
+        label = entry.classification if entry is not None else None
+        if label is not None:
+            graded[key] = "mistake" if label == "missed_mate" else label
+            mistake = key if label != "inaccuracy" else None
+        else:
+            graded.setdefault(key, None)
+    graded |= _analyzed_candidates(session, context.game_id, board)
+    return BoardFacts(fen=board.fen, graded=graded, mistake=mistake, plan_moves=plan_moves(stored))
+
+
+def _analyzed_candidates(
+    session: Session, game_id: str, board: ResolvedPath
+) -> dict[str, Grade | None]:
+    """First moves the coach asked the engine about from this position (analyze_position)."""
+    found: dict[str, Grade | None] = {}
+    for content in tool_results(session, game_id):
+        try:
+            result = AnalysisToolResult.model_validate_json(content)
+        except ValidationError:
+            continue  # an error message, not a result
+        if result.moves_before != board.pgn_to_move or result.candidate is None:
+            continue
+        keys = san_to_keys(board.fen, result.candidate.moves_san[:1])
+        candidate = result.candidate
+        grade: Grade = (
+            "best" if candidate.is_best_move else candidate.classification_if_played or "good"
+        )
+        found |= dict.fromkeys(keys, grade)
+    return found
 
 
 def _save_player_turn(session: Session, game_id: str, task: Task, turn: Turn, display: str) -> None:
@@ -397,7 +478,8 @@ def _load_context(session: Session, settings: Settings, game_id: str) -> _Contex
     block = f"{CONTEXT_INTRO}\n\n{json.dumps(data, separators=(',', ':'))}"
     if synopsis is not None:
         block += f"\n\nThe synopsis you already wrote for the player:\n\n{synopsis[0]}"
-    return _Context(game_id, parsed, summary, block, frozenset(allowed_moves(data)))
+    allowed = frozenset(allowed_moves(data))
+    return _Context(game_id, game.user_id, parsed, summary, block, allowed)
 
 
 def _cancel_pending(session: Session, game_id: str) -> None:

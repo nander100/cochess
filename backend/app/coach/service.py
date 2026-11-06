@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 from anthropic.types import MessageParam
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.coach.annotations import annotate
 from app.coach.client import CoachClient, CoachReply, CoachRequest, system_blocks
 from app.coach.payload import (
     SYNOPSIS_INSTRUCTION,
@@ -16,6 +17,7 @@ from app.coach.payload import (
 )
 from app.coach.validate import allowed_moves, find_invalid, strip_moves
 from app.config import Settings
+from app.db.annotations import log_dropped
 from app.db.coach import load_synopsis, record_usage, save_synopsis
 from app.db.engine_results import load_summary
 from app.db.models import Game
@@ -83,8 +85,20 @@ async def generate_synopsis(
     if words > settings.coach.synopsis_max_words:
         logger.warning("synopsis too long: game=%s words=%d", game_id, words)
     with sessions() as session:
+        # The synopsis is about the whole game, not one board position: no board tags.
+        text = _without_tags(session, settings, game_id, text)
         save_synopsis(session, game_id, text, invalid)
     return SynopsisResult(text=text, invalid_moves_removed=invalid)
+
+
+def _without_tags(session: Session, settings: Settings, game_id: str, text: str) -> str:
+    game = session.get(Game, game_id)
+    stripped = annotate(text, None, settings.coach)
+    user_id = game.user_id if game is not None else None
+    log_dropped(
+        session, user_id=user_id, game_id=game_id, task="synopsis", dropped=stripped.dropped
+    )
+    return stripped.text
 
 
 async def _call(

@@ -17,6 +17,7 @@ from app.analysis.engine import EngineResult, EngineResultError, Tier, check_for
 from app.analysis.evals import format_eval, terminal_evaluation
 from app.analysis.moments import (
     SOLVED,
+    Grade,
     Hint,
     build_hints,
     candidate_facts,
@@ -26,6 +27,15 @@ from app.analysis.moments import (
 from app.analysis.paths import ResolvedPath, resolve_path
 from app.analysis.pgn import parse_pgn
 from app.analysis.summary_models import GameSummary, Moment
+from app.coach.annotations import (
+    AnnotatedText,
+    Annotation,
+    BoardFacts,
+    annotate,
+    engine_grades,
+    plan_moves,
+    san_to_keys,
+)
 from app.coach.client import CoachClient, CoachRequest, system_blocks
 from app.coach.payload import (
     CoachPayload,
@@ -44,6 +54,7 @@ from app.coach.payload import (
 from app.coach.tools import line_summaries
 from app.coach.validate import allowed_moves, find_invalid, find_leaks, normalize, strip_moves
 from app.config import EngineTier, Settings
+from app.db.annotations import log_dropped
 from app.db.coach import record_usage
 from app.db.engine_results import load_position_result, load_summary, save_position_result
 from app.db.models import Game, MomentProgressRow
@@ -61,9 +72,10 @@ CONTEXT_INTRO = (
 )
 # Deliberately names no move: telling the coach the answer would defeat the withholding.
 LEAK_NOTE = (
-    "Your answer named a move the player is supposed to find for themselves. Rewrite the complete "
-    "answer without naming any move for the player to play or saying where a piece should go. "
-    "Use only the facts and the hints listed in the data."
+    "Your answer named or pointed out a move the player is supposed to find for themselves. "
+    "Rewrite the complete answer without naming any move for the player to play, saying where a "
+    "piece should go, or marking those squares on the board. Use only the facts and the hints "
+    "listed in the data."
 )
 INVALID_NOTE = (
     "Your answer mentioned moves that are not in the data: {moves}. Only write moves that appear "
@@ -99,6 +111,7 @@ class MomentCall:
     banned: tuple[str, ...]  # empty once the moment is revealed
     move_number: int
     white_to_move: bool
+    facts: BoardFacts  # what board tags may show (SPEC_V3 §6.2), leak check included
     meta: dict[str, str] | None = None
 
 
@@ -108,6 +121,7 @@ class MomentAnswer:
     invalid_moves_removed: list[str]
     meta: dict[str, str] | None = None
     leaked: list[str] = field(default_factory=list)
+    annotations: list[Annotation] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -131,7 +145,7 @@ def prepare_start(
     intro = next((m for m in row.messages if m.get("kind") == "intro"), None)
     session.commit()
     if intro is not None:
-        return MomentAnswer(text=str(intro["text"]), invalid_moves_removed=[])
+        return _stored(intro)
     return _call(session, settings, game, data, row, "moment_intro", "intro", player)
 
 
@@ -307,7 +321,7 @@ def prepare_wrap_up(
     row = progress[last.index]
     stored = next((m for m in row.messages if m.get("kind") == "wrap_up"), None)
     if stored is not None:
-        return MomentAnswer(text=str(stored["text"]), invalid_moves_removed=[])
+        return _stored(stored)
     data = _load(session, settings, game, last.index)
     before = load_position_result(session, game.id, last.fen_before, tiers=DEEP)
     return _call(
@@ -321,6 +335,13 @@ def prepare_wrap_up(
         player,
         before=before,
         wrap_up=results,
+    )
+
+
+def _stored(message: dict[str, Any]) -> MomentAnswer:
+    annotations = [Annotation.model_validate(a) for a in message.get("annotations", [])]
+    return MomentAnswer(
+        text=str(message["text"]), invalid_moves_removed=[], annotations=annotations
     )
 
 
@@ -343,9 +364,11 @@ async def answer(
         effort=settings.coach.chat_effort,
     )
     text = await _complete(client, request, sessions, call)
-    invalid, leaks = _problems(text, call)
-    if invalid or leaks:
-        notes = ([LEAK_NOTE] if leaks else []) + (
+    invalid, leaks, drawn = _problems(text, call, settings)
+    if invalid or leaks or drawn.leaked:
+        if drawn.leaked:  # the leak is logged even though the retry replaces this answer
+            _log_leaks(sessions, call, drawn)
+        notes = ([LEAK_NOTE] if leaks or drawn.leaked else []) + (
             [INVALID_NOTE.format(moves=", ".join(invalid))] if invalid else []
         )
         retry: list[MessageParam] = [
@@ -354,7 +377,7 @@ async def answer(
             {"role": "user", "content": " ".join(notes)},
         ]
         text = await _complete(client, replace(request, messages=retry), sessions, call)
-        invalid, leaks = _problems(text, call)
+        invalid, leaks, drawn = _problems(text, call, settings)
     if leaks:
         text = strip_moves(text, leaks)
         logger.warning("moment_leak: game=%s moment=%s moves=%s", call.game_id, call.index, leaks)
@@ -363,12 +386,32 @@ async def answer(
         logger.warning(
             "coach moves removed: game=%s endpoint=moment moves=%s", call.game_id, invalid
         )
+    # Tags are checked on the final text (moves removed above never sit inside a tag).
+    drawn = annotate(text, call.facts, settings.coach)
+    if drawn.leaked:
+        logger.warning("moment_leak: game=%s moment=%s via annotation", call.game_id, call.index)
+    annotations = [a.model_dump() for a in drawn.annotations]
     with sessions() as session:
+        log_dropped(
+            session,
+            user_id=call.user_id,
+            game_id=call.game_id,
+            task=call.task,
+            dropped=drawn.dropped,
+            moment_index=call.index,
+        )
         row = progress_for(session, call.user_id, call.game_id, call.index)
-        row.messages = [*row.messages, {"role": "coach", "text": text, "kind": call.kind}]
-        row.leaks += 1 if leaks else 0
+        message = {"role": "coach", "text": drawn.text, "kind": call.kind}
+        row.messages = [*row.messages, {**message, "annotations": annotations}]
+        row.leaks += 1 if leaks or drawn.leaked else 0
         session.commit()
-    return MomentAnswer(text=text, invalid_moves_removed=invalid, meta=call.meta, leaked=leaks)
+    return MomentAnswer(
+        text=drawn.text,
+        invalid_moves_removed=invalid,
+        meta=call.meta,
+        leaked=leaks,
+        annotations=drawn.annotations,
+    )
 
 
 async def _complete(
@@ -380,11 +423,27 @@ async def _complete(
     return reply.text
 
 
-def _problems(text: str, call: MomentCall) -> tuple[list[str], list[str]]:
+def _log_leaks(sessions: sessionmaker[Session], call: MomentCall, drawn: AnnotatedText) -> None:
+    logger.warning("moment_leak: game=%s moment=%s via annotation", call.game_id, call.index)
+    with sessions() as session:
+        log_dropped(
+            session,
+            user_id=call.user_id,
+            game_id=call.game_id,
+            task=call.task,
+            dropped=[d for d in drawn.dropped if d.reason == "moment_leak"],
+            moment_index=call.index,
+        )
+        session.commit()
+
+
+def _problems(
+    text: str, call: MomentCall, settings: Settings
+) -> tuple[list[str], list[str], AnnotatedText]:
     leaks = find_leaks(text, call.banned, call.move_number, call.white_to_move)
     # A leaked move isn't in the data either; report it once, as a leak.
     invalid = [m for m in find_invalid(text, set(call.allowed)) if m not in leaks]
-    return invalid, leaks
+    return invalid, leaks, annotate(text, call.facts, settings.coach)
 
 
 # --- Building the payload ---
@@ -484,7 +543,40 @@ def _call(
         banned=tuple(banned),
         move_number=moment.move_number,
         white_to_move=moment.side == "white",
+        facts=_board_facts(data, row, before if row.revealed else None, banned, settings),
         meta=meta,
+    )
+
+
+def _board_facts(
+    data: _Data,
+    row: MomentProgressRow,
+    before: EngineResult | None,
+    banned: list[str],
+    settings: Settings,
+) -> BoardFacts:
+    """What a moment answer may draw: the game's move and the player's tries (with their
+    grades) and, once revealed, the engine lines. Before that, any arrow or highlight touching
+    a move the player must find is a leak (SPEC_V3 §6.2; PLAN_V3 adjustment 3)."""
+    moment = data.moment
+    game_key = moment.uci[:4]
+    label = moment.label
+    game_grade: Grade = "mistake" if label == "missed_mate" else label
+    graded: dict[str, Grade | None] = {}
+    if before is not None:
+        graded |= engine_grades(
+            data.board, before, settings.thresholds, settings.moments.best_margin
+        )
+    graded[game_key] = game_grade
+    tried = {a["uci"][:4]: cast(Grade, a["grade"]) for a in row.attempts}
+    graded |= tried
+    return BoardFacts(
+        fen=moment.fen_before,
+        graded=graded,
+        mistake=game_key if game_grade != "inaccuracy" else None,
+        plan_moves=plan_moves(before),
+        banned=san_to_keys(moment.fen_before, banned),
+        known=frozenset({game_key, *tried}),
     )
 
 

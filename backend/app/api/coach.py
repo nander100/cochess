@@ -4,7 +4,7 @@ validation (PLAN Q22)."""
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Callable, Coroutine
+from collections.abc import AsyncIterator, Callable, Coroutine, Sequence
 from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -19,6 +19,7 @@ from app.api.deps import get_app_settings, get_session
 from app.api.scoping import OwnedGame
 from app.api.turns import prepare_turn
 from app.auth.deps import CurrentUser
+from app.coach.annotations import Annotation
 from app.coach.chat import (
     ChatLimitError,
     ChatOutcome,
@@ -214,9 +215,12 @@ async def _events[T](
         yield event
 
 
-def text_events(text: str, removed: list[str]) -> list[str]:
+def text_events(text: str, removed: list[str], annotations: Sequence[Annotation] = ()) -> list[str]:
+    """The checked text in chunks, then each board tag's shapes (SPEC_V3 §11.1: `annotation`,
+    tied by `char_offset` to its placeholder in the text), then `done`."""
     pieces = [sse.event("text", {"text": piece}) for piece in sse.chunks(text)]
-    return [*pieces, sse.event("done", {"invalid_moves_removed": removed})]
+    tags = [sse.event("annotation", a.model_dump()) for a in annotations]
+    return [*pieces, *tags, sse.event("done", {"invalid_moves_removed": removed})]
 
 
 def _synopsis_events(result: SynopsisResult) -> list[str]:
@@ -224,7 +228,7 @@ def _synopsis_events(result: SynopsisResult) -> list[str]:
 
 
 def _answer_events(answer: FinalAnswer) -> list[str]:
-    return text_events(answer.text, answer.invalid_moves_removed)
+    return text_events(answer.text, answer.invalid_moves_removed, answer.annotations)
 
 
 def _chat_events(outcome: ChatOutcome) -> list[str]:
@@ -232,4 +236,4 @@ def _chat_events(outcome: ChatOutcome) -> list[str]:
         positions = [p.model_dump() for p in outcome.positions]
         data = {"request_id": outcome.request_id, "tier": "deep", "positions": positions}
         return [sse.event("engine_request", data)]
-    return text_events(outcome.text, outcome.invalid_moves_removed)
+    return text_events(outcome.text, outcome.invalid_moves_removed, outcome.annotations)

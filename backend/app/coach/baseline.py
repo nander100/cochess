@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.analysis.evals import Color
 from app.analysis.summary_models import GameSummary, KeyMoment
+from app.coach.annotations import annotate
 from app.coach.client import CoachClient, CoachReply, CoachRequest, system_blocks
 from app.coach.payload import (
     BaselineGame,
@@ -23,6 +24,7 @@ from app.coach.payload import (
 )
 from app.coach.validate import allowed_moves, find_invalid, strip_moves
 from app.config import Settings
+from app.db.annotations import log_dropped
 from app.db.coach import record_usage
 from app.db.engine_results import load_summary
 from app.db.models import Game, User
@@ -171,6 +173,12 @@ async def generate_baseline(
         logger.warning("baseline report too long: user=%s words=%d", user_id, words)
     game_ids = [game.id for game, _ in games]
     with sessions() as session:
+        # The report covers several games, not one board position: no board tags.
+        stripped = annotate(text, None, settings.coach)
+        log_dropped(
+            session, user_id=user_id, game_id=None, task="baseline_report", dropped=stripped.dropped
+        )
+        text = stripped.text
         save_report(session, user_id, text, invalid, game_ids)
     return BaselineResult(text=text, invalid_moves_removed=invalid, game_ids=game_ids)
 

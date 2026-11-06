@@ -300,3 +300,20 @@ class GameVariationRow(Base):
     moves: Mapped[list[str]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)
+
+
+class AnnotationLogRow(Base):
+    """A board-tag shape the coach wrote that wasn't drawn (SPEC_V3 §6, §11.2): invalid, over a
+    limit, or a moment leak. Kept like token usage when the game is deleted (game_id cleared)."""
+
+    __tablename__ = "annotation_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
+    game_id: Mapped[str | None] = mapped_column(ForeignKey("games.id"), index=True)
+    task: Mapped[str] = mapped_column(String(20))
+    moment_index: Mapped[int | None] = mapped_column(Integer)
+    tag: Mapped[str] = mapped_column(Text)
+    shape: Mapped[str | None] = mapped_column(String(32))
+    reason: Mapped[str] = mapped_column(String(20))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)

@@ -18,6 +18,7 @@ from app.config import Settings
 from app.db.engine_results import load_results
 from app.db.games import pending_verify_fens, record_analysis
 from app.db.models import (
+    AnnotationLogRow,
     ChatMessageRow,
     EngineResultRow,
     Game,
@@ -62,6 +63,9 @@ def delete_game(session: Session, settings: Settings, game: Game) -> None:
     Token usage is kept (it counts toward the daily budget) but no longer points at the game."""
     game_id, user_id = game.id, game.user_id
     session.execute(update(LlmUsageRow).where(LlmUsageRow.game_id == game_id).values(game_id=None))
+    session.execute(
+        update(AnnotationLogRow).where(AnnotationLogRow.game_id == game_id).values(game_id=None)
+    )
     _clear_coaching(session, game_id)
     delete_variations(session, game_id)
     for table in (EngineResultRow, GameSummaryRow, GameThemeFactRow):

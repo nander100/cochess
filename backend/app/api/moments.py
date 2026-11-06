@@ -208,7 +208,7 @@ async def _ready(result: MomentAnswer) -> MomentAnswer:
 
 def _events(result: MomentAnswer) -> list[str]:
     meta = [sse.event("moment", result.meta)] if result.meta else []
-    return [*meta, *text_events(result.text, result.invalid_moves_removed)]
+    return [*meta, *text_events(result.text, result.invalid_moves_removed, result.annotations)]
 
 
 def _check_question_limit(session: Session, settings: Settings, game_id: str) -> None:
