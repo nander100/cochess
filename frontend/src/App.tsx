@@ -1,14 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import type { PipelineDeps } from './analysis/pipeline'
 import { createApiClient, isLoggedOut } from './api/client'
 import type { EngineConfig, Profile } from './api/types'
 import { type EngineHandle, StockfishEngine } from './engine/StockfishEngine'
-import { GamePage } from './pages/GamePage'
 import { GamesPage } from './pages/GamesPage'
 import { LatestGamePage } from './pages/LatestGamePage'
-import { OnboardingPage } from './pages/OnboardingPage'
-import { ProfilePage } from './pages/ProfilePage'
 import { RedeemPage } from './pages/RedeemPage'
 import { errorText, tokenFromHash } from './pages/util'
 import { SettingsProvider } from './settings/SettingsProvider'
@@ -18,6 +15,12 @@ import { useSettings } from './settings/settingsContext'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { useTheme } from './theme/themeContext'
 import { EmptyState, ErrorState, Header, type NavItem, Skeleton, ToastProvider } from './ui'
+
+// Loaded when first opened: the board, chessground, chess.js and the coach panel stay out of the
+// first download (the Games page is home and loads with the app).
+const GamePage = lazy(() => import('./pages/GamePage').then((m) => ({ default: m.GamePage })))
+const OnboardingPage = lazy(() => import('./pages/OnboardingPage').then((m) => ({ default: m.OnboardingPage })))
+const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })))
 
 type Session =
   | { kind: 'loading' }
@@ -114,6 +117,7 @@ function Shell({ deps }: AppProps) {
         </div>
       )}
       {session.kind === 'in' && (
+        <Suspense fallback={<Skeleton lines={4} label="Loading…" />}>
         <Routes>
           <Route
             path="/profile"
@@ -152,6 +156,7 @@ function Shell({ deps }: AppProps) {
           )}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       )}
       </main>
     </SettingsProvider>
