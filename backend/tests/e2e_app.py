@@ -76,8 +76,8 @@ def _task(request: CoachRequest) -> Task:
     return next((t for t in TASKS if system_prompt(t) == prompt), "chat")
 
 
-# Faked Chess.com for the import flow: every player has one archive with two games, the first
-# with that player as White (the e2e HUNG_KNIGHT game), the second against someone else.
+# Faked Chess.com and Lichess for the import flows: every player has two games, the first with
+# that player as White (the e2e HUNG_KNIGHT game), the second between two other players.
 IMPORT_PGN = (
     '[Event "Imported"]\n[White "{white}"]\n[Black "{black}"]\n[Result "0-1"]\n'
     '[Date "2026.10.0{day}"]\n[TimeControl "600"]\n\n{moves}'
@@ -86,6 +86,31 @@ IMPORT_MOVES = (
     "1. e4 e5 2. Nf3 Nc6 3. Ng5 Qxg5 4. Nc3 Nf6 5. d3 Qg6 6. Be2 Bc5 0-1",
     "1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 0-1",
 )
+
+
+def _fake_platforms(request: httpx.Request) -> httpx.Response:
+    if request.url.host == "lichess.org":
+        return _fake_lichess(request)
+    return _fake_chesscom(request)
+
+
+def _fake_lichess(request: httpx.Request) -> httpx.Response:
+    """GET /api/games/user/{name}: the same two games as NDJSON, newest first."""
+    name = request.url.path.rsplit("/", 1)[-1]
+    lines = [
+        json.dumps(
+            {
+                "id": f"e2eLc{i:03}",
+                "variant": "standard",
+                "lastMoveAt": 1_790_900_000_000 + i,
+                "pgn": IMPORT_PGN.format(
+                    white=name if i == 0 else "Somebody", black=f"Rival{i}", day=i + 1, moves=moves
+                ),
+            }
+        )
+        for i, moves in enumerate(IMPORT_MOVES)
+    ]
+    return httpx.Response(200, text="\n".join(lines) + "\n")
 
 
 def _fake_chesscom(request: httpx.Request) -> httpx.Response:
@@ -117,5 +142,5 @@ def make() -> FastAPI:
     for tier, ms in ((engine.scan, 10), (engine.verify, 20), (engine.deep, 20)):
         tier.min_time_ms = ms
     app = create_app(settings, ScriptedCoach())
-    app.state.import_transport = httpx.MockTransport(_fake_chesscom)
+    app.state.import_transport = httpx.MockTransport(_fake_platforms)
     return app

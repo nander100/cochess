@@ -36,3 +36,30 @@ test('a variation is saved, survives a reload, and is in the exported PGN', asyn
   expect(pgn).toContain('[%eval')
   expect(pgn).toMatch(/3\. Ng5 \$4/) // the hung knight, marked ??
 })
+
+// SPEC_V3 done-condition: exported PGNs re-import cleanly. Another player pastes the exported
+// file (variations, NAGs, evals and comments included) and gets the same game.
+test('an exported PGN re-imports cleanly as a new game', async ({ page, browser }) => {
+  await logInWithProfile(page, newLoginLink(`Export ${Date.now()}`), 1200)
+  await page.getByLabel('I played White').check()
+  await page.getByLabel(/your game/i).fill(HUNG_KNIGHT)
+  await page.getByRole('button', { name: 'Analyze' }).click()
+  await expect(page).toHaveURL(/\/games\/[0-9a-f-]+$/, { timeout: 60_000 })
+  await expect(page.getByRole('region', { name: 'Unfinished analysis' })).toBeHidden({ timeout: 60_000 })
+  const original = await (await page.request.get(`/api/games/${page.url().split('/').at(-1)}`)).json()
+  const download = page.waitForEvent('download')
+  await page.getByRole('region', { name: 'Game options' }).getByRole('button', { name: 'Export PGN' }).click()
+  const exported = await readFile((await (await download).path()) ?? '', 'utf8')
+
+  const other = await (await browser.newContext()).newPage()
+  await logInWithProfile(other, newLoginLink(`Re-import ${Date.now()}`), 1200)
+  await other.getByLabel('I played White').check()
+  await other.getByLabel(/your game/i).fill(exported)
+  await other.getByRole('button', { name: 'Analyze' }).click()
+
+  await expect(other).toHaveURL(/\/games\/[0-9a-f-]+$/, { timeout: 60_000 })
+  const copy = await (await other.request.get(`/api/games/${other.url().split('/').at(-1)}`)).json()
+  const sans = (game: { moves: { san: string }[] }) => game.moves.map((m) => m.san)
+  expect(sans(copy)).toEqual(sans(original))
+  expect(copy.final_fen).toBe(original.final_fen)
+})
