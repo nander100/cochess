@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from 'vitest'
 import App from '../App'
 import type { PipelineDeps } from '../analysis/pipeline'
 import type { GameChoice, OnboardingGame, OnboardingStatus, ParsedRow, ParseResponse } from '../api/types'
-import { DETAIL, EMPTY_ONBOARDING, EMPTY_SLOTS, REPORT_TEXT, fakeDeps } from '../test/fakes'
+import { DEFAULT_SETTINGS, DETAIL, EMPTY_ONBOARDING, EMPTY_SLOTS, REPORT_TEXT, fakeDeps } from '../test/fakes'
 
 vi.mock('../board/Board', () => ({ Board: () => <div data-testid="board" /> }))
 
@@ -29,6 +29,7 @@ function row(index: number, overrides: Partial<ParsedRow> = {}): ParsedRow {
     error: null,
     suggested_color: 'white',
     user_color: 'white',
+    color_detected: false,
     user_result: 'win',
     slot: 'white_win',
     reason: null,
@@ -48,6 +49,38 @@ function ready(report: OnboardingStatus['report'] = null): OnboardingStatus {
 }
 
 describe('adding games', () => {
+  test('with a username set, each game comes back with its color and needs nothing more', async () => {
+    const detected = (i: number, color: 'white' | 'black') =>
+      row(i, { user_color: color, color_detected: true, suggested_color: null,
+               slot: color === 'white' ? 'white_win' : 'black_win' }) // prettier-ignore
+    const deps = fakeDeps({
+      settings: vi.fn(async () => ({ ...DEFAULT_SETTINGS, chesscom_username: 'nander100' })),
+      onboardingParse: vi.fn(async () => ({
+        primary_time_control: 'rapid' as const,
+        slots: EMPTY_SLOTS,
+        games: [detected(0, 'white'), detected(1, 'black')],
+      })),
+    })
+    renderAt(deps, '/onboarding')
+
+    expect(await screen.findByText(/Your color in each game comes from your username \(nander100\)/)).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/Paste one or more games/), { target: { value: 'two games' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Check games' }))
+
+    const table = await screen.findByRole('table')
+    expect(within(table).getAllByText('From your username')).toHaveLength(2)
+    expect(within(table).getByLabelText('Your color in game 2')).toHaveValue('black')
+    expect(screen.getByRole('button', { name: 'Add 2 games' })).toBeEnabled()
+  })
+
+  test('without a username, the form points to the profile', async () => {
+    renderAt(fakeDeps(), '/onboarding')
+
+    expect(await screen.findByRole('link', { name: 'Add your Chess.com or Lichess username' })).toHaveAttribute(
+      'href', '/profile',
+    ) // prettier-ignore
+  })
+
   test('the paste becomes a table; the player settles each game; usable games are added', async () => {
     const draw = row(1, { result: '1/2-1/2', user_result: 'draw', slot: null, reason: 'draw' })
     const noTc = row(2, { category: null, time_control: null, slot: null, reason: 'needs_time_control' })

@@ -18,6 +18,8 @@ DEFAULTS = {
     "engine_panel": False,
     "coach_detail_level": "auto",
     "playback_seconds": 1.5,
+    "chesscom_username": "",
+    "lichess_username": "",
     "effective_detail_level": "standard",  # "auto" for the test player's 1350 (intermediate)
 }
 
@@ -48,8 +50,20 @@ def test_only_the_fields_sent_change_and_they_are_kept(client: TestClient) -> No
         {"coach_detail_level": "expert"},
         {"playback_seconds": 0.5},
         {"playback_seconds": 3.5},
+        {"chesscom_username": "has space"},
+        {"lichess_username": "x" * 51},
     ],
-    ids=["theme", "scheme", "pieces", "sounds", "detail", "too fast", "too slow"],
+    ids=[
+        "theme",
+        "scheme",
+        "pieces",
+        "sounds",
+        "detail",
+        "too fast",
+        "too slow",
+        "space",
+        "too long",
+    ],
 )
 def test_unknown_values_are_rejected(client: TestClient, body: dict[str, Any]) -> None:
     response = client.patch("/api/settings", json=body)
@@ -101,3 +115,14 @@ def test_the_chosen_detail_level_reaches_the_coach() -> None:
     chat(client, game_id, "What now?")
 
     assert payload_of(fake, 0)["player"]["detail_level"] == "plain"
+
+
+def test_usernames_are_kept_trimmed_and_can_be_cleared(client: TestClient) -> None:
+    body = client.patch(
+        "/api/settings", json={"chesscom_username": "nander100", "lichess_username": "alex_l"}
+    ).json()
+    assert (body["chesscom_username"], body["lichess_username"]) == ("nander100", "alex_l")
+
+    cleared = client.patch("/api/settings", json={"chesscom_username": ""}).json()
+
+    assert (cleared["chesscom_username"], cleared["lichess_username"]) == ("", "alex_l")

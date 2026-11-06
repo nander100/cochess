@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
+import { DEFAULT_SETTINGS, SettingsContext } from '../settings/settingsContext'
 import { GameInput } from './GameInput'
 
 function setup() {
@@ -60,4 +61,21 @@ test('asks for a PGN when the box is empty', () => {
 
   expect(screen.getByRole('alert')).toHaveTextContent('Paste the game')
   expect(onSubmit).not.toHaveBeenCalled()
+})
+
+test('with a username in the profile, the color can be left for the site to find', () => {
+  const onSubmit = vi.fn()
+  const settings = { ...DEFAULT_SETTINGS, chesscom_username: 'nander100' }
+  render(
+    <SettingsContext.Provider value={{ settings, loaded: true, update: vi.fn() }}>
+      <GameInput disabled={false} onSubmit={onSubmit} />
+    </SettingsContext.Provider>,
+  )
+
+  expect(screen.getByLabelText('I played White')).not.toBeChecked()
+  expect(screen.getByText("Or leave it: we'll find nander100 in the game.")).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText(/your game/i), { target: { value: '1. e4 e5 *' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Analyze game' }))
+
+  expect(onSubmit).toHaveBeenCalledWith({ pgn: '1. e4 e5 *' })
 })

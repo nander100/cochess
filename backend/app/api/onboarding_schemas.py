@@ -38,7 +38,9 @@ class ParsedRow(BaseModel):
     category: Category | None  # from the header; None means the player picks
     error: PgnErrorDetail | None
     suggested_color: Color | None  # a hint from the player names; never pre-selected
-    user_color: Color | None  # the player's choice only; None until they pick
+    # The player's choice, else the side their own Chess.com/Lichess username played.
+    user_color: Color | None
+    color_detected: bool  # user_color came from the player's username, not a pick
     user_result: UserResult | None
     slot: Slot | None
     reason: Reason | None
@@ -58,7 +60,8 @@ class ParseResponse(BaseModel):
 
 class SubmitGame(BaseModel):
     pgn: str = Field(min_length=1)
-    user_color: Color
+    # Left out: detected from the player's username in the PGN (else the game needs a color).
+    user_color: Color | None = None
     time_control_category: TimeControl | None = None
 
 

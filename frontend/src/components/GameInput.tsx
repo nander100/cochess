@@ -1,5 +1,6 @@
 import { type FormEvent, useId, useState } from 'react'
 import type { Color, CreateGameRequest } from '../api/types'
+import { useSettings, usernames } from '../settings/settingsContext'
 import { Button, SegmentedToggle, type ToggleOption } from '../ui'
 import './GameInput.css'
 
@@ -16,17 +17,21 @@ const COLORS: readonly ToggleOption<Color>[] = [
 
 /** One game to analyze. Rating and playstyle come from the player's profile (SPEC_V2 §4.3).
  * The color comes first and starts unselected: the PGN box and Analyze wait for it, so a game
- * is never analyzed from the wrong side (SPEC_V3 §4.6). */
+ * is never analyzed from the wrong side (SPEC_V3 §4.6). A player who has given their Chess.com
+ * or Lichess username can leave it: the backend finds that name in the PGN. */
 export function GameInput({ disabled, onSubmit }: GameInputProps) {
   const id = useId()
+  const { settings } = useSettings()
+  const names = usernames(settings)
   const [color, setColor] = useState<Color | null>(null)
   const [pgn, setPgn] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const needsColor = color === null
+  const needsColor = color === null && names.length === 0
+  const hint = names.length > 0 ? `Or leave it: we'll find ${names.join(' or ')} in the game.` : COLOR_HINT
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (color === null) {
+    if (needsColor) {
       setError(COLOR_HINT)
       return
     }
@@ -35,7 +40,7 @@ export function GameInput({ disabled, onSubmit }: GameInputProps) {
       return
     }
     setError(null)
-    onSubmit({ pgn, user_color: color })
+    onSubmit(color === null ? { pgn } : { pgn, user_color: color })
   }
 
   return (
@@ -49,11 +54,11 @@ export function GameInput({ disabled, onSubmit }: GameInputProps) {
           setError(null)
         }}
         disabled={disabled}
-        describedBy={needsColor ? `${id}-hint` : undefined}
+        describedBy={color === null ? `${id}-hint` : undefined}
       />
-      {needsColor && (
+      {color === null && (
         <p id={`${id}-hint`} className="game-input-hint">
-          {COLOR_HINT}
+          {hint}
         </p>
       )}
       <label className="game-input-label" htmlFor={`${id}-pgn`}>

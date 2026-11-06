@@ -27,7 +27,8 @@ class CreateGameRequest(BaseModel):
     """Elo and playstyle come from the player's profile (SPEC_V2 §4.3)."""
 
     pgn: str = Field(min_length=1)
-    user_color: Color
+    # Left out: detected from the player's own username in the PGN, else a 422 asks for it.
+    user_color: Color | None = None
 
 
 class ChangeColorRequest(BaseModel):

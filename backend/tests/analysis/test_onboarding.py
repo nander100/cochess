@@ -7,6 +7,7 @@ import pytest
 from app.analysis.onboarding import (
     Candidate,
     assign_slots,
+    detect_color,
     split_games,
     suggest_colors,
     time_control_category,
@@ -165,3 +166,40 @@ class TestSuggestColors:
         games = _games(("Anonymous", "x"), ("Anonymous", "x"), ("?", "y"))
 
         assert suggest_colors([*games, None]) == ["black", "black", None, None]
+
+
+class TestDetectColor:
+    """The player's color from their own Chess.com or Lichess username in the PGN headers."""
+
+    def test_the_username_as_white_or_black(self) -> None:
+        white, black = _games(("nander100", "Rival"), ("Rival", "nander100"))
+
+        assert detect_color(white, ["nander100"]) == "white"
+        assert detect_color(black, ["nander100"]) == "black"
+
+    def test_names_match_whatever_the_case_and_spaces(self) -> None:
+        [game] = _games(("  NANDER100 ", "Rival"))
+
+        assert detect_color(game, ["Nander100"]) == "white"
+
+    def test_either_username_matches(self) -> None:
+        [game] = _games(("Rival", "alex_lichess"))
+
+        assert detect_color(game, ["nander100", "alex_lichess"]) == "black"
+
+    def test_no_match_or_no_usernames_detects_nothing(self) -> None:
+        [game] = _games(("A", "B"))
+
+        assert detect_color(game, ["nander100"]) is None
+        assert detect_color(game, []) is None
+        assert detect_color(None, ["nander100"]) is None
+
+    def test_a_username_on_both_sides_detects_nothing(self) -> None:
+        [game] = _games(("nander100", "alex_lichess"))
+
+        assert detect_color(game, ["nander100", "alex_lichess"]) is None
+
+    def test_a_partial_name_is_not_a_match(self) -> None:
+        [game] = _games(("nander1000", "Rival"))
+
+        assert detect_color(game, ["nander100"]) is None

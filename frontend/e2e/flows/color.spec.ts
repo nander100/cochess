@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { logIn, logInWithProfile, newLoginLink } from '../login.ts'
-import { rapidGame } from './games.ts'
+import { HUNG_KNIGHT, rapidGame } from './games.ts'
 
 // SPEC_V3 §4.6: testers had games analyzed from the wrong side because White was pre-selected.
 // No color is ever selected for the player, on either form.
@@ -36,4 +36,23 @@ test('onboarding rows start with no color; submit waits for every row', async ({
   await page.getByLabel('Your color in game 2').selectOption('black')
   await expect(page.getByRole('button', { name: 'Add 2 games' })).toBeEnabled()
   await expect(table.locator('tr.needs-color')).toHaveCount(0)
+})
+
+// Owner decision 2026-11-06: with a Chess.com or Lichess username in the profile, the site
+// finds the player's color in the PGN's player names, so no color has to be chosen.
+test('a username in the profile lets the site find the color', async ({ page }) => {
+  await logInWithProfile(page, newLoginLink(`Color username ${Date.now()}`), 1200)
+  await page.goto('/profile')
+  const accounts = page.getByRole('form', { name: 'Your online accounts' })
+  await accounts.getByLabel('Lichess username').fill('player')
+  await accounts.getByRole('button', { name: 'Save usernames' }).click()
+  await expect(accounts.getByRole('status')).toHaveText('Saved')
+
+  await page.getByRole('link', { name: 'Games', exact: true }).click()
+  await expect(page.getByText("Or leave it: we'll find player in the game.")).toBeVisible()
+  await page.getByLabel(/your game/i).fill(HUNG_KNIGHT)
+  await page.getByRole('button', { name: 'Analyze' }).click()
+
+  await expect(page).toHaveURL(/\/games\/[0-9a-f-]+$/, { timeout: 60_000 })
+  await expect(page.locator('.game-heading')).toContainText('you played white')
 })

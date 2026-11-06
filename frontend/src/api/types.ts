@@ -14,7 +14,8 @@ export interface Position {
 /** Elo and playstyle come from the player's profile (SPEC_V2 §4.3). */
 export interface CreateGameRequest {
   pgn: string
-  user_color: Color
+  /** Left out: the backend finds the player's own username in the PGN (else a 422). */
+  user_color?: Color
 }
 
 export type TimeControl = 'bullet' | 'blitz' | 'rapid' | 'classical'
@@ -405,7 +406,9 @@ export interface ParsedRow {
   category: Category | null
   error: { code: string; message: string; move_number: number | null } | null
   suggested_color: Color | null
+  /** The player's pick, else the side their own username played (`color_detected`). */
   user_color: Color | null
+  color_detected: boolean
   user_result: UserResult | null
   slot: Slot | null
   reason: SlotReason | null
@@ -501,6 +504,9 @@ export interface UserSettings {
   effective_detail_level: DetailLevel
   /** Line playback: one move every this many seconds, 0.75 to 3 (SPEC_V3 §9.5). */
   playback_seconds: number
+  /** The player's own usernames ("" when not set): their color is found in a PGN's player names. */
+  chesscom_username: string
+  lichess_username: string
 }
 
 /** The dashboard (SPEC_V3 §8.1), one response from GET /api/dashboard. */

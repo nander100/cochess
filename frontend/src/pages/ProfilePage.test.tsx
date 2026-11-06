@@ -141,3 +141,30 @@ test('the coach detail level and playback speed are settings', async () => {
   expect(api.updateSettings).toHaveBeenCalledWith({ playback_seconds: 2.5 })
   expect(screen.getByText(/Plain: everyday words/)).toBeInTheDocument()
 })
+
+// The card remounts once saved settings load, so it is looked up again each time.
+const accounts = () => screen.getByRole('form', { name: 'Your online accounts' })
+
+test('the saved usernames load into the accounts card and a change is saved trimmed', async () => {
+  const api = fakeApi({ settings: vi.fn(async () => ({ ...DEFAULT_SETTINGS, lichess_username: 'alex_l' })) })
+  setup(api)
+  await vi.waitFor(() => expect(within(accounts()).getByLabelText('Lichess username')).toHaveValue('alex_l'))
+  expect(within(accounts()).getByRole('button', { name: 'Save usernames' })).toBeDisabled()
+
+  fireEvent.change(within(accounts()).getByLabelText('Chess.com username'), { target: { value: ' nander100 ' } })
+  fireEvent.click(within(accounts()).getByRole('button', { name: 'Save usernames' }))
+
+  expect(api.updateSettings).toHaveBeenCalledWith({ chesscom_username: 'nander100', lichess_username: 'alex_l' })
+  expect(await within(accounts()).findByRole('status')).toHaveTextContent('Saved')
+})
+
+test('a username with other characters is refused before saving', async () => {
+  const { api } = setup()
+  await vi.waitFor(() => expect(api.settings).toHaveBeenCalled())
+  await screen.findByRole('form', { name: 'Your online accounts' })
+
+  fireEvent.change(within(accounts()).getByLabelText('Chess.com username'), { target: { value: 'nander 100' } })
+
+  expect(within(accounts()).getByText('Use only letters, numbers, "_" and "-".')).toBeInTheDocument()
+  expect(within(accounts()).getByRole('button', { name: 'Save usernames' })).toBeDisabled()
+})

@@ -42,6 +42,7 @@ export async function logIn(page: Page, link: string, elo: number): Promise<void
   await page.getByRole('link', { name: 'Set up my profile' }).click()
   await page.getByLabel(/rating/i).fill(String(elo))
   await page.getByLabel('Rapid', { exact: true }).check()
-  await page.getByRole('button', { name: /^Save/ }).click()
+  // The profile form, not the online-accounts card (which has its own Save button).
+  await page.locator('form[aria-labelledby="profile-about"]').getByRole('button', { name: /^Save/ }).click()
   await page.getByRole('heading', { name: 'Twelve games, one honest picture of your play.' }).waitFor()
 }

@@ -203,7 +203,7 @@ class TestSubmit:
         assert {g.id for g in stored} == {results[0]["game_id"], results[2]["game_id"]}
 
     @pytest.mark.parametrize("color", [None, "missing"], ids=["null", "missing"])
-    def test_every_game_needs_a_color(self, color: str | None) -> None:
+    def test_without_a_color_or_a_username_a_game_needs_a_color(self, color: str | None) -> None:
         client, _, _ = make()
         game: dict[str, Any] = {"pgn": pgn(0, "white", "1-0")}
         if color is None:
@@ -211,11 +211,32 @@ class TestSubmit:
 
         response = client.post("/api/onboarding/submit", json={"games": [game]})
 
-        assert response.status_code == 422
-        assert response.json()["detail"][0]["msg"] == (
-            "Choose the color you played: White or Black."
-        )
+        assert response.status_code == 200
+        [result] = response.json()["results"]
+        assert (result["slot"], result["reason"], result["game_id"]) == (None, "needs_color", None)
         assert client.get("/api/onboarding/status").json()["games"] == []
+
+    def test_with_a_username_the_color_is_detected_from_the_pgn(self) -> None:
+        client, _, app = make()
+        client.patch("/api/settings", json={"lichess_username": ME.upper()})
+        games = [pgn(0, "white", "1-0"), pgn(1, "black", "1-0")]
+
+        response = client.post(
+            "/api/onboarding/submit", json={"games": [{"pgn": g} for g in games]}
+        )
+
+        slots = [r["slot"] for r in response.json()["results"]]
+        assert slots == ["white_win", "black_loss"]
+        with app.state.session_factory() as session:
+            assert sorted(g.user_color for g in session.scalars(select(Game))) == ["black", "white"]
+
+    def test_the_players_own_pick_wins_over_the_username(self) -> None:
+        client, _, _ = make()
+        client.patch("/api/settings", json={"chesscom_username": ME})
+
+        [result] = submit(client, [pgn(0, "white", "1-0")], ["black"])["results"]
+
+        assert result["slot"] == "black_loss"
 
     def test_a_full_slot_takes_no_more_games(self) -> None:
         client, _, _ = make()
@@ -363,3 +384,25 @@ class TestReport:
 @pytest.mark.parametrize("path", ["/api/onboarding/status", "/api/onboarding/report"])
 def test_onboarding_needs_a_login(anon_client: TestClient, path: str) -> None:
     assert anon_client.get(path).status_code == 401
+
+
+class TestParseDetectsColors:
+    def test_rows_with_the_username_come_back_colored_and_marked_detected(self) -> None:
+        client, _, _ = make()
+        client.patch("/api/settings", json={"chesscom_username": ME})
+        other = '[White "A"]\n[Black "B"]\n[Result "1-0"]\n[TimeControl "600"]\n\n1. e4 e5 1-0'
+
+        rows = parse(client, [pgn(0, "white", "1-0"), pgn(1, "black", "0-1"), other])["games"]
+
+        assert [(r["user_color"], r["color_detected"]) for r in rows] == [
+            ("white", True), ("black", True), (None, False),
+        ]  # fmt: skip
+        assert [r["slot"] for r in rows[:2]] == ["white_win", "black_win"]
+        assert rows[2]["reason"] == "needs_color"
+
+    def test_without_a_username_nothing_is_picked(self) -> None:
+        client, _, _ = make()
+
+        [row] = parse(client, [pgn(0, "white", "1-0")])["games"]
+
+        assert (row["user_color"], row["color_detected"]) == (None, False)

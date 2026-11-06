@@ -190,6 +190,20 @@ def suggest_colors(games: Sequence[ParsedGame | None]) -> list[Color | None]:
     return suggestions
 
 
+def detect_color(game: ParsedGame | None, usernames: Sequence[str]) -> Color | None:
+    """The side the player played, from their own Chess.com or Lichess username in the PGN's
+    White and Black headers (exact name, any case). None when no username appears, or when one
+    appears on each side: then the player picks."""
+    names = {name.strip().casefold() for name in usernames if name.strip()}
+    if game is None or not names:
+        return None
+    white = _name(game, "White") in names
+    black = _name(game, "Black") in names
+    if white == black:
+        return None
+    return "white" if white else "black"
+
+
 def _name(game: ParsedGame, side: str) -> str:
     name = game.headers.get(side, "").strip()
     return "" if name in ("?", "Anonymous") else name.casefold()

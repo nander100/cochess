@@ -221,6 +221,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   coach_detail_level: 'auto',
   effective_detail_level: 'standard',
   playback_seconds: 1.5,
+  chesscom_username: '',
+  lichess_username: '',
 }
 
 export const EMPTY_TENDENCIES = {

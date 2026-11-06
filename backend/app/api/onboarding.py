@@ -18,6 +18,7 @@ from app.analysis.onboarding import (
     SlotDecision,
     SplitGame,
     assign_slots,
+    detect_color,
     split_games,
     suggest_colors,
     time_control_category,
@@ -49,6 +50,7 @@ from app.config import Settings
 from app.db.games import game_fingerprint, new_game
 from app.db.models import BaselineReportRow, Game, User
 from app.db.onboarding import filled_slots, latest_report, onboarding_games, slot_of
+from app.db.user_settings import usernames_for
 
 router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 
@@ -75,12 +77,15 @@ def parse(
     games = [piece.game for piece in split]
     suggestions = suggest_colors(games)
     choices = [_choice(body.choices, i) for i in range(len(split))]
-    # Only the player's own choice counts: the suggestion is a hint, never a default (SPEC_V3 §4.6).
-    colors = [c.user_color for c in choices]
+    # The player's own choice, else the side their own username played (owner decision,
+    # 2026-11-06). The name-count suggestion stays a hint, never a default (SPEC_V3 §4.6).
+    usernames = usernames_for(session, user.id)
+    detected = [detect_color(game, usernames) for game in games]
+    colors = [c.user_color or d for c, d in zip(choices, detected, strict=True)]
     filled = onboarding_games(session, user.id)
     decisions = _decide(session, user, settings, games, colors, choices, filled, primary)
     rows = [
-        _row(i, piece, suggestions[i], colors[i], decision, settings)
+        _row(i, piece, suggestions[i], colors[i], decision, settings, choices[i].user_color is None)
         for i, (piece, decision) in enumerate(zip(split, decisions, strict=True))
     ]
     return ParseResponse(
@@ -96,23 +101,25 @@ def submit(
     decides again from the PGNs: what the browser showed is only a preview."""
     primary = _primary(user)
     games = [_parse_one(item.pgn, settings) for item in body.games]
-    colors: list[Color | None] = [item.user_color for item in body.games]
+    usernames = usernames_for(session, user.id)
+    colors: list[Color | None] = [
+        item.user_color or detect_color(game, usernames)
+        for item, game in zip(body.games, games, strict=True)
+    ]
     choices = [
-        GameChoice(user_color=item.user_color, time_control_category=item.time_control_category)
-        for item in body.games
+        GameChoice(user_color=color, time_control_category=item.time_control_category)
+        for item, color in zip(body.games, colors, strict=True)
     ]
     filled = onboarding_games(session, user.id)
     decisions = _decide(session, user, settings, games, colors, choices, filled, primary)
 
     results = []
     stored = list(filled)
-    for i, (game, decision, item) in enumerate(zip(games, decisions, body.games, strict=True)):
+    for i, (game, decision, color) in enumerate(zip(games, decisions, colors, strict=True)):
         game_id = None
-        if game is not None and decision.slot is not None:
+        if game is not None and decision.slot is not None and color is not None:
             category = _category(game, choices[i], settings)
-            row = new_game(
-                session, user, game, item.user_color, source="onboarding", category=category
-            )
+            row = new_game(session, user, game, color, source="onboarding", category=category)
             session.flush()
             stored.append(row)
             game_id = row.id
@@ -247,6 +254,7 @@ def _row(
     color: Color | None,
     decision: SlotDecision,
     settings: Settings,
+    unpicked: bool,
 ) -> ParsedRow:
     headers = piece.game.headers if piece.game else {}
     return ParsedRow(
@@ -261,6 +269,7 @@ def _row(
         error=_error(piece.error) if piece.error else None,
         suggested_color=suggested,
         user_color=color,
+        color_detected=unpicked and color is not None,
         user_result=user_result(headers.get("Result"), color) if color and piece.game else None,
         slot=decision.slot,
         reason=decision.reason,

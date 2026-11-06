@@ -1,7 +1,9 @@
 import { type FormEvent, useId, useState } from 'react'
 import { ApiError, type ApiClient, isLoggedOut } from '../api/client'
 import type { Color, GameChoice, ParseResponse, ParsedRow, SubmitGame, TimeControl } from '../api/types'
+import { Link } from 'react-router'
 import { errorText } from '../pages/util'
+import { useSettings, usernames } from '../settings/settingsContext'
 import { Button, Pill, Table, useToast } from '../ui'
 import { CATEGORY_LABEL, PICKABLE, SLOT_LABEL, reasonText } from './labels'
 import './Onboarding.css'
@@ -24,6 +26,7 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { show } = useToast()
+  const names = usernames(useSettings().settings)
 
   async function run<T>(work: () => Promise<T>): Promise<T | null> {
     setBusy(true)
@@ -106,6 +109,16 @@ export function PasteGames({ api, onAdded, onLoggedOut }: PasteGamesProps) {
         <label className="paste-label" htmlFor={`${id}-pgn`}>
           Paste one or more games (PGN). We split them and check each one.
         </label>
+        <p className="paste-note">
+          {names.length > 0 ? (
+            <>Your color in each game comes from your username ({names.join(', ')}).</>
+          ) : (
+            <>
+              <Link to="/profile">Add your Chess.com or Lichess username</Link> and we'll fill in your color in
+              each game.
+            </>
+          )}
+        </p>
         <textarea
           id={`${id}-pgn`}
           className="ui-input ui-textarea ui-mono"
@@ -249,6 +262,7 @@ function Row({ row, primary, disabled, onChoose }: RowProps) {
             <option value="black">Black</option>
           </select>
         )}
+        {row.color_detected && <span className="color-hint">From your username</span>}
         {needsColor(row) && row.suggested_color && (
           <span className="color-hint">
             Detected: you played {row.suggested_color === 'white' ? 'White' : 'Black'}

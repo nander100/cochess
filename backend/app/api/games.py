@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.analysis.evals import Color
 from app.analysis.game_info import opening_name
-from app.analysis.onboarding import time_control_category
+from app.analysis.onboarding import detect_color, time_control_category
 from app.analysis.pgn import PgnError, parse_pgn
 from app.api.deps import get_app_settings, get_session
 from app.api.game_detail import build_detail
@@ -26,11 +26,13 @@ from app.api.schemas import (
     UserResult,
 )
 from app.api.scoping import OwnedGame
+from app.api.validation import color_needed
 from app.auth.deps import CurrentUser
 from app.config import Settings
 from app.db.game_changes import SlotFullError, change_color, delete_game
 from app.db.games import find_duplicate, game_fingerprint, list_games, new_game
 from app.db.models import Game
+from app.db.user_settings import usernames_for
 
 router = APIRouter(prefix="/api/games", tags=["games"])
 
@@ -70,9 +72,13 @@ def create_game(
             status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail.model_dump()
         ) from error
 
+    usernames = usernames_for(session, user.id)
+    color = body.user_color or detect_color(parsed, usernames)
+    if color is None:
+        raise color_needed(bool(usernames))
     if find_duplicate(session, user.id, game_fingerprint(parsed)) is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=DUPLICATE)
-    game = new_game(session, user, parsed, body.user_color, source="single")
+    game = new_game(session, user, parsed, color, source="single")
     session.commit()
 
     return CreateGameResponse(

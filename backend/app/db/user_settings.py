@@ -14,6 +14,14 @@ def detail_level_for(session: Session, user_id: str | None) -> DetailLevel | Non
     return cast(DetailLevel | None, row.coach_detail_level) if row is not None else None
 
 
+def usernames_for(session: Session, user_id: str) -> list[str]:
+    """The player's Chess.com and Lichess usernames, for detecting their color in a PGN."""
+    row = session.get(UserSettingsRow, user_id)
+    if row is None:
+        return []
+    return [name for name in (row.chesscom_username, row.lichess_username) if name]
+
+
 def effective_detail_level(session: Session, user_id: str | None) -> DetailLevel:
     """The level the coach writes at: the player's choice, else their rating band's default."""
     chosen = detail_level_for(session, user_id)

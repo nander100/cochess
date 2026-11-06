@@ -3,6 +3,7 @@ import { type ApiClient, isLoggedOut } from '../api/client'
 import type { BoardScheme, DetailLevel, PieceSet, Profile, TendencyReport, TimeControl, UserSettings } from '../api/types'
 import { BaselineReportPanel } from '../onboarding/BaselineReportPanel'
 import { useSettings } from '../settings/settingsContext'
+import { OnlineAccounts } from './OnlineAccounts'
 import { ShortcutList } from '../shortcuts/ShortcutHelp'
 import type { ThemePreference } from '../theme/theme'
 import { Button, Card, Input, SegmentedToggle, Skeleton, Switch, Textarea, type ToggleOption } from '../ui'
@@ -65,6 +66,7 @@ interface ProfilePageProps {
  * first login, editable any time. */
 export function ProfilePage({ api, profile, onSaved, onLoggedOut }: ProfilePageProps) {
   const [report, setReport] = useState<TendencyReport | null>(null)
+  const { loaded } = useSettings()
 
   useEffect(() => {
     if (!profile.complete) return
@@ -79,6 +81,7 @@ export function ProfilePage({ api, profile, onSaved, onLoggedOut }: ProfilePageP
       <div className="profile-columns">
         <div className="profile-main">
           <AboutYou api={api} profile={profile} onSaved={onSaved} onLoggedOut={onLoggedOut} />
+          <OnlineAccounts key={loaded ? 'loaded' : 'loading'} />
           <SettingsSection />
         </div>
         {profile.complete && (

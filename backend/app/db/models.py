@@ -287,6 +287,9 @@ class UserSettingsRow(Base):
     # SPEC_V3 §9.3: plain | standard | technical; NULL follows the rating band (PLAN_V3 adj. 5).
     coach_detail_level: Mapped[str | None] = mapped_column(String(10))
     playback_seconds: Mapped[float] = mapped_column(Float, default=1.5)  # §9.5, 0.75 to 3
+    # The player's own usernames: their color is detected from the PGN's player names.
+    chesscom_username: Mapped[str | None] = mapped_column(String(50))
+    lichess_username: Mapped[str | None] = mapped_column(String(50))
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)
 
 

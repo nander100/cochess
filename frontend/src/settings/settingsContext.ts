@@ -10,6 +10,13 @@ export const DEFAULT_SETTINGS: UserSettings = {
   coach_detail_level: 'auto',
   effective_detail_level: 'standard', // replaced by the server's answer once settings load
   playback_seconds: 1.5,
+  chesscom_username: '',
+  lichess_username: '',
+}
+
+/** The player's Chess.com and Lichess usernames that are set. */
+export function usernames(settings: UserSettings): string[] {
+  return [settings.chesscom_username, settings.lichess_username].filter((name) => name.trim() !== '')
 }
 
 export interface SettingsState {

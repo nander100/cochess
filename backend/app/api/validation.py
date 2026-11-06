@@ -2,12 +2,21 @@
 
 from typing import Any
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 COLOR_MESSAGE = "Choose the color you played: White or Black."
+NOT_IN_GAME = f"Your username isn't in this game. {COLOR_MESSAGE}"
+
+
+def color_needed(has_usernames: bool) -> HTTPException:
+    """A game whose color wasn't given and couldn't be detected: the same shape as a missing
+    `user_color`, so the form shows it next to the color choice."""
+    message = NOT_IN_GAME if has_usernames else COLOR_MESSAGE
+    detail = [{"loc": ["body", "user_color"], "msg": message, "type": "missing"}]
+    return HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
 
 
 def _reworded(error: dict[str, Any]) -> dict[str, Any]:

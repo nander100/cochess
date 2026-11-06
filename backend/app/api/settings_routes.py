@@ -20,6 +20,8 @@ PieceSet = Literal["cburnett", "merida"]
 DetailChoice = Literal["auto", "plain", "standard", "technical"]
 DEFAULT_DETAIL: DetailLevel = "standard"  # for a player who hasn't given a rating yet
 Seconds = Annotated[float, Field(ge=0.75, le=3)]
+# Chess.com and Lichess usernames: letters, digits, "_" and "-". Empty clears it.
+Username = Annotated[str, Field(max_length=50, pattern=r"^[A-Za-z0-9_-]*$")]
 
 
 class UserSettings(BaseModel):
@@ -30,6 +32,8 @@ class UserSettings(BaseModel):
     engine_panel: bool = False
     coach_detail_level: DetailChoice = "auto"
     playback_seconds: Seconds = 1.5  # one move every this many seconds (§9.5)
+    chesscom_username: Username = ""
+    lichess_username: Username = ""
 
 
 class SettingsResponse(UserSettings):
@@ -47,6 +51,8 @@ class SettingsUpdate(BaseModel):
     engine_panel: bool | None = None
     coach_detail_level: DetailChoice | None = None
     playback_seconds: Seconds | None = None
+    chesscom_username: Username | None = None
+    lichess_username: Username | None = None
 
 
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -63,6 +69,8 @@ def _of(row: UserSettingsRow | None) -> UserSettings:
         engine_panel=row.engine_panel,
         coach_detail_level=cast(DetailChoice, row.coach_detail_level or "auto"),
         playback_seconds=row.playback_seconds,
+        chesscom_username=row.chesscom_username or "",
+        lichess_username=row.lichess_username or "",
     )
 
 
@@ -82,6 +90,8 @@ def _columns(settings: UserSettings) -> dict[str, object]:
     values["coach_detail_level"] = (
         None if settings.coach_detail_level == "auto" else settings.coach_detail_level
     )
+    for field in ("chesscom_username", "lichess_username"):
+        values[field] = values[field].strip() or None
     return values
 
 

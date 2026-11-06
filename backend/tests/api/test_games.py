@@ -242,3 +242,29 @@ class TestDuplicates:
         client.post("/api/games", json=SHORT_GAME)
 
         assert log_in(app, "Sam").post("/api/games", json=SHORT_GAME).status_code == 201
+
+
+DETECTABLE = '[White "Rival"]\n[Black "Nander100"]\n[Result "0-1"]\n\n1. e4 e5 0-1'
+
+
+def test_without_a_color_the_players_username_in_the_pgn_sets_it(
+    client: TestClient, db_session: Session
+) -> None:
+    client.patch("/api/settings", json={"chesscom_username": "nander100"})
+
+    response = client.post("/api/games", json={"pgn": DETECTABLE})
+
+    assert response.status_code == 201, response.text
+    game = db_session.get(Game, response.json()["game_id"])
+    assert game is not None and game.user_color == "black"
+
+
+def test_a_username_not_in_the_game_still_needs_a_color(client: TestClient) -> None:
+    client.patch("/api/settings", json={"lichess_username": "someone_else"})
+
+    response = client.post("/api/games", json={"pgn": DETECTABLE})
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["msg"] == (
+        "Your username isn't in this game. Choose the color you played: White or Black."
+    )

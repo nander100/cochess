@@ -151,7 +151,7 @@ Keep this section accurate. If a command changes, update it here.
 - Coach markup: move tags `{{move:Nxe5}}` (optionally numbered, `{{move:14...Qxd4}}`), line links `{{line:here.engine1|link text}}`, board tags `<board arrows="d1d4:red" squares="d4:red"/>`, and puzzle tags `{{puzzle:fork}}`. The backend parses, validates, and converts them to structured SSE events; the frontend never parses raw coach markup.
 - Coach text uses everyday language (SPEC_V3 §9.2). Raw notation outside a move tag, or more than one move in a row in the text, is a validation failure. The coach never writes out a line; it links to one, and the backend fills in the moves.
 - Line playback stops at the settle point computed on the backend (SPEC_V3 §9.6), never at a point chosen by the LLM.
-- `user_color` is always chosen by the user: no default anywhere (schemas, forms, state, fixtures).
+- `user_color` is chosen by the user, or detected by the backend from the user's own Chess.com/Lichess username (profile, `user_settings`) in the PGN's White/Black headers (`analysis/onboarding.py::detect_color`, exact name, any case). Never a default (schemas, forms, state, fixtures); no match means the user picks. The name-count `suggested_color` stays a hint only.
 - Chat annotations refer to the position the message was sent from. Later positions are only annotated inside walkthroughs.
 - Structured coach output (walkthroughs) uses a forced tool call, not free-text JSON.
 - UI: no hard-coded colors, sizes, or fonts in components; use the design tokens (`frontend/src/styles/tokens.css`, from `docs/design/tokens.md`; `src/styles/tokens.guard.test.ts` fails on raw colors or font stacks). Fonts are self-hosted woff2 (OFL, licenses in `src/styles/fonts/`), never Google Fonts: the COEP header would block them. Themes: `<html data-theme="light|dark">`, light by default; "match system" is resolved in `src/theme/theme.ts`. Chess-meaning colors (good/inaccuracy/mistake/blunder/plan) come from one shared map and always appear with a glyph or label.
@@ -172,7 +172,7 @@ Keep this section accurate. If a command changes, update it here.
 - PGN export round-trips: export, re-import, replay, compare.
 - Plain-language tests: bare notation and multi-move sequences in coach text are caught; move tags render the right words (captures, checks, castling, promotion); line references resolve, and `best` before reveal is rejected.
 - Settle-point tests on hand-built lines: a piece win, an even exchange (never stops mid-exchange), a mate, and a quiet line.
-- Color tests: the API rejects a missing color, and no color is selected when a form loads.
+- Color tests: without a username match the API rejects a missing color (assessment rows come back `needs_color`), and no color is selected when a form loads; with a match the color is detected, and the user's own pick wins.
 - The dashboard endpoint has a performance test with 200 generated games.
 - Coach tests mock the Anthropic client (`tests/coach_fakes.py`); never call the real API in tests. Import tests fake the Lichess API. Frontend tests use the fake engine transport.
 - Don't mark a milestone done with failing tests, lint errors, or type errors.
@@ -203,7 +203,7 @@ Also stop and ask before: adding a dependency not listed here, changing an appro
 - Don't invent puzzles, courses, or resources. Puzzle themes only, from the allowed list, as validated tags.
 - Don't build v4 features (Google sign-in, payments, credits, production AWS setup, mobile layout).
 - Don't accept PGNs from non-standard starting positions.
-- Don't default the user's color to White (or anything).
+- Don't default the user's color to White (or anything). Detection from the user's own username is not a default; a guess from anything else is.
 - Don't let the coach write out move sequences; use line links.
 - Don't commit `.env`, API keys, the SQLite database, or invite links.
 
