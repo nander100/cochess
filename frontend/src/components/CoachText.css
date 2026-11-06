@@ -42,7 +42,7 @@ button.coach-board-tag:focus-visible {
   border: 0;
   border-radius: var(--radius-nav);
   background: none;
-  color: var(--chess-plan);
+  color: inherit; /* readable on light, tinted and dark coach panels alike */
   font: inherit;
   font-weight: 600;
   text-decoration: underline;

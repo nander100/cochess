@@ -68,7 +68,9 @@ cochess/
 │   │   │   ├── evals.py, accuracy.py, classify.py, selection.py, moves.py
 │   │   │   ├── material.py, pawns.py, phase.py
 │   │   │   ├── detectors/       # nine detectors
-│   │   │   ├── move_facts.py    # + per-step facts for walkthroughs and playback captions
+│   │   │   ├── move_facts.py    # + per-step facts for walkthroughs
+│   │   │   ├── move_words.py    # + SAN to words for move tags
+│   │   │   ├── settle.py        # + playback settle point and caption
 │   │   │   ├── moments.py       # selection, grading, hints
 │   │   │   ├── tendencies.py, onboarding.py, summary.py, summary_models.py
 │   │   │   └── dashboard.py     # + dashboard aggregation
@@ -91,6 +93,7 @@ cochess/
     │   ├── board/               # chessground wrapper, game tree, move list, eval graph (+ annotations, saved variations, playback)
     │   ├── moments/             # critical-moment stepper
     │   ├── walkthrough/         # + stepper panel and useWalkthrough (the per-step scan lives in analysis/walkthrough.ts)
+    │   ├── playback/            # + line playback hook and control bar (scans: analysis/playback.ts)
     │   ├── dashboard/           # + cards and charts
     │   ├── onboarding/          # paste-and-check table, slots, baseline report
     │   ├── components/          # ChatPanel, CoachText (markdown + board-tag icons), GameInput, Synopsis, ...
