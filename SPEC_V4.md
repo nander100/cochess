@@ -110,13 +110,14 @@ Before planning:
 
 For every active player, paid or not, and with zero credits: uploading and importing games, engine analysis (it runs in the browser), the move list, eval graph, critical moments without coach text, saved variations, PGN export, and the dashboard's numbers and charts. Cached coach output (a walkthrough already generated for the same line and tier) costs nothing to show again.
 
-## 6. Free trial and payments (Stripe)
+## 6. Free trial and payments (Stripe Managed Payments)
 
-v4 launches with Stripe, selling to US customers (owner decision, §15 D13). A move to Paddle may come later if CoChess sells internationally, so the provider sits behind one `BillingProvider` interface (create checkout, open the customer portal, verify and parse a webhook, cancel a subscription), and nothing outside it names Stripe:
+v4 launches with **Stripe Managed Payments** (owner decision, §15 D13): Stripe is the merchant of record, so it registers for, collects and files sales tax and VAT, and handles fraud, disputes and buyer support. CoChess can sell in every country Managed Payments supports from launch. It's turned on in Stripe Checkout, so the integration below is ordinary Stripe Checkout, Customer Portal and webhooks. The provider still sits behind one `BillingProvider` interface (create checkout, open the customer portal, verify and parse a webhook, cancel a subscription), and nothing outside it names Stripe:
 - Data uses provider-neutral names (`billing_provider`, `billing_customer_id`, `billing_events`), and every billing record carries its provider, so Stripe history stays readable after a switch.
 - Plans are keyed by CoChess's own product names in config (`monthly`, `top_up`), mapped to the provider's price ids.
 - No provider-only features the ledger depends on (Stripe coupons, metered billing): credits, trials and owner grants live in CoChess's ledger.
-- The ledger, the webhook rules (signature checked, events stored, repeats ignored, the browser never trusted) and the plans don't change with the provider. A switch means a second `BillingProvider`, a terms update naming the new seller, and moving subscribers (Stripe's card-data export to the new provider, or asking them to re-subscribe).
+- The ledger, the webhook rules (signature checked, events stored, repeats ignored, the browser never trusted) and the plans don't change with the provider. A switch (to Paddle, or to plain Stripe) means a second `BillingProvider` or a configuration change, a terms update naming the seller, and moving subscribers if the provider changes.
+- Managed Payments must accept CoChess as a digital product business when the account is set up (M4); if it doesn't, plain Stripe with Stripe Tax is the fallback (§15 D4).
 
 ### 6.1 Plans (owner approved; amounts in config)
 
@@ -140,7 +141,7 @@ Unpaid players are those on the trial (or with only owner grants); they use ever
   - Each event is stored (`billing_events`) with its amount and currency, for the owner dashboard's revenue; a repeat is acknowledged and ignored. Unknown events are logged and acknowledged.
 - The return page after checkout says "Payment received, your credits will appear in a moment" and polls `GET /api/billing` until the webhook has landed.
 - Failed renewals: the subscription goes `past_due` per Stripe's retry settings; no new allowance until an invoice is paid. Remaining credits stay usable.
-- Taxes: see §15, D4. Stripe sends receipts by email.
+- Taxes: Stripe, as merchant of record, adds and remits sales tax and VAT where they apply; prices are shown before tax and Checkout adds it. Stripe sends receipts and invoices by email. Card statements show Stripe's descriptor with CoChess's name, per Managed Payments.
 
 ### 6.3 Data
 
@@ -386,12 +387,12 @@ Stop for owner review at every ✅.
 | D1 | Where Postgres runs | Amazon RDS (§12.1) |
 | D6a | Minimum age | 13, with parent or guardian agreement for 13–17 (§11) |
 | D11 | Account email | Yes, through Amazon SES, starting with the acceptance email (§12.4) |
-| D13 | Payment provider | Stripe at launch, US customers only; Paddle (merchant of record) considered later for international sales, so billing is provider-neutral (§6) |
+| D13 | Payment provider | Stripe Managed Payments (Stripe as merchant of record, handling sales tax and VAT), chosen over Paddle (5% + 50¢, its checkout would need a page without cross-origin isolation) and plain Stripe (the owner would handle tax). Billing stays provider-neutral (§6). A $5 option stays: about 58% is left after fees and the most API it can use |
 
 **Still open (at M0):**
 
 | # | Decision | Recommendation |
 |---|---|---|
-| D4 | Sales tax | Talk to a CPA first. Sell to US customers only (Checkout collects the billing address and accepts US only), with Stripe Tax watching state registration thresholds; turn on collection in a state once its threshold is reached |
+| D4 | Tax | Sales tax and VAT: handled by Stripe as merchant of record (D13). Still the owner's, with a CPA: income tax on Stripe's payouts, the business entity, and any local business licence |
 | D6 | The terms and privacy text | Owner, reviewed by a lawyer |
 | D10 | A domain the owner controls (today: `3-15-12-174.sslip.io`) | Buy one (Route 53 or any registrar) before M2; needed for email, Google sign-in and the payment provider's review |
