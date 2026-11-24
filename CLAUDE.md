@@ -2,7 +2,7 @@
 
 CoChess is a web app that coaches intermediate chess players (roughly 1000–1800 Elo) to improve. Users upload games, a chess engine analyzes them, and an LLM coach (Claude API) explains the engine's findings in plain, encouraging language, teaches move by move, and tracks the player's tendencies over time.
 
-- **Current work: v4** (branch `v4`). The spec is `SPEC_V4.md` (production: Google sign-in and waitlist, credits, Stripe, Deep coach, owner dashboard, account email, Postgres on RDS, legal); the plan and decision log are `docs/PLAN_V4.md`, written at M0. The owner's decisions so far are in `SPEC_V4.md` §14.
+- **Current work: v4** (branch `v4`). The spec is `SPEC_V4.md` (production: Google sign-in and waitlist, credits, Stripe, Deep coach, owner dashboard, account email, Postgres on RDS, legal); the plan and decision log are `docs/PLAN_V4.md`, written at M0. The owner's decisions so far are in `SPEC_V4.md` §15.
 - `SPEC.md` (v1), `SPEC_V2.md` (v2) and `SPEC_V3.md` (v3) are kept for reference; `docs/PLAN_V3.md` holds v3's decision log. `docs/v1-as-built.md`, `docs/v2-as-built.md` and `docs/v3-as-built.md` record what each version actually became (v3's also has the done-condition review and known issues); `docs/v2-handoff.md` records v2's deviations, feedback, known issues and gotchas.
 - Where files disagree: `SPEC_V4.md` wins over older specs, `docs/PLAN_V4.md` decisions approved at a checkpoint win over the spec, and the code as built wins over all specs until a checkpoint decides otherwise.
 - v3 is deployed (EC2 + Caddy, `docs/DEPLOY.md`) and merged into `main`. Mobile layout, opening courses and in-app puzzles are later versions (`SPEC_V4.md` §2): don't build them.
@@ -182,7 +182,7 @@ Keep this section accurate. If a command changes, update it here.
 
 ## Checkpoints — stop and ask
 
-Stop for owner review at every ✅ checkpoint in SPEC_V4 §12. At each one:
+Stop for owner review at every ✅ checkpoint in SPEC_V4 §13. At each one:
 1. Summarize what was built and what's next.
 2. Show evidence: test results; for UI milestones, Playwright screenshots; for coach milestones, real output on the owner's games (with screenshots of annotations where relevant).
 3. Wait for approval.

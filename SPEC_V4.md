@@ -1,6 +1,6 @@
 # CoChess — v4 Spec
 
-Status: **Draft for owner review** (third draft, 2026-11-23, with the owner's answers on hosting, waitlist, pricing, coach strength, mobile layout, the owner dashboard, Postgres on RDS, the minimum age and account email). This builds on v3 (`SPEC_V3.md`, as built in `docs/v3-as-built.md`), v2 and v1, all kept for reference. Where they disagree, this file wins once approved. Sections 1–13 define v4 (§12 is the milestone plan). §14 records the owner's decisions and the few still open.
+Status: **Draft for owner review** (third draft, 2026-11-23, with the owner's answers on hosting, waitlist, pricing, coach strength, mobile layout, the owner dashboard, Postgres on RDS, the minimum age and account email). This builds on v3 (`SPEC_V3.md`, as built in `docs/v3-as-built.md`), v2 and v1, all kept for reference. Where they disagree, this file wins once approved. Sections 1–14 define v4 (§13 is the milestone plan). §15 records the owner's decisions and the few still open.
 
 ---
 
@@ -12,11 +12,12 @@ v3 made CoChess pleasant to use every day for a handful of invited testers. v4 m
 2. **Coaching credits.** Every Claude call is priced from its real token usage and paid for from the player's credit balance. Players see what they have left; at zero the coach stops, the engine doesn't.
 3. **Free trial and payments.** Accepted players get trial credits. A monthly subscription includes a coaching allowance, and one-time top-ups add more, through Stripe's hosted pages.
 4. **Coach strength.** Players can choose a Deep coach that uses their credits faster.
-5. **Owner dashboard.** The owner sees every user, their usage and the site's numbers (paid vs unpaid, cost vs revenue), accepts or revokes access, and adds credits.
-6. **Cost controls.** Measured cost per game, better prompt-cache use, smaller payloads, and per-task model routing.
-7. **Production hardening on EC2.** Postgres, backups with a tested restore, monitoring, a staging copy, and rate limiting.
-8. **Accounts and legal.** Terms of service, privacy policy, a minimum age of 13, account deletion and data export.
-9. **Account email.** Players get email about their account, starting with "You've been accepted".
+5. **Faster game analysis.** A game is analyzed in seconds instead of about a minute, so importing games keeps up with other chess sites (owner request, §8).
+6. **Owner dashboard.** The owner sees every user, their usage and the site's numbers (paid vs unpaid, cost vs revenue), accepts or revokes access, and adds credits.
+7. **Cost controls.** Measured cost per game, better prompt-cache use, smaller payloads, and per-task model routing.
+8. **Production hardening on EC2.** Postgres, backups with a tested restore, monitoring, a staging copy, and rate limiting.
+9. **Accounts and legal.** Terms of service, privacy policy, a minimum age of 13, account deletion and data export.
+10. **Account email.** Players get email about their account, starting with "You've been accepted".
 
 **Rules carried forward:**
 - **The engine analyzes, the LLM explains.**
@@ -41,7 +42,8 @@ v3 made CoChess pleasant to use every day for a handful of invited testers. v4 m
 Before planning:
 1. Check `docs/v3-as-built.md` against the code on `main` and note anything that changed since (it's current as of 2026-11-23).
 2. **Measure real cost.** From `llm_usage` on the deployed server, compute the cost per task and per analyzed game (synopsis + the questions players actually ask + moments + walkthroughs) at today's prices, for Standard and (by replaying a few owner games) Deep. The credit amounts in §6 are checked against this.
-3. Settle the open decisions in §14 and write `docs/PLAN_V4.md` (plan, adjustments, decision log), as in v3.
+3. **Measure engine time.** Scan and verify time per game, with both Stockfish builds, on the owner's fixture games: the baseline for §8.
+4. Settle the open decisions in §15 and write `docs/PLAN_V4.md` (plan, adjustments, decision log), as in v3.
 
 ## 4. Google sign-in and the waitlist
 
@@ -53,15 +55,15 @@ Before planning:
 
 ### 4.2 Joining the waitlist
 
-- A new Google `sub` creates a user with status `waitlisted`, after the person passes the age check and accepts the terms and privacy policy (§10). Their name comes from Google and can be changed later. They get the "You're on the waitlist" email (§11.4).
-- A waitlisted user who signs in sees one page: "You're on the waitlist", the date they joined, and a sign-out link. Every other route refuses them (`403`, "Your account is waiting for approval"). They can still delete their waitlist entry (§10).
+- A new Google `sub` creates a user with status `waitlisted`, after the person passes the age check and accepts the terms and privacy policy (§11). Their name comes from Google and can be changed later. They get the "You're on the waitlist" email (§12.4).
+- A waitlisted user who signs in sees one page: "You're on the waitlist", the date they joined, and a sign-out link. Every other route refuses them (`403`, "Your account is waiting for approval"). They can still delete their waitlist entry (§11).
 - Waitlisted users cost nothing: no coach calls, no trial credits, no game uploads.
 
 ### 4.3 Accepted players
 
-- The owner accepts a user from the owner dashboard (§9) or `app.cli admit --user`. Their status becomes `active` and the trial grant (§6.1) is added once.
+- The owner accepts a user from the owner dashboard (§10) or `app.cli admit --user`. Their status becomes `active` and the trial grant (§6.1) is added once.
 - The next time they sign in with Google (or reload, if signed in), they reach the normal first-run profile flow and the app.
-- They get the "You've been accepted" email (§11.4) with a sign-in link to the app. The waitlist page also opens the app by itself once they're accepted.
+- They get the "You've been accepted" email (§12.4) with a sign-in link to the app. The waitlist page also opens the app by itself once they're accepted.
 
 ### 4.4 Revoked access
 
@@ -76,7 +78,7 @@ Before planning:
 ### 4.6 Data
 
 - `users`: add `email` (verified, from Google, shown on the Profile page and the owner dashboard), `google_sub` (unique, nullable for invite-only users), `status` (`waitlisted`, `active`, `suspended`, `deleted`), `role` (`player`, `owner`), `age_band` (`13_17`, `18_plus`), `age_checked_at`, `waitlisted_at`, `admitted_at`, `last_active_at` (updated at most once an hour).
-- `email_preferences`: user, kind, enabled (only for the kinds a player can turn off, §11.4).
+- `email_preferences`: user, kind, enabled (only for the kinds a player can turn off, §12.4).
 - `oauth_states`: hashed state, nonce, PKCE verifier, created_at, expires_at; deleted after use or expiry.
 - `terms_acceptances`: user, version, accepted_at.
 - The email is personal data: never logged, never sent to the coach, never sent to Chess.com or Lichess.
@@ -110,7 +112,7 @@ For every active player, paid or not, and with zero credits: uploading and impor
 
 ## 6. Free trial and payments (Stripe)
 
-v4 launches with Stripe, selling to US customers (owner decision, §14 D13). A move to Paddle may come later if CoChess sells internationally, so the provider sits behind one `BillingProvider` interface (create checkout, open the customer portal, verify and parse a webhook, cancel a subscription), and nothing outside it names Stripe:
+v4 launches with Stripe, selling to US customers (owner decision, §15 D13). A move to Paddle may come later if CoChess sells internationally, so the provider sits behind one `BillingProvider` interface (create checkout, open the customer portal, verify and parse a webhook, cancel a subscription), and nothing outside it names Stripe:
 - Data uses provider-neutral names (`billing_provider`, `billing_customer_id`, `billing_events`), and every billing record carries its provider, so Stripe history stays readable after a switch.
 - Plans are keyed by CoChess's own product names in config (`monthly`, `top_up`), mapped to the provider's price ids.
 - No provider-only features the ledger depends on (Stripe coupons, metered billing): credits, trials and owner grants live in CoChess's ledger.
@@ -138,7 +140,7 @@ Unpaid players are those on the trial (or with only owner grants); they use ever
   - Each event is stored (`billing_events`) with its amount and currency, for the owner dashboard's revenue; a repeat is acknowledged and ignored. Unknown events are logged and acknowledged.
 - The return page after checkout says "Payment received, your credits will appear in a moment" and polls `GET /api/billing` until the webhook has landed.
 - Failed renewals: the subscription goes `past_due` per Stripe's retry settings; no new allowance until an invoice is paid. Remaining credits stay usable.
-- Taxes: see §14, D4. Stripe sends receipts by email.
+- Taxes: see §15, D4. Stripe sends receipts by email.
 
 ### 6.3 Data
 
@@ -151,7 +153,35 @@ Unpaid players are those on the trial (or with only owner grants); they use ever
 - The Profile page shows both with the measured credits per game for each (e.g. "about 2 credits a game" vs "about 8") and says Deep uses credits about 4× faster. Trial players can choose Deep too. The choice applies to new coach calls only.
 - Cached walkthroughs record their tier; a Deep player is not served a Standard walkthrough.
 
-## 8. Cost controls
+## 8. Faster game analysis (owner request, M3)
+
+Analyzing a game takes about a minute today (scan and verify, multi-threaded Stockfish on a laptop), so importing 20 games takes about 20 minutes, much slower than other chess sites. The game import itself (fetching from Chess.com or Lichess) is quick; the engine is the bottleneck. The engine stays in the player's browser and the backend keeps checking every result (golden rule 3).
+
+### 8.1 Targets
+
+Measured with real Stockfish on the owner's fixture games, on the same laptop as the v3 figures (M0 records the baseline per game and per phase):
+- A 40-move game is fully analyzed (scan and verify) in **15 seconds or less** with the multi-threaded build, and in 30 seconds or less with the single-threaded fallback.
+- The board, move list and eval graph open as soon as the scan is done; the verify step finishes in the background.
+- An import of 20 games: the first game opens within 15 seconds, all 20 are analyzed within 5 minutes, and the player can keep using the app while it runs.
+- **Quality doesn't drop:** on the owner's fixture games, every blunder and mistake found today is still found, at least 95% of move classifications are unchanged, and the critical moments picked are the same or the owner accepts the differences. A regression test compares new results to the stored v3 engine results.
+
+### 8.2 How (each change measured on its own, kept only if it helps)
+
+- **Stop the scan by depth, not time.** Today every position waits at least 250 ms even when depth 12 is reached sooner. The scan tier stops as soon as its depth is reached, with the hard cap kept for slow positions; the depth is set from the quality test.
+- **Several engines at once.** Scan positions are independent, so a pool of single-threaded Stockfish workers (sized from the device's cores and memory, `ENGINE__POOL_SIZE` as the ceiling) searches several positions at the same time. That scales better than one engine with several threads on short searches, and it also works without cross-origin isolation, so the single-threaded fallback gets faster too. Verify searches, which are longer, keep one multi-threaded engine.
+- **Reuse the engine's memory.** Each worker scans a run of consecutive positions from the end of the game backwards, so its hash table already knows the positions that follow.
+- **Skip searches whose answer is known.** A position with only one legal move gets the evaluation of the position after that move. The backend fills it in from that result (the browser doesn't send it), so the backend's checks don't change. Terminal positions are already scored from the board.
+- **Lighter verify.** Verify runs on fewer positions when the scan already makes the verdict clear, and with fewer lines or less time where the quality test allows. The settings stay in `EngineSettings`.
+- **Import in the background.** The import queue keeps running while the player opens other pages (it survives navigation within the app and resumes after a reload). The Games page shows its progress, and each game opens as soon as its scan is done.
+- Not in v4: running Stockfish on the server (it would load the single EC2 instance with every player's analysis and change the browser-engine design), and taking evaluations from outside services.
+
+### 8.3 Tests
+
+- Vitest with the fake engine transport: the worker pool splits and orders positions correctly, a worker that fails or stops responding has its positions retried on another, a cancelled analysis stops every worker, and results come back in ply order.
+- Backend: a scan without the forced-move positions is accepted and filled in correctly; any other missing position is still rejected.
+- The quality regression test (§8.1) on the owner's fixture games, and a timing check in `npm run e2e:real` that reports scan and verify time per game.
+
+## 9. Cost controls
 
 Target, measured on the owner's games: a typical analyzed game at Standard (synopsis, three chat questions, the critical moments, one walkthrough) costs **no more than it does in v3**, and the v3 quality checks still pass. M0 records the baseline.
 
@@ -160,11 +190,11 @@ Target, measured on the owner's games: a typical analyzed game at Standard (syno
 - **Model routing:** each task's model comes from the tier (§7), so cheaper tasks can move to Haiku without touching code.
 - **Caching coach output:** walkthroughs are cached (v3). The synopsis and baseline report are stored and never regenerated unless the player asks; a regeneration costs credits and says so.
 
-## 9. Owner dashboard
+## 10. Owner dashboard
 
 A page at `/owner` for users with `role = owner`. The role is set only on the server (`app.cli set-role --user "..." owner`), never from the UI. Every `/api/admin/*` route checks it on the backend; for anyone else they return `404`, and the nav never shows the link.
 
-### 9.1 Overview
+### 10.1 Overview
 
 - **Users:** total, and by status (waitlisted, active, suspended); waitlist length and the oldest wait.
 - **Paid vs unpaid:** active subscribers, past-due, cancelled this month, trial-only players (with and without credits left), players at zero credits.
@@ -172,7 +202,7 @@ A page at `/owner` for users with `role = owner`. The role is set only on the se
 - **Money:** revenue in the period (from `billing_events`), API cost in the period (from `llm_usage`), the difference, API cost per active player and per game, credits granted vs spent, the prompt-cache hit rate. Stripe fees aren't known to CoChess and are shown as "before Stripe fees".
 - Period filter: 7 days, 30 days, this month, all time. Charts use Recharts and the chart tokens, as in the v3 dashboard.
 
-### 9.2 Users
+### 10.2 Users
 
 - A table with search (name, email) and filters (status, plan, coach strength, zero credits): name, email, status, plan, balance, credits used in the last 30 days, API cost in the last 30 days, games, last active, joined. Sorted and paginated on the server.
 - **The waitlist** is its own tab, oldest first, with "Accept" on each row and for a selection.
@@ -185,13 +215,13 @@ A page at `/owner` for users with `role = owner`. The role is set only on the se
   - Mark or unmark `unmetered`.
 - The dashboard shows counts and usage, not the content of anyone's games or chats.
 
-### 9.3 Data and limits
+### 10.3 Data and limits
 
 - `admin_actions`: id, admin user id, target user id, action, details (JSON: reason, credits, note), created_at. Ledger entries from the owner point to their action.
 - The overview and the users page each load in under 500 ms with 10,000 generated users and a year of usage (performance test).
 - The same actions stay in the CLI (`admit`, `suspend`, `restore`, `grant-credits`, `set-role`, `usage-report`) for when the web app is down.
 
-## 10. Accounts and legal
+## 11. Accounts and legal
 
 - **Pages:** `/terms` and `/privacy`, public, versioned (`LEGAL__TERMS_VERSION`). The text is the owner's (with legal advice); v4 ships the pages, the version check and the consent records, not the legal wording. A new version asks logged-in users to accept before they continue.
 - **The privacy policy must say:** games, chat messages and profile notes are sent to Anthropic's API to produce coaching; usernames are used to fetch games from Chess.com and Lichess; payments go through Stripe; Google provides the name and email; the owner can see each account's email and usage; only an essential login cookie is set. California's privacy law (CCPA) has thresholds a small app is unlikely to meet at launch, but the export and deletion below cover its main rights anyway.
@@ -202,21 +232,21 @@ A page at `/owner` for users with `role = owner`. The role is set only on the se
   - Only `age_band` (`13_17` or `18_plus`) and the check's time are stored, not the birth year.
   - 13–17: the terms say a parent or guardian must agree to them, and paying needs a parent or guardian. The checkout page says so for `13_17` accounts.
   - The site is a general-audience site: it isn't marketed to children, and the privacy policy says what happens if the owner learns an under-13 account exists (it's deleted).
-  - The terms and privacy wording is still the owner's, reviewed by a lawyer (§14, D6).
+  - The terms and privacy wording is still the owner's, reviewed by a lawyer (§15, D6).
 
-## 11. Production on the EC2 server
+## 12. Production on the EC2 server
 
 The owner hosts on one EC2 instance with Docker Compose and Caddy (`docs/DEPLOY.md`), and v4 stays there. One backend process is kept.
 
-### 11.1 Postgres
+### 12.1 Postgres
 
 - SQLAlchemy and Alembic on Postgres (driver `psycopg`). Every existing migration must run on both SQLite (local dev, tests) and Postgres; the test suite runs on both, and Postgres-only behavior (row locks for the ledger) has its own tests.
 - Postgres runs on **Amazon RDS** (owner decision): the smallest current instance class, single availability zone, in the same region and VPC as the EC2 instance, not publicly reachable (its security group only admits the instance), encrypted storage, TLS required, automated backups kept 14 days with point-in-time recovery, deletion protection on. Staging uses its own database on the same RDS instance.
 - `app.cli migrate-sqlite --from <db> --to <postgres url>` copies the v3 server's data into Postgres, then compares row counts and a checksum per table. Run once at the switch.
 
-### 11.2 Server setup
+### 12.2 Server setup
 
-- **Domain:** the app runs at `https://3-15-12-174.sslip.io` today. v4 needs a domain the owner controls (§14, D10), because:
+- **Domain:** the app runs at `https://3-15-12-174.sslip.io` today. v4 needs a domain the owner controls (§15, D10), because:
   - email can't be sent from `sslip.io`: SES only sends for a domain whose DNS the sender can change (SPF, DKIM, DMARC records), and mail without them lands in spam;
   - the hostname is tied to the Elastic IP, so a new IP means a new address for every player and new Google and payment settings;
   - Google's sign-in consent screen and the payment provider's account review both ask for the business's website, with its terms and privacy pages.
@@ -226,13 +256,13 @@ The owner hosts on one EC2 instance with Docker Compose and Caddy (`docs/DEPLOY.
 - **Migrations** still run at startup (one process).
 - **Rate limiting** in the database (`rate_limits`: key, window start, count), so limits survive restarts and staging and production don't share them: login and OAuth callback per IP; coach calls per user per minute; the import cooldown (moved from memory); export per user per day; checkout per user per minute. The webhook only accepts signed requests. Existing per-player limits (`LIMITS__MAX_GAMES_PER_DAY`, chat messages per game, walkthroughs per game) stay.
 
-### 11.3 Monitoring and backups
+### 12.3 Monitoring and backups
 
 - Structured JSON logs with a request id; never the API key, tokens, cookies or emails. Shipped to CloudWatch with the CloudWatch agent, kept 30 days.
 - Alarms emailed to the owner: the health check failing, disk above 80%, backend errors, Anthropic errors, webhook failures, daily API spend above a threshold, and the AWS budget. `GET /api/health` (database reachable, migrations at head) is what the uptime check calls.
 - Backups: RDS automated backups (14 days, point-in-time) plus a manual snapshot before every release's migrations. **Restore drill:** restoring a backup into a fresh database and running staging against it is part of the M8 checkpoint and written up in `docs/DEPLOY.md`.
 
-### 11.4 Account email (Amazon SES)
+### 12.4 Account email (Amazon SES)
 
 **Service:** Amazon SES in the server's region, sending from `CoChess <account@mail.<domain>>` with a reply-to the owner chooses. The domain is verified in SES with DKIM, and SPF and DMARC records are added. The SES account is moved out of the sandbox (an AWS request) before launch. The backend sends through SES's SMTP interface with Python's standard library (`smtplib`, `email`), so no new dependency. The SMTP credentials come from an IAM user that can only send mail.
 
@@ -259,14 +289,14 @@ Payment receipts, renewal reminders and failed-payment emails come from the paym
 
 All of these are account messages, not marketing: no newsletters or promotions are sent in v4. The ones players can turn off sit under Profile → "Email", with a one-click link at the bottom of each email (a signed token, no login needed).
 
-## 12. v4 milestones and checkpoints
+## 13. v4 milestones and checkpoints
 
 Stop for owner review at every ✅.
 
 - **M0 — Reconcile, measure and plan.** §3: as-built check, real cost per task and per game at both strengths, the domain and Google/Stripe requirements, Postgres location, `docs/PLAN_V4.md`. ✅ *Checkpoint: the cost report and the remaining decisions.*
 - **M1 — Postgres.** Driver, migrations on both databases, tests on both, `migrate-sqlite` with checks. ✅ *Checkpoint: the full suite green on Postgres; a copy of the server's database moved and compared.*
 - **M2 — Google sign-in, the waitlist and account email.** The domain and SES set up; OIDC flow, user status and role, the age check, the waitlist page, accept/suspend/restore from the CLI, Connect Google for existing players, terms consent, invites as an owner tool; the outbox and sender with the `waitlist_joined`, `accepted`, `access_paused` and `access_restored` emails. ✅ *Checkpoint: screenshots of joining the waitlist, being accepted and signing in, and Connect Google, on staging; the acceptance email as received in a real inbox (not spam); the security tests (state, nonce, audience, unverified email, replay, under-13, waitlisted and suspended users refused).*
-- **M3 — Credits and coach strength.** Pricing config, `cost_microusd`, ledger and balance, trial grant on acceptance, the pre-call check and post-call charge on every coach task, warnings, the daily safety cap, CLI grants and `unmetered`, the credits UI, Standard and Deep. No Stripe yet. ✅ *Checkpoint: a week of the owner's real use priced by CoChess against the Anthropic console (within 2%); the out-of-credits screens; one game coached at each strength.*
+- **M3 — Credits, coach strength and faster analysis.** Pricing config, `cost_microusd`, ledger and balance, trial grant on acceptance, the pre-call check and post-call charge on every coach task, warnings, the daily safety cap, CLI grants and `unmetered`, the credits UI, Standard and Deep. No Stripe yet. Faster game analysis (§8): depth-based scan, the worker pool, backwards runs, forced-move skips, lighter verify, background imports, the quality regression test. ✅ *Checkpoint: a week of the owner's real use priced by CoChess against the Anthropic console (within 2%); the out-of-credits screens; one game coached at each strength; engine time per game before and after on the owner's games, a 20-game import timed, and the quality comparison.*
 - **M4 — Stripe.** Checkout, portal, webhooks, refunds, failed renewals, the billing page, in test mode. ✅ *Checkpoint: a full subscription life on a Stripe test clock (subscribe, renew, top-up, failed payment, cancel, refund), showing the ledger after each step.*
 - **M5 — Owner dashboard.** Overview, users table, waitlist tab, user page, the actions with the audit log, the performance test. ✅ *Checkpoint: the dashboard on staging with real and generated users; accepting, revoking, restoring and adding credits, with the audit log after each.*
 - **M6 — Cost controls.** Cache ordering, payload trims, routing. ✅ *Checkpoint: cost per game before and after on the owner's games, and the same 3 synopses and replies side by side for the owner to judge.*
@@ -278,6 +308,7 @@ Stop for owner review at every ✅.
 - A stranger can join the waitlist with Google, and once the owner accepts them, sign in with Google, use the trial, subscribe, and keep getting coached without the owner doing anything more.
 - Waitlisted and suspended users can't reach anything but their status page, export and deletion.
 - Existing players keep all their games and history and sign in with Google.
+- A 40-move game is analyzed in 15 seconds or less (multi-threaded build), a 20-game import finishes within 5 minutes, and no blunder or mistake found in v3 is lost (§8.1).
 - Every coach call is priced, charged and visible in the player's credit history; CoChess's total matches the Anthropic bill within 2% over a month.
 - Nobody gets coaching with zero credits, and no balance ever changes from a player's browser request.
 - A replayed or forged Stripe webhook changes nothing.
@@ -288,9 +319,9 @@ Stop for owner review at every ✅.
 - All v3 done-conditions still hold (zero `moment_leak` incidents, validated annotations, plain language).
 - All tests, lint, type checks and end-to-end tests pass, on SQLite and Postgres.
 
-## 13. API, data model and testing
+## 14. API, data model and testing
 
-### 13.1 New and changed endpoints
+### 14.1 New and changed endpoints
 
 | Method & path | Purpose |
 |---|---|
@@ -303,23 +334,23 @@ Stop for owner review at every ✅.
 | `POST /api/billing/portal` | Stripe Customer Portal URL |
 | `POST /api/billing/webhook` | Stripe events (signed, no session) |
 | `POST /api/me/export` | Data export zip |
-| `DELETE /api/me` | Account deletion (§10) |
+| `DELETE /api/me` | Account deletion (§11) |
 | `GET /api/health` | Uptime check |
-| `GET /api/admin/overview?period=` | Owner dashboard numbers (§9.1) |
-| `GET /api/admin/users?q=&status=&plan=&sort=&page=` | Users table (§9.2) |
+| `GET /api/admin/overview?period=` | Owner dashboard numbers (§10.1) |
+| `GET /api/admin/users?q=&status=&plan=&sort=&page=` | Users table (§10.2) |
 | `GET /api/admin/users/{id}` | A user's page: numbers, ledger, audit log |
 | `POST /api/admin/users/{id}/accept` · `/suspend` · `/restore` · `/credits` · `/metering` | Owner actions (audited) |
 | Every coach route | `402` out of credits, `403` not active; the SSE `done` event carries the call's credits |
 
 `PATCH /api/settings` gains `coach_strength`.
 
-### 13.2 Data model
+### 14.2 Data model
 
 - **Changed:** `users` (§4.6, §6.3), `llm_usage` (`cost_microusd`, `tier`), `user_settings` (`coach_strength`, `unmetered`), `walkthroughs` (`tier`).
 - **New:** `oauth_states`, `terms_acceptances`, `credit_ledger`, `credit_balances`, `billing_events`, `admin_actions`, `rate_limits`, `email_outbox`, `email_preferences`.
 - **Removed:** `USER_DAILY_TOKEN_LIMIT` (replaced by the daily safety cap).
 
-### 13.3 Testing rules (added to CLAUDE.md's)
+### 14.3 Testing rules (added to CLAUDE.md's)
 
 - Google is faked (a local signing key and JWKS); never call Google in tests. Tests cover bad state, bad nonce, wrong audience, expired token, unverified email, a reused code, and waitlisted and suspended users.
 - Stripe is faked with signed test events; never call Stripe in tests. Tests cover each webhook type, a replayed event, a bad signature, out-of-order events, and a refund that drives the balance negative.
@@ -332,14 +363,14 @@ Stop for owner review at every ✅.
 - Email is faked (a recording transport); never send real mail in tests. Tests cover: each trigger writes exactly one outbox row in the same transaction, a rolled-back action writes none, a repeat trigger is deduplicated, retries stop after the limit, a turned-off kind is skipped, the unsubscribe link only works with a valid token, and no address or body reaches the logs.
 - Age check: under 13 stores nothing; 13–17 and 18+ store only the band.
 
-### 13.4 New dependencies (owner approval needed, per CLAUDE.md)
+### 14.4 New dependencies (owner approval needed, per CLAUDE.md)
 
 - `stripe` (Python SDK) for Checkout, Portal, webhook signature checks and cancelling a subscription from the owner dashboard.
 - `psycopg[binary]` for Postgres.
 - One library for Google ID-token verification (`google-auth`, or `authlib`), decided at M0.
 - None for email: SES's SMTP interface through the standard library.
 
-## 14. Owner decisions
+## 15. Owner decisions
 
 **Decided (2026-11-23):**
 
@@ -352,9 +383,9 @@ Stop for owner review at every ✅.
 | D8 | Deep coach | In v4 |
 | D9 | Mobile layout | A later version |
 | D12 | Owner dashboard | In v4: all users, usage, site stats, paid vs unpaid, accept/revoke access, add credits |
-| D1 | Where Postgres runs | Amazon RDS (§11.1) |
-| D6a | Minimum age | 13, with parent or guardian agreement for 13–17 (§10) |
-| D11 | Account email | Yes, through Amazon SES, starting with the acceptance email (§11.4) |
+| D1 | Where Postgres runs | Amazon RDS (§12.1) |
+| D6a | Minimum age | 13, with parent or guardian agreement for 13–17 (§11) |
+| D11 | Account email | Yes, through Amazon SES, starting with the acceptance email (§12.4) |
 | D13 | Payment provider | Stripe at launch, US customers only; Paddle (merchant of record) considered later for international sales, so billing is provider-neutral (§6) |
 
 **Still open (at M0):**
