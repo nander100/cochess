@@ -2,10 +2,10 @@
 
 CoChess is a web app that coaches intermediate chess players (roughly 1000–1800 Elo) to improve. Users upload games, a chess engine analyzes them, and an LLM coach (Claude API) explains the engine's findings in plain, encouraging language, teaches move by move, and tracks the player's tendencies over time.
 
-- **Current work: v3.** The spec is `SPEC_V3.md`; the plan and decision log are `docs/PLAN_V3.md`.
-- `SPEC.md` (v1) and `SPEC_V2.md` (v2) are kept for reference. `docs/v1-as-built.md`, `docs/v2-as-built.md` and `docs/v3-as-built.md` record what each version actually became (v3's also has the done-condition review and known issues); `docs/v2-handoff.md` records v2's deviations, feedback, known issues and gotchas.
-- Where files disagree: `SPEC_V3.md` wins over older specs, `docs/PLAN_V3.md` decisions approved at a checkpoint win over the spec, and the code as built wins over all specs until a checkpoint decides otherwise.
-- v4 is listed in `SPEC_V3.md` §13 so v3's design doesn't block it. Do not implement it.
+- **Current work: v4** (branch `v4`). The spec is `SPEC_V4.md` (production: Google sign-in and waitlist, credits, Stripe, Deep coach, owner dashboard, account email, Postgres on RDS, legal); the plan and decision log are `docs/PLAN_V4.md`, written at M0. The owner's decisions so far are in `SPEC_V4.md` §14.
+- `SPEC.md` (v1), `SPEC_V2.md` (v2) and `SPEC_V3.md` (v3) are kept for reference; `docs/PLAN_V3.md` holds v3's decision log. `docs/v1-as-built.md`, `docs/v2-as-built.md` and `docs/v3-as-built.md` record what each version actually became (v3's also has the done-condition review and known issues); `docs/v2-handoff.md` records v2's deviations, feedback, known issues and gotchas.
+- Where files disagree: `SPEC_V4.md` wins over older specs, `docs/PLAN_V4.md` decisions approved at a checkpoint win over the spec, and the code as built wins over all specs until a checkpoint decides otherwise.
+- v3 is deployed (EC2 + Caddy, `docs/DEPLOY.md`) and merged into `main`. Mobile layout, opening courses and in-app puzzles are later versions (`SPEC_V4.md` §2): don't build them.
 
 ## The golden rules
 
@@ -44,7 +44,8 @@ Stockfish build: `stockfish-19-lite` (multi-threaded) with `stockfish-19-lite-si
 cochess/
 ├── CLAUDE.md
 ├── SPEC.md / SPEC_V2.md         # earlier specs (reference)
-├── SPEC_V3.md                   # current spec
+├── SPEC_V3.md                   # v3 spec (reference)
+├── SPEC_V4.md                   # current spec
 ├── docs/
 │   ├── v1-as-built.md, v2-as-built.md (+), v2-handoff.md
 │   ├── PLAN.md, PLAN_V2.md      # earlier plans and decisions
@@ -181,12 +182,12 @@ Keep this section accurate. If a command changes, update it here.
 
 ## Checkpoints — stop and ask
 
-Stop for owner review at every ✅ checkpoint in SPEC_V3 §12. At each one:
+Stop for owner review at every ✅ checkpoint in SPEC_V4 §12. At each one:
 1. Summarize what was built and what's next.
 2. Show evidence: test results; for UI milestones, Playwright screenshots; for coach milestones, real output on the owner's games (with screenshots of annotations where relevant).
 3. Wait for approval.
 
-Also stop and ask before: adding a dependency not listed here, changing an approved schema, removing earlier behavior the spec doesn't mention, or making a decision the spec doesn't cover. Record decisions in `docs/PLAN_V3.md`.
+Also stop and ask before: adding a dependency not listed here, changing an approved schema, removing earlier behavior the spec doesn't mention, or making a decision the spec doesn't cover. Record decisions in `docs/PLAN_V4.md`.
 
 ## Gotchas
 
@@ -205,7 +206,8 @@ Also stop and ask before: adding a dependency not listed here, changing an appro
 - Don't draw an annotation that hasn't passed validation.
 - Don't trust FENs, SAN, or engine results from the client without checking them.
 - Don't invent puzzles, courses, or resources. Puzzle themes only, from the allowed list, as validated tags.
-- Don't build v4 features (Google sign-in, payments, credits, production AWS setup, mobile layout).
+- Don't build past v4's scope (mobile layout, opening courses, in-app puzzles, other sign-in providers, ECS or multi-server hosting).
+- Don't call Google, Stripe or SES in tests, and don't change a player's credit balance from anything but a verified webhook, metered usage, or an audited owner action.
 - Don't accept PGNs from non-standard starting positions.
 - Don't default the user's color to White (or anything). Detection from the user's own username is not a default; a guess from anything else is.
 - Don't let the coach write out move sequences; use line links.
