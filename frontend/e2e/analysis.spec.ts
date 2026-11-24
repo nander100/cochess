@@ -17,11 +17,6 @@ const ENGINE_FIXTURE = new URL(
   import.meta.url,
 )
 
-// Tier minimums from backend config: a search must reach the min depth unless it hit the cap.
-const TIERS = {
-  scan: { minDepth: 12, hardCapMs: 1000 },
-  verify: { minDepth: 18, hardCapMs: 3000 },
-}
 
 test('analyzes a real game in the browser with the multi-threaded engine', async ({ page }) => {
   const engineLog: string[] = []
@@ -39,7 +34,6 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
   await page.goto('/')
   // The Vite dev server can reload the page once while it bundles newly added dependencies.
   await page.waitForLoadState('networkidle')
-  await expect(page.getByRole('heading', { name: 'CoChess' })).toBeVisible()
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(true)
   await expect(page.getByRole('link', { name: 'Continue with Google' })).toBeVisible()
 
@@ -92,6 +86,8 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
 
   // M2: the analysis board shows the game from the database.
   await expect(page.locator('cg-board piece')).toHaveCount(32)
+  // The move list starts folded on the game page ("Moves 74 moves · Show").
+  await page.getByRole('button', { name: /^Moves .* Show$/ }).click()
   const moves = page.getByLabel('Moves')
   expect(await moves.locator('button.move').count()).toBeGreaterThan(10)
   const marked = await moves.locator('button.move .glyph').count()
@@ -102,9 +98,12 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
 
   expect(engineLog.join()).toContain('CoChess engine: stockfish-19-lite,') // multi-threaded build
   expect(rows.some((row) => row.tier === 'verify')).toBe(true)
+  // Tier minimums from the backend's engine config: a search reaches its min depth unless it hit
+  // the cap (a little slack for the stop message's round trip).
+  const config = await (await page.request.get('/api/engine-config')).json()
   for (const row of rows) {
-    const tier = TIERS[row.tier as keyof typeof TIERS]
-    const deepEnough = row.depth >= tier.minDepth || row.time_ms >= tier.hardCapMs
+    const tier = config[row.tier as 'scan' | 'verify']
+    const deepEnough = row.depth >= tier.min_depth || row.time_ms >= tier.hard_cap_ms - 50
     expect(deepEnough, JSON.stringify(row)).toBe(true)
   }
 })

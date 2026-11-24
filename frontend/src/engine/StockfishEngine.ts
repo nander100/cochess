@@ -91,8 +91,9 @@ export class StockfishEngine implements EngineHandle {
     this.terminate = terminate
   }
 
-  /** Start the right Stockfish build in a Web Worker and complete the UCI handshake. */
-  static async create(config: EngineConfig): Promise<StockfishEngine> {
+  /** Start the right Stockfish build in a Web Worker and complete the UCI handshake. A pool
+   * engine (SPEC_V4 §8.2) runs on one thread with the pool's smaller hash. */
+  static async create(config: EngineConfig, { pooled = false }: { pooled?: boolean } = {}): Promise<StockfishEngine> {
     if (typeof Worker === 'undefined' || typeof WebAssembly === 'undefined') {
       throw new Error(
         "Your browser can't run the chess engine. Please use a recent version of Chrome, " +
@@ -100,15 +101,16 @@ export class StockfishEngine implements EngineHandle {
       )
     }
     const build = chooseBuild(globalThis.crossOriginIsolated === true)
-    const threads = threadCount(build, navigator.hardwareConcurrency || 2, config.max_threads)
+    const threads = pooled ? 1 : threadCount(build, navigator.hardwareConcurrency || 2, config.max_threads)
+    const hashMb = pooled ? config.pool_hash_mb : config.hash_mb
     const opened = openTransport(build)
     opened.loadFailed.catch(() => undefined) // only matters while racing the handshake below
     try {
       const engine = await Promise.race([
-        StockfishEngine.connect(opened.transport, build, threads, config.hash_mb, opened.terminate),
+        StockfishEngine.connect(opened.transport, build, threads, hashMb, opened.terminate),
         opened.loadFailed,
       ])
-      console.info(`CoChess engine: ${build}, ${threads} thread(s)`)
+      if (!pooled) console.info(`CoChess engine: ${build}, ${threads} thread(s)`)
       return engine
     } catch (error) {
       opened.terminate()

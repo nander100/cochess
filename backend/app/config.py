@@ -22,11 +22,18 @@ class EngineSettings(BaseModel):
 
     max_threads: int = 4  # browser uses min(hardwareConcurrency - 1, max_threads)
     hash_mb: int = 64
+    # SPEC_V4 §8.2: scan and verify run on this many single-threaded engines at once (at most the
+    # device's cores minus one); each gets pool_hash_mb. 1 means one multi-threaded engine.
+    pool_size: int = 4
+    pool_hash_mb: int = 16
+    # SPEC_V4 §8 (M3): searches stop at their depth, with no minimum time. v3 waited at least 250 ms
+    # (scan) and 1.5 s (verify) a position; on the pool, depth 16 and 18 keep v3's verdicts within
+    # v3's own run-to-run variation at about a fifth of the time (docs/PLAN_V4.md, M3 log).
     scan: EngineTier = EngineTier(
-        multipv=1, min_time_ms=250, min_depth=12, hard_cap_ms=1000, max_line_plies=1
+        multipv=1, min_time_ms=0, min_depth=16, hard_cap_ms=1000, max_line_plies=1
     )
     verify: EngineTier = EngineTier(
-        multipv=4, min_time_ms=1500, min_depth=18, hard_cap_ms=3000, max_line_plies=10
+        multipv=4, min_time_ms=0, min_depth=18, hard_cap_ms=3000, max_line_plies=10
     )
     deep: EngineTier = EngineTier(
         multipv=4, min_time_ms=3000, min_depth=22, hard_cap_ms=8000, max_line_plies=10

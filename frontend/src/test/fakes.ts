@@ -26,6 +26,8 @@ const TIER = { multipv: 1, min_time_ms: 1, min_depth: 1, hard_cap_ms: 1, max_lin
 export const ENGINE_CONFIG: EngineConfig = {
   max_threads: 4,
   hash_mb: 64,
+  pool_size: 1,
+  pool_hash_mb: 16,
   scan: TIER,
   verify: { ...TIER, multipv: 4, max_line_plies: 10 },
   deep: { ...TIER, multipv: 4, max_line_plies: 10 },

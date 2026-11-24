@@ -139,6 +139,9 @@ export interface TierConfig {
 export interface EngineConfig {
   max_threads: number
   hash_mb: number
+  /** Single-threaded engines for scan and verify (SPEC_V4 §8.2); 1 = the one multi-threaded engine. */
+  pool_size: number
+  pool_hash_mb: number
   scan: TierConfig
   verify: TierConfig
   deep: TierConfig

@@ -37,14 +37,15 @@ def test_engine_config_serves_the_tiers(client: TestClient) -> None:
     data = response.json()
     assert data["scan"] == {
         "multipv": 1,
-        "min_time_ms": 250,
-        "min_depth": 12,
+        "min_time_ms": 0,
+        "min_depth": 16,
         "hard_cap_ms": 1000,
         "max_line_plies": 1,
     }
     assert (data["verify"]["multipv"], data["deep"]["hard_cap_ms"]) == (4, 8000)
     assert (data["live"]["multipv"], data["live"]["hard_cap_ms"]) == (3, 10_000)
     assert (data["max_threads"], data["hash_mb"]) == (4, 64)
+    assert (data["pool_size"], data["pool_hash_mb"]) == (4, 16)
 
 
 def test_scan_then_verify_round_trip(client: TestClient, db_session: Session) -> None:

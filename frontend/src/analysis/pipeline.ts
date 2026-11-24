@@ -5,10 +5,12 @@ import type {
   EngineConfig,
   EngineResult,
   GameDetail,
+  TierConfig,
   VerifyResponse,
 } from '../api/types'
-import { analyzeAll, itemsForFens, moveNumber, scanItems } from '../engine/runner'
-import type { EngineBuild, EngineHandle } from '../engine/StockfishEngine'
+import { analyzeParallel } from '../engine/pool'
+import { analyzeAll, itemsForFens, moveNumber, type ProgressListener, scanItems } from '../engine/runner'
+import type { AnalysisItem, EngineBuild, EngineHandle } from '../engine/StockfishEngine'
 
 export type AnalysisStatus =
   | { phase: 'starting' }
@@ -29,6 +31,9 @@ export interface AnalysisRun {
 export interface PipelineDeps {
   api: ApiClient
   getEngine(config: EngineConfig): Promise<EngineHandle>
+  /** Several single-threaded engines for scan and verify (SPEC_V4 §8.2); null or absent means
+   * the one engine above does everything. */
+  getPool?(config: EngineConfig): Promise<EngineHandle[] | null>
   now?: () => number
 }
 
@@ -56,8 +61,11 @@ export async function analyzeGame(
   pendingVerify: readonly string[] | null = null,
 ): Promise<AnalysisRun> {
   const now = deps.now ?? (() => performance.now())
-  const engine = await deps.getEngine(config)
-  await engine.newGame()
+  const pool = (await deps.getPool?.(config)) ?? null
+  const engines = pool ?? [await deps.getEngine(config)]
+  await Promise.all(engines.map((e) => e.newGame()))
+  const run = (items: AnalysisItem[], tierName: 'scan' | 'verify', tier: TierConfig, progress: ProgressListener) =>
+    pool ? analyzeParallel(pool, items, tierName, tier, progress) : analyzeAll(engines[0], items, tierName, tier, progress)
 
   let scan: EngineResult[] = []
   let scanMs = 0
@@ -65,7 +73,7 @@ export async function analyzeGame(
   if (verifyFens === null) {
     const totalMoves = moveNumber(game.positions.length)
     const scanStart = now()
-    scan = await analyzeAll(engine, scanItems(game), 'scan', config.scan, (done, total, item) =>
+    scan = await run(scanItems(game), 'scan', config.scan, (done, total, item) =>
       onStatus({
         phase: 'scanning',
         done,
@@ -79,8 +87,7 @@ export async function analyzeGame(
   }
 
   const verifyStart = now()
-  const verify = await analyzeAll(
-    engine,
+  const verify = await run(
     itemsForFens(game, verifyFens),
     'verify',
     config.verify,
@@ -91,7 +98,8 @@ export async function analyzeGame(
 
   return {
     game,
-    engine: { build: engine.build, threads: engine.threads },
+    // With a pool: the build, and how many engines (each on one thread) searched at once.
+    engine: { build: engines[0].build, threads: pool ? pool.length : engines[0].threads },
     config,
     scan,
     verify,

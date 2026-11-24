@@ -1,6 +1,6 @@
 """Compare new engine results with v3's on the owner's games (SPEC_V4 §8.1).
 
-Usage (from backend/): uv run python -m scripts.engine_quality [game1w game5b ...]
+Usage (from backend/): uv run python -m scripts.engine_quality [--new DIR] [game1w game5b ...]
 
 `npm run e2e:real` with new engine settings re-captures tests/fixtures/engine/<game>.json; the v3
 results stay in tests/fixtures/engine/v3/. Both are run through the app's own summary (labels,
@@ -84,9 +84,9 @@ def compare(
     )
 
 
-def check(game: str) -> Quality:
+def check(game: str, new: Path = ENGINE) -> Quality:
     before, old_seconds = summary_from(game, BASELINE / f"{game}.json")
-    after, new_seconds = summary_from(game, ENGINE / f"{game}.json")
+    after, new_seconds = summary_from(game, new / f"{game}.json")
     return compare(game, before, after, (old_seconds, new_seconds))
 
 
@@ -109,10 +109,13 @@ def report(quality: Quality) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
-    parser.add_argument("games", nargs="*", help="fixture names (default: every v3 capture)")
+    parser.add_argument("games", nargs="*", help="fixture names (default: every capture in --new)")
+    parser.add_argument(
+        "--new", type=Path, default=ENGINE, help="captures to compare (default: the fixtures)"
+    )
     args = parser.parse_args(argv)
-    games = args.games or sorted(path.stem for path in BASELINE.glob("game*.json"))
-    results = [check(game) for game in games]
+    games = args.games or sorted(path.stem for path in args.new.glob("game*.json"))
+    results = [check(game, args.new) for game in games]
     for quality in results:
         print(report(quality))
     return 0 if all(q.passed for q in results) else 1

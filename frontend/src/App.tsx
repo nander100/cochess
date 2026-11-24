@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import type { PipelineDeps } from './analysis/pipeline'
 import { createApiClient, isLoggedOut } from './api/client'
 import type { EngineConfig, Profile } from './api/types'
+import { poolSize } from './engine/pool'
 import { type EngineHandle, StockfishEngine } from './engine/StockfishEngine'
 import { GamesPage } from './pages/GamesPage'
 import { LatestGamePage } from './pages/LatestGamePage'
@@ -33,6 +34,7 @@ type Session =
 /** Real dependencies. The engine loads once and is reused for every game in this tab. */
 function defaultDeps(): PipelineDeps {
   let engine: Promise<EngineHandle> | null = null
+  let pool: Promise<EngineHandle[]> | null = null
   return {
     api: createApiClient(),
     getEngine(config: EngineConfig) {
@@ -41,6 +43,24 @@ function defaultDeps(): PipelineDeps {
         throw error
       })
       return engine
+    },
+    // Scan and verify on several single-threaded engines (SPEC_V4 §8.2), made once per tab.
+    getPool(config: EngineConfig) {
+      const size = poolSize(config.pool_size, navigator.hardwareConcurrency || 2)
+      if (size < 2) return Promise.resolve(null)
+      pool ??= Promise.all(
+        Array.from({ length: size }, () => StockfishEngine.create(config, { pooled: true })),
+      ).then(
+        (engines) => {
+          console.info(`CoChess engine pool: ${engines[0].build}, ${engines.length} engines`)
+          return engines
+        },
+        (error: unknown) => {
+          pool = null
+          throw error
+        },
+      )
+      return pool
     },
   }
 }
