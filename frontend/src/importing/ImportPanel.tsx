@@ -1,12 +1,12 @@
 import { type FormEvent, useId, useState } from 'react'
 import { Link } from 'react-router'
 import type { PipelineDeps } from '../analysis/pipeline'
-import { type QueueProgress, queueLabel, runGamesQueue } from '../analysis/queue'
+import { useAnalysisQueue } from '../analysis/analysisQueueContext'
 import { ApiError, isLoggedOut } from '../api/client'
 import type { Color, ImportResponse, Platform, TimeControl } from '../api/types'
 import { errorText } from '../pages/util'
 import { useSettings } from '../settings/settingsContext'
-import { Button, ProgressBar, Select, TintedPanel, useToast } from '../ui'
+import { Button, Select, TintedPanel, useToast } from '../ui'
 import { ImportTable } from './ImportTable'
 import { type ImportChoice, PLATFORM_LABEL, initialChoices, missingColors, requestsFor } from './importRows'
 import './ImportPanel.css'
@@ -44,7 +44,7 @@ export function ImportPanel({ deps, onLoggedOut, onAdded }: ImportPanelProps) {
   const [found, setFound] = useState<ImportResponse | null>(null)
   const [choices, setChoices] = useState<ImportChoice[]>([])
   const [busy, setBusy] = useState(false)
-  const [progress, setProgress] = useState<QueueProgress | null>(null)
+  const queue = useAnalysisQueue()
   const [error, setError] = useState<string | null>(null)
 
   if (platform === null) {
@@ -108,15 +108,15 @@ export function ImportPanel({ deps, onLoggedOut, onAdded }: ImportPanelProps) {
         }
       }
       setFound(null)
-      onAdded()
-      await runGamesQueue(deps, ids, setProgress)
+      // Analyzed in the background (SPEC_V4 §8.2): the player can leave this page meanwhile.
+      queue.add(ids)
       const extra = skipped > 0 ? ` (${skipped} ${skipped === 1 ? 'was' : 'were'} already here)` : ''
       const later = leftOver > 0 ? ` Today's limit is reached: import the other ${plural(leftOver)} tomorrow.` : ''
-      show(`Added and analyzed ${plural(ids.length)}${extra}.${later}`, 'info')
+      const analyzing = ids.length > 0 ? ' They\'re being analyzed now; you can keep using CoChess.' : ''
+      show(`Added ${plural(ids.length)}${extra}.${analyzing}${later}`, 'info')
     } catch (caught) {
       failed(caught)
     } finally {
-      setProgress(null)
       setBusy(false)
       onAdded()
     }
@@ -200,7 +200,6 @@ export function ImportPanel({ deps, onLoggedOut, onAdded }: ImportPanelProps) {
           </div>
         </>
       )}
-      {progress && <ProgressBar label={queueLabel(progress)} done={progress.game - 1} total={progress.total} />}
     </TintedPanel>
   )
 }

@@ -1,3 +1,4 @@
+import { AnalysisQueue } from '../analysis/backgroundQueue'
 import type { PipelineDeps } from '../analysis/pipeline'
 import type { ApiClient } from '../api/client'
 import type { CoachEvent } from '../api/sse'
@@ -342,4 +343,10 @@ export function importRow(n: number, overrides: Partial<ImportRow> = {}): Import
     error: null,
     ...overrides,
   }
+}
+
+/** A background analysis queue for tests: in-memory storage, no tab lock. */
+export function fakeQueue(deps: PipelineDeps): AnalysisQueue {
+  let saved: string[] = []
+  return new AnalysisQueue(deps, { load: () => [...saved], save: (ids) => (saved = [...ids]) })
 }

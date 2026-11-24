@@ -1,7 +1,10 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
+import { AnalysisQueueContext } from './analysis/analysisQueueContext'
+import { AnalysisQueue, browserLock, browserStorage } from './analysis/backgroundQueue'
 import type { PipelineDeps } from './analysis/pipeline'
 import { createApiClient, isLoggedOut } from './api/client'
+import { QueueStatus } from './components/QueueStatus'
 import type { EngineConfig, Profile } from './api/types'
 import { poolSize } from './engine/pool'
 import { type EngineHandle, StockfishEngine } from './engine/StockfishEngine'
@@ -95,6 +98,8 @@ export default function App({ deps }: AppProps) {
 
 function Shell({ deps }: AppProps) {
   const [pipeline] = useState(() => deps ?? defaultDeps())
+  // Imported games analyzed in the background, on every page (SPEC_V4 §8.2); one per tab.
+  const [queue] = useState(() => new AnalysisQueue(pipeline, browserStorage(), browserLock()))
   const [session, setSession] = useState<Session>({ kind: 'loading' })
   const location = useLocation()
   const navigate = useNavigate()
@@ -127,7 +132,13 @@ function Shell({ deps }: AppProps) {
     [navigate],
   )
 
+  const active = session.kind === 'in' && session.profile.status === 'active'
+  useEffect(() => {
+    if (active) queue.resume() // games left waiting by a reload or an expired session
+  }, [active, queue])
+
   async function logOut() {
+    queue.clear() // the next player in this browser doesn't inherit the queue
     await pipeline.api.logout().catch(() => undefined) // logged out either way
     setSession({ kind: 'logged-out' })
   }
@@ -153,8 +164,10 @@ function Shell({ deps }: AppProps) {
   }
 
   return (
+    <AnalysisQueueContext.Provider value={queue}>
     <SettingsProvider api={pipeline.api} enabled={session.kind === 'in'}>
       <AppHeader session={session} onLogOut={() => void logOut()} />
+      {active && <QueueStatus />}
       <main className="page">
       {session.kind === 'loading' && <Skeleton label="Connecting…" />}
       {session.kind === 'error' && <ErrorState message={session.message} onRetry={loadProfile} />}
@@ -202,6 +215,7 @@ function Shell({ deps }: AppProps) {
       )}
       </main>
     </SettingsProvider>
+    </AnalysisQueueContext.Provider>
   )
 }
 

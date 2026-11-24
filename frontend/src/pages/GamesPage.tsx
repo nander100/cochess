@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { type AnalysisStatus, type PipelineDeps, runAnalysis, statusLabel } from '../analysis/pipeline'
 import { ApiError, isLoggedOut } from '../api/client'
@@ -8,6 +8,7 @@ import { DashboardView } from '../dashboard/DashboardView'
 import { ImportPanel } from '../importing/ImportPanel'
 import { LatestGameCard } from '../importing/LatestGameCard'
 import { CreditsNotice } from '../components/CreditsNotice'
+import { useAnalysisQueue } from '../analysis/analysisQueueContext'
 import {
   ColorSwatch,
   EmptyState,
@@ -70,6 +71,20 @@ export function GamesPage({ deps, onLoggedOut }: GamesPageProps) {
   useEffect(() => {
     void load()
   }, [load])
+
+  // Each game the background queue finishes shows up in the lists and the dashboard (§8.2).
+  const queue = useAnalysisQueue()
+  const seen = useRef(queue.state.finished.length)
+  useEffect(
+    () =>
+      queue.subscribe((state) => {
+        if (state.finished.length === seen.current) return
+        seen.current = state.finished.length
+        void load()
+        setVersion((n) => n + 1)
+      }),
+    [queue, load],
+  )
 
   return (
     <div className="games-page">

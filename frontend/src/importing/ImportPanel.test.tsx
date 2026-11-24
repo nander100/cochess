@@ -1,24 +1,28 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
+import { AnalysisQueueContext } from '../analysis/analysisQueueContext'
 import { ApiError } from '../api/client'
 import type { UserSettings } from '../api/types'
 import { SettingsContext } from '../settings/settingsContext'
-import { DEFAULT_SETTINGS, DETAIL, GAME, fakeDeps, importRow } from '../test/fakes'
+import { DEFAULT_SETTINGS, DETAIL, GAME, fakeDeps, fakeQueue, importRow } from '../test/fakes'
 import { ToastProvider } from '../ui'
 import { ImportPanel } from './ImportPanel'
 
 function setup(deps = fakeDeps(), settings: Partial<UserSettings> = { chesscom_username: 'nander100' }) {
   const onAdded = vi.fn()
+  const queue = fakeQueue(deps)
   render(
     <MemoryRouter>
       <ToastProvider>
         <SettingsContext.Provider value={{ settings: { ...DEFAULT_SETTINGS, ...settings }, loaded: true, update: vi.fn() }}>
-          <ImportPanel deps={deps} onLoggedOut={vi.fn()} onAdded={onAdded} />
+          <AnalysisQueueContext.Provider value={queue}>
+            <ImportPanel deps={deps} onLoggedOut={vi.fn()} onAdded={onAdded} />
+          </AnalysisQueueContext.Provider>
         </SettingsContext.Provider>
       </ToastProvider>
     </MemoryRouter>,
   )
-  return { deps, onAdded }
+  return { deps, onAdded, queue }
 }
 
 const FOUND = {
@@ -52,19 +56,20 @@ test('fetched games are reviewed: added ones are marked, unknown colors are aske
   expect(screen.getByRole('button', { name: 'Add and analyze 2 games' })).toBeEnabled()
 })
 
-test('ticked games are added with their platform ids, then analyzed', async () => {
+test('ticked games are added with their platform ids, then analyzed in the background', async () => {
   const deps = fakeDeps({
     importGames: vi.fn(async () => ({ ...FOUND, games: [importRow(0), importRow(3)] })),
     getGame: vi.fn(async () => DETAIL),
   })
-  const { onAdded } = setup(deps)
+  const { onAdded, queue } = setup(deps)
   fireEvent.click(screen.getByRole('button', { name: 'Fetch games' }))
   const table = await screen.findByRole('table', { name: 'Fetched games' })
   fireEvent.click(within(table).getByLabelText('Add me vs Rival3'))
 
   fireEvent.click(screen.getByRole('button', { name: 'Add and analyze 1 game' }))
 
-  expect(await screen.findByText('Added and analyzed 1 game.')).toBeInTheDocument()
+  expect(await screen.findByText("Added 1 game. They're being analyzed now; you can keep using CoChess.")).toBeInTheDocument()
+  await vi.waitFor(() => expect(queue.state.finished).toEqual([GAME.game_id]))
   expect(deps.api.createGame).toHaveBeenCalledTimes(1)
   expect(vi.mocked(deps.api.createGame).mock.calls[0][0]).toMatchObject({
     user_color: 'white',
@@ -95,7 +100,7 @@ test("only today's room is added; the rest waits for tomorrow", async () => {
   expect(screen.getByText('Only 1 more game can be added today, so the first one ticked will be added.')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Add and analyze 1 game' }))
 
-  expect(await screen.findByText(/Added and analyzed 1 game\. Today's limit is reached: import the other 1 game tomorrow\./)).toBeInTheDocument()
+  expect(await screen.findByText(/Added 1 game\. They're being analyzed now; you can keep using CoChess\. Today's limit is reached: import the other 1 game tomorrow\./)).toBeInTheDocument()
   expect(deps.api.createGame).toHaveBeenCalledTimes(1)
 })
 
@@ -114,7 +119,7 @@ test('a cap reached during the batch stops adding but keeps and analyzes what wa
 
   fireEvent.click(screen.getByRole('button', { name: 'Add and analyze 3 games' }))
 
-  expect(await screen.findByText(/Added and analyzed 1 game\. Today's limit is reached: import the other 2 games tomorrow\./)).toBeInTheDocument()
+  expect(await screen.findByText(/Added 1 game\. They're being analyzed now; you can keep using CoChess\. Today's limit is reached: import the other 2 games tomorrow\./)).toBeInTheDocument()
   expect(deps.api.createGame).toHaveBeenCalledTimes(2)
   expect(deps.api.getGame).toHaveBeenCalledWith('g1')
 })

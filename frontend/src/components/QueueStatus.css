@@ -1,0 +1,13 @@
+/* Background analysis of imported games (QueueStatus), under the header on every page. */
+.queue-status {
+  margin: 0;
+  padding: var(--space-3) var(--page-gutter);
+  border-bottom: var(--border-width) solid var(--color-tint-border);
+  background: var(--color-tint);
+  color: var(--color-fg);
+  font: var(--text-ui);
+}
+
+.queue-status-dismiss {
+  margin-left: var(--space-2);
+}

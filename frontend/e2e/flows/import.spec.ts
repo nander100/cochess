@@ -23,7 +23,13 @@ test('recent games are imported from Chess.com and analyzed', async ({ page }) =
   await table.getByLabel('Add Somebody vs Rival1').uncheck()
   await panel.getByRole('button', { name: 'Add and analyze 1 game' }).click()
 
-  await expect(page.getByText('Added and analyzed 1 game.')).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByText("Added 1 game. They're being analyzed now; you can keep using CoChess.")).toBeVisible()
+  // SPEC_V4 §8.2: the analysis carries on in the background while the player goes elsewhere.
+  await page.getByRole('link', { name: 'Profile', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Analyzed 1 imported game.' })).toBeVisible({
+    timeout: 60_000,
+  })
+  await page.getByRole('link', { name: 'Games', exact: true }).click()
   const all = page.getByRole('table', { name: 'All games' })
   await expect(all.getByText('Rival0')).toBeVisible()
   await expect(all.getByText('Analyzed')).toBeVisible()

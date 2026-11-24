@@ -2,9 +2,10 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import type { Dashboard, GameListItem } from '../api/types'
 import { ApiError } from '../api/client'
-import { EMPTY_DASHBOARD, EMPTY_TENDENCIES, fakeDeps } from '../test/fakes'
+import { EMPTY_DASHBOARD, EMPTY_TENDENCIES, fakeDeps, fakeQueue } from '../test/fakes'
 import { ToastProvider } from '../ui'
 import { GamesPage } from './GamesPage'
+import { AnalysisQueueContext } from '../analysis/analysisQueueContext'
 
 function game(id: string, overrides: Partial<GameListItem> = {}): GameListItem {
   return {
@@ -44,7 +45,9 @@ function renderPage(games: GameListItem[], tendencies = TENDENCIES, dashboard: D
   render(
     <MemoryRouter>
       <ToastProvider>
-        <GamesPage deps={deps} onLoggedOut={vi.fn()} />
+        <AnalysisQueueContext.Provider value={fakeQueue(deps)}>
+          <GamesPage deps={deps} onLoggedOut={vi.fn()} />
+        </AnalysisQueueContext.Provider>
       </ToastProvider>
     </MemoryRouter>,
   )
