@@ -13,6 +13,7 @@ from tests.analysis_flow import analyzed_game
 from tests.auth_helpers import log_in
 from tests.coach.test_synopsis import sse_events
 from tests.coach_fakes import FakeCoachClient, Reply, ToolCall
+from tests.databases import fresh_database_url
 from tests.engine_fakes import fake_result
 
 WHAT_IF = {"ply": 9, "candidate_moves_san": ["gxf3"]}  # Opera Game: 5. gxf3 instead of 5. Qxf3
@@ -26,7 +27,9 @@ def setup(
     *replies: Reply, coach: CoachSettings | None = None
 ) -> tuple[TestClient, FakeCoachClient, FastAPI, str]:
     fake = FakeCoachClient(*replies)
-    settings = Settings(_env_file=None, database_url="sqlite://", coach=coach or CoachSettings())
+    settings = Settings(
+        _env_file=None, database_url=fresh_database_url(), coach=coach or CoachSettings()
+    )
     app = create_app(settings, fake)
     client = log_in(app, "Owner")
     return client, fake, app, analyzed_game(client, "white")

@@ -15,6 +15,7 @@ from app.main import create_app
 from tests.analysis_flow import analyzed_game
 from tests.auth_helpers import log_in
 from tests.coach_fakes import FakeCoachClient
+from tests.databases import fresh_database_url
 
 # Moves as move tags, one at a time (SPEC_V3 §9.4); the player sees the backend's words.
 VALID = (
@@ -30,7 +31,9 @@ INVALID = "### Overall\nYou could have played {{move:9.Ka8}} or {{move:Qh5}} ins
 
 def make(*replies: str | Exception) -> tuple[TestClient, FakeCoachClient, FastAPI]:
     coach = FakeCoachClient(*replies)
-    app = create_app(Settings(_env_file=None, database_url="sqlite://"), coach_client=coach)
+    app = create_app(
+        Settings(_env_file=None, database_url=fresh_database_url()), coach_client=coach
+    )
     return log_in(app, "Owner"), coach, app
 
 

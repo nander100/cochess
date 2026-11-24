@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pytest
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
@@ -11,6 +12,7 @@ from sqlalchemy import Engine, inspect, text
 from app.db.migrate import alembic_config, upgrade
 from app.db.models import Base
 from app.db.session import make_engine
+from tests.databases import fresh_database_url, is_postgres
 
 V1_SCHEMA = Path(__file__).parents[1] / "fixtures" / "v1_schema.sql"
 
@@ -32,7 +34,7 @@ def _version(engine: Engine) -> str | None:
 
 
 def test_fresh_database_matches_the_models() -> None:
-    engine = make_engine("sqlite://")
+    engine = make_engine(fresh_database_url(migrated=False))
 
     upgrade(engine)
 
@@ -41,7 +43,7 @@ def test_fresh_database_matches_the_models() -> None:
 
 
 def test_upgrade_is_idempotent() -> None:
-    engine = make_engine("sqlite://")
+    engine = make_engine(fresh_database_url(migrated=False))
     upgrade(engine)
 
     upgrade(engine)
@@ -49,8 +51,9 @@ def test_upgrade_is_idempotent() -> None:
     assert _version(engine) == _head()
 
 
+@pytest.mark.skipif(is_postgres(), reason="v1 databases only ever existed as SQLite")
 def test_v1_database_is_stamped_then_upgraded_and_keeps_its_data() -> None:
-    engine = make_engine("sqlite://")
+    engine = make_engine(fresh_database_url(migrated=False))
     with engine.begin() as connection:
         for statement in V1_SCHEMA.read_text().split(";"):
             if statement.strip():
@@ -98,7 +101,7 @@ def test_v1_database_is_stamped_then_upgraded_and_keeps_its_data() -> None:
 
 
 def test_every_migration_downgrades_back_to_an_empty_database() -> None:
-    engine = make_engine("sqlite://")
+    engine = make_engine(fresh_database_url(migrated=False))
     upgrade(engine)
     config = alembic_config()
 
@@ -114,7 +117,7 @@ def test_every_migration_downgrades_back_to_an_empty_database() -> None:
 def test_a_database_that_ran_an_early_0014_gets_the_baseline_moves_column() -> None:
     # A dev database migrated while 0014 was being written recorded 0014 without
     # baseline_reports.moves; 0016 adds it where it's missing.
-    engine = make_engine("sqlite://")
+    engine = make_engine(fresh_database_url(migrated=False))
     config = alembic_config()
     with engine.begin() as connection:
         config.attributes["connection"] = connection

@@ -13,6 +13,7 @@ from app.db.models import Game, GameStatsRow, TendencySnapshotRow, User
 from app.main import create_app
 from tests.analysis_flow import analyzed_game
 from tests.auth_helpers import log_in
+from tests.databases import fresh_database_url
 
 
 def test_a_new_player_sees_an_empty_dashboard(client: TestClient) -> None:
@@ -89,7 +90,7 @@ def _tendency(theme: str, score: float, game_id: str) -> Tendency:
 
 
 def test_two_hundred_games_load_within_the_target() -> None:
-    app = create_app(Settings(_env_file=None, database_url="sqlite://"))
+    app = create_app(Settings(_env_file=None, database_url=fresh_database_url()))
     client = log_in(app, "Busy player")
     start = datetime(2025, 1, 1, tzinfo=UTC)
     themes = ["hung_piece", "missed_tactic", "king_safety", "allowed_tactic", "pawn_structure",

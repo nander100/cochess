@@ -13,13 +13,16 @@ from app.main import create_app
 from tests.analysis_flow import analyzed_game
 from tests.auth_helpers import BASE_URL, log_in
 from tests.coach_fakes import FakeCoachClient
+from tests.databases import fresh_database_url
 
 PUBLIC = {("GET", "/api/health"), ("POST", "/api/auth/redeem"), ("POST", "/api/auth/logout")}
 
 
 def _app() -> FastAPI:
     # A coach client is configured, so coach routes can't answer 503 before checking ownership.
-    return create_app(Settings(_env_file=None, database_url="sqlite://"), FakeCoachClient([]))
+    return create_app(
+        Settings(_env_file=None, database_url=fresh_database_url()), FakeCoachClient([])
+    )
 
 
 # From the OpenAPI schema: FastAPI 0.16x nests included routers, so `app.routes` doesn't list

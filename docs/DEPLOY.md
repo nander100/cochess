@@ -228,14 +228,74 @@ docker compose cp backend:/data/backup.db ./cochess-$(date +%F).db
 **Check API spend**
 
 ```bash
-docker compose exec -T backend python -c "
-import sqlite3
-db = sqlite3.connect('/data/cochess.db')
-for row in db.execute('select model, count(*), sum(input_tokens), sum(output_tokens), sum(cache_read_tokens) from llm_usage group by model'):
-    print(row)"
+docker compose exec -T backend uv run --no-dev python -c "
+import os
+from sqlalchemy import create_engine, text
+query = 'select task, model, count(*), sum(input_tokens), sum(output_tokens), sum(cache_read_tokens), sum(cache_write_tokens) from llm_usage group by task, model'
+for row in create_engine(os.environ['DATABASE_URL']).connect().execute(text(query)):
+    print(tuple(row))"
 ```
 
+This works on SQLite and, after the move below, on Postgres.
+
 Multiply by the current per-token prices for each model to get the cost.
+
+## Moving the database to Postgres (RDS)
+
+v4 moves the database from the SQLite file on the `cochess-data` volume to Amazon RDS for PostgreSQL: managed daily backups with point-in-time recovery, and the database the v4 payment features need. It costs about $15 a month (the smallest instance plus 20 GB of storage). Do this once; nothing else on the server changes.
+
+**1. Create the database** (AWS console → RDS → *Create database*), in the same region as the EC2 instance:
+- *Standard create*, engine **PostgreSQL**, version 17.
+- Template *Dev/Test* (or *Free tier* if offered), deployment **Single-AZ**.
+- DB instance identifier `cochess`; master username `cochess`; *Self managed* password: generate a long random one and keep it in your password manager.
+- Instance class **db.t4g.micro**; storage **gp3, 20 GB**, storage autoscaling off.
+- Connectivity: **Connect to an EC2 compute resource** → choose the `cochess` instance. AWS then creates security groups that only let that instance in. **Public access: No.**
+- *Additional configuration*: initial database name `cochess`; backup retention **14 days**; encryption **on**; **deletion protection on**.
+- *Create database*. When it's *Available*, copy its **Endpoint** (like `cochess.abc123xyz.us-east-2.rds.amazonaws.com`).
+
+RDS for PostgreSQL 15 and later only accepts encrypted connections (`rds.force_ssl` is on by default), so the URL below asks for TLS.
+
+**2. Check the server can reach it** (on the server):
+
+```bash
+docker run --rm postgres:17 psql "postgresql://cochess:<password>@<endpoint>:5432/cochess?sslmode=require" -c "select version()"
+```
+
+**3. Back up the SQLite database** (see *Back up the database* above) and keep the file.
+
+**4. Check the SQLite data for anything Postgres would refuse.** v3 ran SQLite without enforcing links between tables or text lengths, and Postgres enforces both:
+
+```bash
+docker compose exec backend uv run --no-dev python -m app.cli migrate-sqlite --from sqlite:////data/cochess.db --check-only
+```
+
+It should say `No problems found in 19 tables.` If it lists problems, stop and keep the output: each one needs a decision before copying.
+
+**5. Copy.** Stop the frontend first so nobody changes anything mid-copy (the backend keeps running for the command):
+
+```bash
+docker compose stop frontend
+docker compose exec backend uv run --no-dev python -m app.cli migrate-sqlite --from sqlite:////data/cochess.db --to "postgresql+psycopg://cochess:<password>@<endpoint>:5432/cochess?sslmode=require"
+```
+
+It lists each table with its row counts and ends with `every table matches`. If any table says `DIFFERENT`, don't switch: start the frontend again (`docker compose start frontend`) and keep the output.
+
+**6. Switch.** Put the URL in `~/cochess/.env` (next to `docker-compose.yml`, not `backend/.env`; create it if needed, `chmod 600 .env`):
+
+```bash
+DATABASE_URL=postgresql+psycopg://cochess:<password>@<endpoint>:5432/cochess?sslmode=require
+```
+
+```bash
+docker compose up -d
+docker compose exec -T backend uv run --no-dev python -c "import os; print(os.environ['DATABASE_URL'].split('@')[-1])"   # the RDS endpoint
+```
+
+Then log in and open a game, the dashboard and the profile.
+
+**Going back:** remove the `DATABASE_URL` line from `~/cochess/.env` and run `docker compose up -d`. The SQLite file on the volume is untouched, but anything players did after the switch stays in Postgres only.
+
+**After the move:** RDS backs up daily and keeps 14 days, and can restore to any minute in that window (RDS → the database → *Actions* → *Restore to point in time*). Before each update, also take a manual snapshot (*Actions* → *Take snapshot*). The SQLite backup commands above no longer apply.
 
 ## Pausing it, and stopping the bill
 
@@ -250,4 +310,4 @@ Multiply by the current per-token prices for each model to get the cost.
 - Login links from the owner only; Google sign-in arrives in v4.
 - At most 10 new games a day per player (onboarding's 12 don't count) and 30 questions per game (see the configuration table in the README to change them).
 - Optional: `USER_DAILY_TOKEN_LIMIT` in `backend/.env` caps each player's Claude tokens per rolling 24 hours (off by default).
-- SQLite and a single backend process: fine for a few testers, not for public traffic.
+- A single backend process, with SQLite or Postgres (RDS); v4 hardens it for public traffic.

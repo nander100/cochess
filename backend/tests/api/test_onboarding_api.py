@@ -14,6 +14,7 @@ from app.main import create_app
 from tests.analysis_flow import analyze_pgn
 from tests.auth_helpers import log_in
 from tests.coach_fakes import FakeCoachClient
+from tests.databases import fresh_database_url
 
 ME = "nander100"
 OPENINGS = ["1. e4 e5 2. Nf3 Nc6", "1. d4 d5 2. c4 e6", "1. c4 e5 2. Nc3 Nf6"]
@@ -37,7 +38,9 @@ def twelve() -> list[str]:
 
 def make(*replies: str) -> tuple[TestClient, FakeCoachClient, FastAPI]:
     coach = FakeCoachClient(*replies)
-    app = create_app(Settings(_env_file=None, database_url="sqlite://"), coach_client=coach)
+    app = create_app(
+        Settings(_env_file=None, database_url=fresh_database_url()), coach_client=coach
+    )
     return log_in(app, "Owner", time_control="rapid"), coach, app
 
 
@@ -173,7 +176,9 @@ class TestParse:
         assert response.json()["detail"]["code"] == "too_large"
 
     def test_the_profile_comes_first(self) -> None:
-        app = create_app(Settings(_env_file=None, database_url="sqlite://"), FakeCoachClient())
+        app = create_app(
+            Settings(_env_file=None, database_url=fresh_database_url()), FakeCoachClient()
+        )
         client = log_in(app, "New", elo=None, time_control=None)
 
         response = client.post("/api/onboarding/parse", json={"pgn_text": pgn(0, "white", "1-0")})

@@ -22,15 +22,18 @@ from app.db.models import (
     User,
 )
 from app.db.session import make_engine
+from tests.databases import fresh_database_url, is_postgres
 from tests.engine_fakes import fake_result
 from tests.pgn_fixtures import read_pgn
 
 
 @pytest.fixture
 def file_settings(tmp_path: Path) -> Settings:
+    # The CLI opens its own engine, so on SQLite it needs a file, not an in-memory database.
+    url = fresh_database_url() if is_postgres() else f"sqlite:///{tmp_path / 'cli.db'}"
     return Settings(
         _env_file=None,
-        database_url=f"sqlite:///{tmp_path / 'cli.db'}",
+        database_url=url,
         public_base_url="https://cochess.example/",
     )
 
@@ -98,6 +101,11 @@ def test_assign_games_gives_v1_games_to_the_user_with_date_and_result(
                     headers={"Result": "*"},
                     created_at=uploaded,
                 ),
+            ]
+        )
+        session.flush()  # the games first: the engine result points at one
+        session.add_all(
+            [
                 EngineResultRow(
                     game_id="dated",
                     fen="f",

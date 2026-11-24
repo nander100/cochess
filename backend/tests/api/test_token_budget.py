@@ -12,12 +12,15 @@ from app.main import create_app
 from tests.analysis_flow import analyzed_game
 from tests.auth_helpers import log_in
 from tests.coach_fakes import FakeCoachClient
+from tests.databases import fresh_database_url
 
 ANSWER = "### Overall\nA classic: 17. Rd8# finished it."  # FAKE_USAGE: 2,500 tokens a call
 
 
 def make(limit: int | None) -> tuple[FastAPI, TestClient, str]:
-    settings = Settings(_env_file=None, database_url="sqlite://", user_daily_token_limit=limit)
+    settings = Settings(
+        _env_file=None, database_url=fresh_database_url(), user_daily_token_limit=limit
+    )
     app = create_app(settings, FakeCoachClient(*[ANSWER] * 5))
     client = log_in(app, "Owner")
     return app, client, analyzed_game(client, "white")

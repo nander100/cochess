@@ -3,6 +3,8 @@
 create-user --name "Alex"     add a player
 invite --user Alex            print a one-time login link (valid 7 days)
 assign-games --user Alex      give every game without an owner (v1 games) to a player
+migrate-sqlite --from URL --to URL [--check-only]
+                              copy the v3 SQLite database into an empty Postgres database
 """
 
 import argparse
@@ -15,6 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.auth.service import UserExistsError, create_invite, create_user, find_user
 from app.config import Settings, get_settings
+from app.db.copy_sqlite import CopyError, copy_database, describe, find_problems
 from app.db.games import assign_unowned_games, fill_fingerprints, rebuild_summaries
 from app.db.migrate import upgrade
 from app.db.models import User
@@ -29,6 +32,8 @@ def main(
     argv: Sequence[str] | None = None, settings: Settings | None = None, out: TextIO = sys.stdout
 ) -> int:
     args = _parser().parse_args(argv)
+    if args.command == "migrate-sqlite":
+        return _migrate_sqlite(args, out)
     settings = settings or get_settings()
     engine = make_engine(settings.database_url)
     upgrade(engine)
@@ -73,6 +78,41 @@ def _run(args: argparse.Namespace, session: Session, settings: Settings) -> str:
     return f"Assigned {count} game(s) to {user.name}."
 
 
+def _migrate_sqlite(args: argparse.Namespace, out: TextIO) -> int:
+    """Check, then copy (SPEC_V4 §12.1). Works on the two databases named, not DATABASE_URL."""
+    if not args.source.startswith("sqlite:///"):
+        print(
+            "error: --from must be a SQLite file URL (sqlite:///path/to/cochess.db)",
+            file=sys.stderr,
+        )
+        return 1
+    if not args.check_only and not args.target:
+        print("error: --to is needed unless --check-only", file=sys.stderr)
+        return 1
+    source = make_engine(args.source)
+    try:
+        problems = find_problems(source)
+        if args.check_only or problems:
+            print(describe(problems), file=out)
+            return 1 if problems else 0
+        results = copy_database(source, make_engine(args.target))
+    except CopyError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    for result in results:
+        status = "ok" if result.matches else "DIFFERENT"
+        print(
+            f"  {result.table}: {result.source_rows} -> {result.target_rows} rows, {status}",
+            file=out,
+        )
+    rows = sum(r.target_rows for r in results)
+    if all(r.matches for r in results):
+        print(f"Copied {rows} rows in {len(results)} tables; every table matches.", file=out)
+        return 0
+    print("The copy doesn't match the source: don't switch DATABASE_URL to it.", file=out)
+    return 1
+
+
 def _user(session: Session, name: str) -> User:
     user = find_user(session, name)
     if user is None:
@@ -93,6 +133,14 @@ def _parser() -> argparse.ArgumentParser:
         "backfill", help="rebuild analyzed games' summaries from stored engine results"
     )
     backfill.add_argument("--user", help="only this player's games (default: everyone's)")
+    copy = commands.add_parser(
+        "migrate-sqlite", help="copy the v3 SQLite database into an empty Postgres database"
+    )
+    copy.add_argument("--from", dest="source", required=True, help="sqlite:///path/to/cochess.db")
+    copy.add_argument("--to", dest="target", help="postgresql+psycopg://... (empty database)")
+    copy.add_argument(
+        "--check-only", action="store_true", help="list problems without copying anything"
+    )
     return parser
 
 

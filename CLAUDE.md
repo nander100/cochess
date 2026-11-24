@@ -29,7 +29,7 @@ CoChess is a web app that coaches intermediate chess players (roughly 1000–180
 
 ## Stack
 
-- **Backend:** Python 3.12, FastAPI, python-chess, Anthropic Python SDK, SQLAlchemy + Alembic, SQLite (Postgres in v4), Pydantic v2 for all schemas, httpx (game import only).
+- **Backend:** Python 3.12, FastAPI, python-chess, Anthropic Python SDK, SQLAlchemy + Alembic, SQLite (dev, tests) and Postgres via `psycopg` (Amazon RDS in production from v4), Pydantic v2 for all schemas, httpx (game import only).
 - **Frontend:** React + TypeScript + Vite, react-router, `@lichess-org/chessground` (board, including drawable auto-shapes; the old `chessground` package is deprecated), chess.js (legal moves and SAN while exploring on the board only), Stockfish.js (WASM) in a Web Worker, react-markdown (coach text, no raw HTML), Recharts (dashboard charts only).
 - **Testing:** pytest, Vitest, Playwright (end-to-end and screenshots, with the engine and external APIs faked).
 - **Packaging:** `uv` for Python, `npm` for the frontend, Docker Compose for both.
@@ -116,12 +116,14 @@ If the real layout differs, follow the code and update this section.
 Backend (run from `backend/`):
 - Install: `uv sync`
 - Dev server: `uv run uvicorn app.main:create_app --factory --reload` (importing `app.main` has no side effects; tests build apps on in-memory SQLite via `tests/conftest.py`)
-- Tests: `uv run pytest` (includes coverage; pytest plugin autoload is disabled in `pyproject.toml` — add new pytest plugins there with `-p`)
+- Tests: `uv run pytest` (includes coverage; pytest plugin autoload is disabled in `pyproject.toml` — add new pytest plugins there with `-p`). On Postgres: start a throwaway server (`docker --context default run -d --name cochess-pg-test -e POSTGRES_USER=cochess -e POSTGRES_PASSWORD=cochess-test -e POSTGRES_DB=cochess -p 127.0.0.1:55432:5432 postgres:17`; Docker Desktop may be off, the system engine is `--context default`), then `TEST_DATABASE_URL=postgresql+psycopg://cochess:cochess-test@127.0.0.1:55432/cochess uv run pytest`. Each test gets its own database cloned from a migrated template (`tests/databases.py`); tests build databases with `fresh_database_url()`, never a hard-coded `sqlite://`.
+- CI (`.github/workflows/ci.yml`): backend lint, types and tests on SQLite and Postgres, frontend lint, types, tests and build, on every push. The Playwright flows aren't in CI (they need system Chrome).
 - Lint/format: `uv run ruff check . && uv run ruff format .`
 - Types: `uv run mypy app` (strict)
 - Config: copy `.env.example` to `.env`. Nested settings use `__`, e.g. `THRESHOLDS__BLUNDER=0.35`. Engine tiers can't be partly overridden (`EngineTier` fields have no defaults): override a whole tier, or set it in code as `tests/e2e_app.py` does.
 - Migrations: `uv run alembic upgrade head` / `uv run alembic revision --autogenerate -m "..."`. The app also migrates at startup.
 - Users: `uv run python -m app.cli create-user --name "..."`, `uv run python -m app.cli invite --user "..."` (prints a one-time `PUBLIC_BASE_URL/redeem#token=…` link), `uv run python -m app.cli assign-games --user "..."`, `uv run python -m app.cli backfill [--user "..."]` (rebuilds summaries from stored engine results, no engine runs; lists duplicate uploads without deleting). In Docker: `docker compose exec backend uv run --no-dev python -m app.cli …`.
+- Moving a SQLite database to Postgres: `uv run python -m app.cli migrate-sqlite --from sqlite:///path.db --check-only` lists rows Postgres would refuse (missing parents, text too long); without `--check-only` and with `--to <empty postgres url>` it copies and compares every table. Server steps: `docs/DEPLOY.md` (Moving the database to Postgres).
 - Optional per-player daily token cap: `USER_DAILY_TOKEN_LIMIT` (off by default).
 - Game import names itself to Lichess and Chess.com as `IMPORTS__APP_NAME (IMPORTS__CONTACT)` in the User-Agent; set a contact for production. Tests and the e2e backend fake both platforms (`tests/importers/fakes.py`, `app.state.import_transport`).
 - Owner tools (real games): `uv run python -m scripts.seed_owner_games --db <scratch.db>` (fixture games with stored engine results, no coach calls; prints a login link), `uv run python -m scripts.synopsis game5b --elo 800` (calls the Claude API), `uv run python -m scripts.annotations_demo game1w --db <scratch.db>` (real coach chat and moment replies with board tags, plus the annotation log, on a scratch database; calls the Claude API), `uv run python -m scripts.print_summary game1w [--elo 1400] [--compact]`, `uv run python -m scripts.print_tendencies --user "..."`.
@@ -195,6 +197,7 @@ Also stop and ask before: adding a dependency not listed here, changing an appro
 - The branch and tag are both named `v2`; use `refs/tags/v2` when it matters.
 - The owner's local Docker app (compose project `cochcess`, port 8080) runs a pre-v2-M5 build with duplicate games. Ask before touching it.
 - Playwright strict mode: text like "3. Ng5" appears in several places; scope locators.
+- SQLite enforces foreign keys (`db/session.py`), like Postgres; migrations switch them off while they run (`db/migrate.py`) and check afterwards. Tests that insert rows directly must insert parents first (`session.flush()`).
 - A dev server with `--reload` applies a migration the moment its file is written: write each migration once, complete (0016 repairs a dev database that ran an early 0014).
 - The production CSP (`frontend/security-headers.conf`) blocks inline scripts and inline style attributes: no inline `<script>` in `index.html` (`public/theme-init.js` sets the theme); React `style={{}}` is fine (set through the CSSOM). Smoke-test the Docker build under another compose project (`docker compose -p cochess-v3check`, another port) so the owner's `cochcess` stack is untouched.
 - Deploy: see `docs/DEPLOY.md` and `docs/v2-handoff.md` (Caddy validate before reload, `COCHESS_PORT=127.0.0.1:8080`, exact `PUBLIC_BASE_URL`).

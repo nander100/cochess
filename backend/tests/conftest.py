@@ -8,11 +8,19 @@ from sqlalchemy.orm import Session
 from app.config import Settings
 from app.main import create_app
 from tests.auth_helpers import BASE_URL, log_in
+from tests.databases import drop_test_databases, fresh_database_url
+
+
+@pytest.fixture(autouse=True)
+def _drop_test_databases() -> Iterator[None]:
+    """On Postgres, drop each test's databases when it ends (no-op on SQLite)."""
+    yield
+    drop_test_databases()
 
 
 @pytest.fixture
 def settings() -> Settings:
-    return Settings(_env_file=None, database_url="sqlite://")
+    return Settings(_env_file=None, database_url=fresh_database_url())
 
 
 @pytest.fixture

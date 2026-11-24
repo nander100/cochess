@@ -17,6 +17,7 @@ from app.main import create_app
 from tests.auth_helpers import log_in
 from tests.coach.test_synopsis import sse_events
 from tests.coach_fakes import FakeCoachClient, Reply
+from tests.databases import fresh_database_url
 from tests.engine_fakes import fake_result, legal_line
 from tests.pgn_fixtures import read_pgn
 
@@ -61,7 +62,7 @@ def after(uci: str, cp: int) -> dict[str, Any]:
 
 def setup(*replies: Reply) -> tuple[TestClient, FakeCoachClient, FastAPI, str]:
     fake = FakeCoachClient(*replies)
-    app = create_app(Settings(_env_file=None, database_url="sqlite://"), fake)
+    app = create_app(Settings(_env_file=None, database_url=fresh_database_url()), fake)
     client = log_in(app, "Owner")
     assert client.patch("/api/me", json={"elo": 1200}).status_code == 200
     game = client.post(
