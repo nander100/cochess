@@ -26,6 +26,7 @@ import {
 } from '../board/tree'
 import { useShortcuts } from '../shortcuts/useShortcuts'
 import { ChatPanel, type ShowChatTag } from '../components/ChatPanel'
+import { CreditsNotice } from '../components/CreditsNotice'
 import { chatMessages } from '../components/chatMessages'
 import { EngineStats } from '../components/EngineStats'
 import { isUnsolved } from '../moments/moment'
@@ -753,6 +754,7 @@ function Coach({
       )}
       {moves}
       <ChatPanel
+        notice={<CreditsNotice api={deps.api} variant="note" />}
         onExplainReady={onExplainReady}
         initial={chatMessages(detail.chat)}
         where={positionLabel(board)}

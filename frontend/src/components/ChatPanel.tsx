@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useId, useState } from 'react'
+import { type FormEvent, type ReactNode, useEffect, useId, useState } from 'react'
 import type { ChatProgress } from '../analysis/chat'
 import type { Annotation, CoachReply } from '../api/types'
 import { Button, ChatBubble, TintedPanel, TypingIndicator } from '../ui'
@@ -14,6 +14,8 @@ const EXPLAIN_TEXT = 'Explain this position'
 export type ShowChatTag = (path: string, annotation: Annotation | null, how: 'hover' | 'click') => void
 
 interface ChatPanelProps {
+  /** Shown under the input, e.g. that coaching credits are running low (SPEC_V4 §5.3). */
+  notice?: ReactNode
   ask: (message: string, onProgress: (progress: ChatProgress) => void) => Promise<CoachReply>
   /** Explain the position on the board (SPEC_V2 §6.3); the answer appears in the chat. */
   explain?: (onProgress: (progress: ChatProgress) => void) => Promise<CoachReply>
@@ -40,7 +42,7 @@ const PROGRESS_LABEL: Record<ChatProgress, string> = {
 
 /** Questions about the position on the board, and the Explain button (SPEC_V2 §6). */
 export function ChatPanel({
-  ask, explain, where, path, initial = [], onExplainReady, onReply, onShowTag, onPlayLine,
+  ask, explain, where, path, initial = [], onExplainReady, onReply, onShowTag, onPlayLine, notice,
 }: ChatPanelProps) {
   const id = useId()
   const [messages, setMessages] = useState<ChatMessage[]>(() => [...initial])
@@ -153,6 +155,7 @@ export function ChatPanel({
           Send
         </Button>
       </form>
+      {notice}
     </TintedPanel>
   )
 }

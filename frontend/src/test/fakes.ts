@@ -3,6 +3,7 @@ import type { ApiClient } from '../api/client'
 import type { CoachEvent } from '../api/sse'
 import { Chess } from 'chess.js'
 import type {
+  Billing,
   Color,
   ImportRow,
   CreateGameResponse,
@@ -29,6 +30,17 @@ export const ENGINE_CONFIG: EngineConfig = {
   verify: { ...TIER, multipv: 4, max_line_plies: 10 },
   deep: { ...TIER, multipv: 4, max_line_plies: 10 },
   live: { ...TIER, multipv: 3, max_line_plies: 10 },
+}
+
+export const BILLING: Billing = {
+  credits: 42,
+  allowance_credits: 0,
+  unmetered: false,
+  low: false,
+  out: false,
+  coach_strength: 'standard',
+  credits_per_game: { standard: 3.3, deep: 12 },
+  history: [{ kind: 'trial', credits: 50, note: null, created_at: '2026-11-24T12:00:00Z' }],
 }
 
 export const PROFILE: Profile = {
@@ -230,6 +242,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   playback_seconds: 1.5,
   chesscom_username: '',
   lichess_username: '',
+  coach_strength: 'standard',
 }
 
 export const EMPTY_TENDENCIES = {
@@ -246,6 +259,7 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     me: vi.fn(async () => PROFILE),
     signupInfo: vi.fn(async () => ({ name: 'Sam Player', email: 'sam@example.com', terms_version: '2026-11-draft' })),
     signUp: vi.fn(async () => {}),
+    billing: vi.fn(async () => BILLING),
     updateMe: vi.fn(async (update) => ({ ...PROFILE, ...update, complete: true })),
     createGame: vi.fn(async () => GAME),
     listGames: vi.fn(async () => []),

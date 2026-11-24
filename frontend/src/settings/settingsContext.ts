@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   playback_seconds: 1.5,
   chesscom_username: '',
   lichess_username: '',
+  coach_strength: 'standard',
 }
 
 /** The player's Chess.com and Lichess usernames that are set. */

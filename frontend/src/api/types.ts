@@ -592,6 +592,30 @@ export interface UserSettings {
   /** The player's own usernames ("" when not set): their color is found in a PGN's player names. */
   chesscom_username: string
   lichess_username: string
+  /** SPEC_V4 §7: Deep uses a stronger coach and credits about 3.5 times faster. */
+  coach_strength: CoachStrength
+}
+
+export type CoachStrength = 'standard' | 'deep'
+
+/** GET /api/billing (SPEC_V4 §5): coaching credits, 1 credit = $0.01 of API cost. */
+export interface Billing {
+  credits: number
+  allowance_credits: number
+  /** Owner and test accounts: never charged. */
+  unmetered: boolean
+  low: boolean
+  out: boolean
+  coach_strength: CoachStrength
+  credits_per_game: Record<CoachStrength, number>
+  history: CreditEntry[]
+}
+
+export interface CreditEntry {
+  kind: 'trial' | 'allowance' | 'top_up' | 'usage' | 'refund' | 'expiry' | 'owner_grant' | 'owner_removal'
+  credits: number
+  note: string | null
+  created_at: string
 }
 
 /** The dashboard (SPEC_V3 §8.1), one response from GET /api/dashboard. */

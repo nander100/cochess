@@ -7,6 +7,7 @@ import { GameInput } from '../components/GameInput'
 import { DashboardView } from '../dashboard/DashboardView'
 import { ImportPanel } from '../importing/ImportPanel'
 import { LatestGameCard } from '../importing/LatestGameCard'
+import { CreditsNotice } from '../components/CreditsNotice'
 import {
   ColorSwatch,
   EmptyState,
@@ -72,6 +73,7 @@ export function GamesPage({ deps, onLoggedOut }: GamesPageProps) {
 
   return (
     <div className="games-page">
+      <CreditsNotice api={deps.api} variant="banner" />
       <LatestGameCard deps={deps} onLoggedOut={onLoggedOut} />
       <section className="games-hero" aria-label="Upload a game">
         <div className="games-hero-text">

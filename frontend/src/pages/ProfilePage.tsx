@@ -3,6 +3,7 @@ import { type ApiClient, isLoggedOut } from '../api/client'
 import type { BoardScheme, DetailLevel, PieceSet, Profile, TendencyReport, TimeControl, UserSettings } from '../api/types'
 import { BaselineReportPanel } from '../onboarding/BaselineReportPanel'
 import { useSettings } from '../settings/settingsContext'
+import { CreditsCard } from './CreditsCard'
 import { GoogleAccount } from './GoogleAccount'
 import { OnlineAccounts } from './OnlineAccounts'
 import { ShortcutList } from '../shortcuts/ShortcutHelp'
@@ -84,6 +85,7 @@ export function ProfilePage({ api, profile, onSaved, onLoggedOut }: ProfilePageP
           <AboutYou api={api} profile={profile} onSaved={onSaved} onLoggedOut={onLoggedOut} />
           <OnlineAccounts key={loaded ? 'loaded' : 'loading'} />
           <GoogleAccount profile={profile} />
+          <CreditsCard api={api} />
           <SettingsSection />
         </div>
         {profile.complete && (

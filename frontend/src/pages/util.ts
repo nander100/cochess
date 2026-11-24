@@ -14,3 +14,8 @@ export function tokenFromHash(hash: string): string | null {
 export function gameDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium', timeZone: 'UTC' })
 }
+
+/** Coaching credits as players read them: whole numbers plain, others to one decimal. */
+export function formatCredits(credits: number): string {
+  return Number.isInteger(credits) ? String(credits) : credits.toFixed(1)
+}

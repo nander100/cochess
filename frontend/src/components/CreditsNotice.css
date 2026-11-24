@@ -1,0 +1,19 @@
+/* Coaching credits running low or gone (CreditsNotice). */
+.credits-notice {
+  margin: 0;
+  color: var(--color-fg);
+}
+
+.credits-notice-banner {
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--color-tint-border);
+  border-radius: var(--radius-card);
+  background: var(--color-tint);
+  font: var(--text-ui);
+}
+
+.credits-notice-note {
+  margin-top: var(--space-2);
+  font: var(--text-small);
+  color: var(--color-muted);
+}
