@@ -1,4 +1,5 @@
 import { ApiError, createApiClient, isLoggedOut } from './client'
+import { PROFILE } from '../test/fakes'
 
 function respond(status: number, body: unknown) {
   return vi.fn<typeof fetch>().mockResolvedValue(
@@ -80,7 +81,7 @@ test('sends the session cookie with same-origin requests and no access code', as
 })
 
 test('redeems a login token and reads and updates the profile', async () => {
-  const profile = { name: 'Alex', elo: 1400, time_control: 'rapid', playstyle: null, complete: true }
+  const profile = { ...PROFILE, elo: 1400 }
   const fetchImpl = vi
     .fn<typeof fetch>()
     .mockResolvedValueOnce(new Response(null, { status: 204 }))

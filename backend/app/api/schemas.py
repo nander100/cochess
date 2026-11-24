@@ -21,6 +21,9 @@ MAX_NAME_CHARS = 60
 
 Color = Literal["white", "black"]
 TimeControl = Literal["bullet", "blitz", "rapid", "classical"]
+AccountStatus = Literal["waitlisted", "active", "suspended"]
+Role = Literal["player", "owner"]
+AgeBand = Literal["13_17", "18_plus"]
 
 
 Platform = Literal["lichess", "chesscom"]
@@ -55,6 +58,13 @@ class Profile(BaseModel):
     playstyle: str | None
     # Elo and time control are needed before analyzing games; playstyle is optional.
     complete: bool
+    # SPEC_V4 §4: what the app shows (waitlist and paused pages), the owner role, and Google.
+    status: AccountStatus
+    role: Role
+    email: str | None
+    google_connected: bool
+    waitlisted_at: datetime | None
+    age_band: AgeBand | None
 
 
 class ProfileUpdate(BaseModel):

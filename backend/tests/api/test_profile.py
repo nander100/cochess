@@ -16,6 +16,12 @@ def test_read_profile(app: FastAPI) -> None:
         "time_control": "blitz",
         "playstyle": "solid",
         "complete": True,
+        "status": "active",
+        "role": "player",
+        "email": None,
+        "google_connected": False,
+        "waitlisted_at": None,
+        "age_band": None,
     }
 
 
@@ -37,6 +43,12 @@ def test_update_changes_only_the_fields_sent(app: FastAPI) -> None:
         "time_control": "rapid",
         "playstyle": "solid",
         "complete": True,
+        "status": "active",
+        "role": "player",
+        "email": None,
+        "google_connected": False,
+        "waitlisted_at": None,
+        "age_band": None,
     }
     assert client.get("/api/me").json() == response.json()
 

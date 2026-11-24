@@ -2,6 +2,15 @@ import { execFileSync } from 'node:child_process'
 import type { Page } from '@playwright/test'
 import { BACKEND_DIR, E2E_DATABASE_URL } from './paths.ts'
 
+/** An owner command (`python -m app.cli ...`) against the E2E database. */
+export function ownerCli(...args: string[]): string {
+  return execFileSync('uv', ['run', 'python', '-m', 'app.cli', ...args], {
+    cwd: BACKEND_DIR,
+    env: { ...process.env, DATABASE_URL: E2E_DATABASE_URL },
+    encoding: 'utf8',
+  })
+}
+
 /**
  * A one-time login link for a new player, made with the owner CLI against the E2E database.
  * Against an already running stack (E2E_BASE_URL) the test can't reach its database: pass a
@@ -13,14 +22,8 @@ export function newLoginLink(name: string): string {
     if (!link) throw new Error('E2E_BASE_URL needs E2E_LOGIN_LINK (from `python -m app.cli invite`).')
     return link
   }
-  const cli = (...args: string[]) =>
-    execFileSync('uv', ['run', 'python', '-m', 'app.cli', ...args], {
-      cwd: BACKEND_DIR,
-      env: { ...process.env, DATABASE_URL: E2E_DATABASE_URL },
-      encoding: 'utf8',
-    })
-  cli('create-user', '--name', name)
-  const link = cli('invite', '--user', name).trim().split('\n').at(-1)
+  ownerCli('create-user', '--name', name)
+  const link = ownerCli('invite', '--user', name).trim().split('\n').at(-1)
   if (!link?.includes('/redeem#token=')) throw new Error(`Unexpected invite output: ${link}`)
   return link
 }

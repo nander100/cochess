@@ -54,8 +54,89 @@ class User(Base):
     elo: Mapped[int | None] = mapped_column(Integer)
     time_control: Mapped[str | None] = mapped_column(String(10))
     playstyle: Mapped[str | None] = mapped_column(Text)
+    # SPEC_V4 §4.6. Google's verified email (personal data: never logged or sent to the coach)
+    # and its account id `sub`, the account key (never the email). Invite-only players have
+    # neither until they connect Google.
+    email: Mapped[str | None] = mapped_column(String(320))
+    google_sub: Mapped[str | None] = mapped_column(String(255), unique=True)
+    # waitlisted | active | suspended | deleted. Players made by the CLI start active.
+    status: Mapped[str] = mapped_column(String(12), default="active", server_default="active")
+    role: Mapped[str] = mapped_column(String(10), default="player", server_default="player")
+    # The age check's answer, banded (13_17 | 18_plus); the birth year itself isn't kept.
+    age_band: Mapped[str | None] = mapped_column(String(8))
+    age_checked_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    waitlisted_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    admitted_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    # Updated at most once an hour (auth/deps.py), for the owner dashboard's activity numbers.
+    last_active_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)
+
+
+class OAuthState(Base):
+    """One "Continue with Google" round trip (SPEC_V4 §4.1). Only hashes are stored: the browser
+    keeps the PKCE verifier in an httpOnly cookie, and the state and nonce travel through Google.
+    Deleted when used or expired."""
+
+    __tablename__ = "oauth_states"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    state_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    browser_hash: Mapped[str] = mapped_column(String(64))  # hash of the cookie's verifier
+    nonce_hash: Mapped[str] = mapped_column(String(64))
+    intent: Mapped[str] = mapped_column(String(10))  # signin | connect
+    # For "Connect Google": the logged-in player the Google account is being added to.
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+
+
+class PendingSignup(Base):
+    """A new Google account between Google's answer and the sign-up form (age check and terms,
+    SPEC_V4 §4.2). Deleted when the form is done, when the age check says under 13, or when it
+    expires, so nothing about a refused sign-up is kept."""
+
+    __tablename__ = "pending_signups"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    google_sub: Mapped[str] = mapped_column(String(255))
+    email: Mapped[str] = mapped_column(String(320))
+    name: Mapped[str] = mapped_column(String(60))
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+
+
+class TermsAcceptance(Base):
+    """Which terms version a player accepted, and when (SPEC_V4 §11)."""
+
+    __tablename__ = "terms_acceptances"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    version: Mapped[str] = mapped_column(String(40))
+    accepted_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+
+
+class EmailOutboxRow(Base):
+    """An account email waiting to be sent, written in the same transaction as what caused it
+    (SPEC_V4 §12.4). The address is read from the user when it's sent; logs show the kind, user
+    and status, never the address or body."""
+
+    __tablename__ = "email_outbox"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(30))
+    dedupe_key: Mapped[str] = mapped_column(String(120), unique=True)  # each email sent once
+    details: Mapped[dict[str, str]] = mapped_column(JSON, default=dict)  # e.g. the owner's reason
+    # pending | sent | failed | skipped
+    status: Mapped[str] = mapped_column(String(10), default="pending", server_default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    next_attempt_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+    last_error: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+    sent_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
 
 
 class Invite(Base):

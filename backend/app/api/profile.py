@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_session
-from app.api.schemas import Profile, ProfileUpdate, TimeControl
-from app.auth.deps import CurrentUser
+from app.api.schemas import AccountStatus, AgeBand, Profile, ProfileUpdate, Role, TimeControl
+from app.auth.deps import CurrentAccount, CurrentUser
 from app.auth.service import find_user, name_key
 from app.db.models import User
 
@@ -25,11 +25,18 @@ def profile_of(user: User) -> Profile:
         time_control=cast(TimeControl | None, user.time_control),  # validated on write
         playstyle=user.playstyle,
         complete=is_complete(user),
+        status=cast(AccountStatus, user.status),  # "deleted" never gets this far
+        role=cast(Role, user.role),
+        email=user.email,
+        google_connected=user.google_sub is not None,
+        waitlisted_at=user.waitlisted_at,
+        age_band=cast(AgeBand | None, user.age_band),
     )
 
 
 @router.get("")
-def read_profile(user: CurrentUser) -> Profile:
+def read_profile(user: CurrentAccount) -> Profile:
+    """Any signed-in account: the app reads the status here to show the waitlist page."""
     return profile_of(user)
 
 

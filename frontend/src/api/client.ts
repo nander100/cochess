@@ -27,6 +27,8 @@ import type {
   ProfileUpdate,
   SavedVariation,
   ScanResponse,
+  SignupInfo,
+  SignupRequest,
   SubmitGame,
   SubmitResponse,
   TendencyReport,
@@ -55,7 +57,12 @@ export interface ApiClient {
   /** Use a one-time login link's token; the server sets the session cookie. */
   redeem(token: string): Promise<void>
   logout(): Promise<void>
+  /** Any signed-in account, including waitlisted and paused ones (they read their status here). */
   me(): Promise<Profile>
+  /** The new Google account between Google's answer and the sign-up form (410 when gone). */
+  signupInfo(): Promise<SignupInfo>
+  /** Age check and terms; joins the waitlist and signs in (403 when too young). */
+  signUp(body: SignupRequest): Promise<void>
   updateMe(update: ProfileUpdate): Promise<Profile>
   createGame(body: CreateGameRequest): Promise<CreateGameResponse>
   listGames(): Promise<GameListItem[]>
@@ -176,6 +183,10 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
       await send('/api/auth/logout', { method: 'POST' })
     },
     me: () => request('/api/me'),
+    signupInfo: () => request('/api/auth/signup'),
+    signUp: async (body) => {
+      await send('/api/auth/signup', { method: 'POST', body: JSON.stringify(body) })
+    },
     updateMe: (update) => request('/api/me', { method: 'PATCH', body: JSON.stringify(update) }),
     createGame: (body) => post('/api/games', body),
     listGames: () => request('/api/games'),

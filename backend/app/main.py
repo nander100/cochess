@@ -1,6 +1,7 @@
 """FastAPI application factory and middleware. Run with `uvicorn app.main:create_app --factory`."""
 
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from sqlalchemy.orm import sessionmaker
@@ -17,11 +18,13 @@ from app.api import onboarding_import as onboarding_import_routes
 from app.api import tendencies as tendency_routes
 from app.api import variations as variation_routes
 from app.api import walkthrough as walkthrough_routes
+from app.auth import google_routes
 from app.auth import routes as auth_routes
 from app.coach.client import AnthropicCoachClient, CoachClient
 from app.config import Settings, get_settings
 from app.db.migrate import upgrade
 from app.db.session import make_engine
+from app.email.smtp import EmailSender, SmtpTransport
 
 # Required for SharedArrayBuffer, which multi-threaded Stockfish WASM needs (SPEC §4.1).
 CROSS_ORIGIN_ISOLATION_HEADERS = {
@@ -39,7 +42,23 @@ def create_app(
     engine = make_engine(settings.database_url)
     upgrade(engine)
 
-    app = FastAPI(title="CoChess")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        # Account email (SPEC_V4 §12.4) is sent from a background thread, only when it's on;
+        # otherwise queued emails are marked skipped by whoever runs send_pending.
+        if settings.email.enabled:
+            transport = app.state.email_transport or SmtpTransport(settings.email)
+            app.state.email_sender = EmailSender(app.state.session_factory, settings, transport)
+            app.state.email_sender.start()
+        try:
+            yield
+        finally:
+            if app.state.email_sender is not None:
+                app.state.email_sender.stop()
+
+    app = FastAPI(title="CoChess", lifespan=lifespan)
+    app.state.email_transport = None  # tests put a recording transport here
+    app.state.email_sender = None
     validation.install(app)
     app.state.settings = settings
     app.state.session_factory = sessionmaker(engine, expire_on_commit=False)
@@ -47,8 +66,9 @@ def create_app(
         coach_client = AnthropicCoachClient(settings.anthropic_api_key)
     app.state.coach_client = coach_client
 
-    # Every API route except health and redeem requires a login session (app/auth), checked
-    # per route by the CurrentUser dependency; v1's shared access code is gone (SPEC_V2 §4.1).
+    # Every API route except health, redeem and the Google sign-in routes requires a login
+    # session (app/auth), checked per route: CurrentUser for active players, CurrentAccount for
+    # the status page a waitlisted or paused player sees (SPEC_V4 §4).
     @app.middleware("http")
     async def cross_origin_isolation(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
@@ -62,6 +82,7 @@ def create_app(
         return {"ok": True}
 
     app.include_router(auth_routes.router)
+    app.include_router(google_routes.router)
     app.include_router(profile.router)
     app.include_router(games.router)
     app.include_router(engine_routes.router)

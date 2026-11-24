@@ -7,7 +7,7 @@ test('a used login link and logging out say what to do next', async ({ page }) =
   await logInWithProfile(page, link, 1200)
 
   await page.getByRole('button', { name: 'Log out' }).click()
-  await expect(page.getByRole('alert')).toContainText("You're not logged in")
+  await expect(page.getByRole('link', { name: 'Continue with Google' })).toBeVisible()
 
   const url = new URL(link)
   await page.goto(`${url.pathname}${url.hash}`)

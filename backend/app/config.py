@@ -238,6 +238,59 @@ class ImportSettings(BaseModel):
         return f"{self.app_name} ({self.contact})" if self.contact else self.app_name
 
 
+class GoogleSettings(BaseModel):
+    """Sign in with Google (SPEC_V4 §4): an OpenID Connect authorization-code flow with PKCE, run
+    by the backend. Off until both the client id and secret are set (GOOGLE__CLIENT_ID,
+    GOOGLE__CLIENT_SECRET). The secret is backend-only and never logged."""
+
+    client_id: str = ""
+    client_secret: str = ""
+    authorize_url: str = "https://accounts.google.com/o/oauth2/v2/auth"
+    token_url: str = "https://oauth2.googleapis.com/token"
+    certs_url: str = "https://www.googleapis.com/oauth2/v1/certs"
+    issuers: tuple[str, ...] = ("https://accounts.google.com", "accounts.google.com")
+    state_ttl_minutes: int = 10  # from "Continue with Google" to Google's redirect back
+    signup_ttl_minutes: int = 30  # from Google's answer to finishing the sign-up form
+    certs_cache_seconds: int = 3600
+    timeout_seconds: float = 10
+    oauth_cookie: str = "cochess_oauth"
+    signup_cookie: str = "cochess_signup"
+    age_block_cookie: str = "cochess_age_check"
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.client_id and self.client_secret)
+
+
+class LegalSettings(BaseModel):
+    """Terms, privacy and the age check (SPEC_V4 §11). The texts are the owner's (D6)."""
+
+    terms_version: str = "2026-11-draft"
+    min_age: int = 13  # COPPA: no accounts for children under 13
+    adult_age: int = 18  # 13 to 17 need a parent or guardian to agree and to pay
+    age_block_hours: int = 24  # after an under-13 answer, sign-up stays closed in that browser
+
+
+class EmailSettings(BaseModel):
+    """Account email through Amazon SES's SMTP interface (SPEC_V4 §12.4). Off unless enabled:
+    rows are still written and marked skipped, so tests and development send nothing."""
+
+    enabled: bool = False
+    smtp_host: str = ""  # e.g. email-smtp.us-east-2.amazonaws.com
+    smtp_port: int = 587  # STARTTLS
+    smtp_username: str = ""  # SES SMTP credentials (an IAM user that can only send)
+    smtp_password: str = ""
+    from_address: str = ""  # e.g. "CoChess <account@mail.example.com>"
+    reply_to: str | None = None
+    # Staging: only these addresses get mail (empty = everyone, for production).
+    allow_list: list[str] = []
+    max_attempts: int = 5
+    retry_seconds: float = 60  # doubled after each failed attempt
+    poll_seconds: float = 10
+    batch_size: int = 20
+    timeout_seconds: float = 20
+
+
 class AuthSettings(BaseModel):
     """Invite links and login sessions (SPEC_V2 §4.1)."""
 
@@ -265,6 +318,9 @@ class Settings(BaseSettings):
     user_daily_token_limit: int | None = None
 
     auth: AuthSettings = AuthSettings()
+    google: GoogleSettings = GoogleSettings()
+    legal: LegalSettings = LegalSettings()
+    email: EmailSettings = EmailSettings()
     engine: EngineSettings = EngineSettings()
     thresholds: Thresholds = Thresholds()
     detectors: DetectorSettings = DetectorSettings()

@@ -6,14 +6,14 @@ import { ToastProvider } from '../ui'
 import { DEFAULT_SETTINGS, EMPTY_TENDENCIES, PROFILE, fakeApi } from '../test/fakes'
 import { ProfilePage } from './ProfilePage'
 
-function setup(api = fakeApi()) {
+function setup(api = fakeApi(), profile = PROFILE, url = '/profile') {
   const onSaved = vi.fn()
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[url]}>
       <ThemeProvider>
         <ToastProvider>
           <SettingsProvider api={api} enabled>
-            <ProfilePage api={api} profile={PROFILE} onSaved={onSaved} onLoggedOut={vi.fn()} />
+            <ProfilePage api={api} profile={profile} onSaved={onSaved} onLoggedOut={vi.fn()} />
           </SettingsProvider>
         </ToastProvider>
       </ThemeProvider>
@@ -167,4 +167,30 @@ test('a username with other characters is refused before saving', async () => {
 
   expect(within(accounts()).getByText('Use only letters, numbers, "_" and "-".')).toBeInTheDocument()
   expect(within(accounts()).getByRole('button', { name: 'Save usernames' })).toBeDisabled()
+})
+
+test('an invite-link player can connect Google', () => {
+  setup()
+
+  const card = screen.getByRole('region', { name: 'Signing in' })
+  expect(within(card).getByRole('link', { name: 'Connect Google' })).toHaveAttribute(
+    'href',
+    '/api/auth/google/start?intent=connect',
+  )
+})
+
+test('once connected, the card says which Google account signs in', () => {
+  setup(fakeApi(), { ...PROFILE, google_connected: true, email: 'alex@example.com' }, '/profile?google=connected')
+
+  const card = screen.getByRole('region', { name: 'Signing in' })
+  expect(within(card).getByText(/as alex@example.com/)).toBeInTheDocument()
+  expect(within(card).getByRole('status')).toHaveTextContent('Google is connected')
+  expect(within(card).queryByRole('link', { name: 'Connect Google' })).not.toBeInTheDocument()
+})
+
+test('a Google account another player uses is explained', () => {
+  setup(fakeApi(), PROFILE, '/profile?google=taken')
+
+  const card = screen.getByRole('region', { name: 'Signing in' })
+  expect(within(card).getByRole('status')).toHaveTextContent('already belongs to another CoChess player')
 })

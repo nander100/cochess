@@ -1,4 +1,4 @@
-"""Login routes (SPEC_V2 §11): redeem an invite link, log out."""
+"""Login routes (SPEC_V2 §11): redeem an invite link, log out. Google sign-in: google_routes.py."""
 
 from datetime import UTC, datetime
 from typing import Annotated
@@ -31,6 +31,11 @@ def redeem(
         token = redeem_invite(session, body.token, datetime.now(UTC), settings.auth)
     except InvalidInviteError as error:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=INVALID_LINK) from error
+    set_session_cookie(response, token, settings)
+
+
+def set_session_cookie(response: Response, token: str, settings: Settings) -> None:
+    """The login cookie: httpOnly, SameSite=Lax, Secure in production (CLAUDE.md)."""
     response.set_cookie(
         settings.auth.cookie_name,
         token,

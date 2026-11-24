@@ -9,7 +9,7 @@ import { HUNG_KNIGHT } from './games.ts'
 test('a player uploads a game, reads the coach, and steps through a critical moment', async ({ page }) => {
   await page.goto('/')
   await page.waitForLoadState('networkidle') // Vite can reload once while it bundles
-  await expect(page.getByRole('alert')).toContainText("You're not logged in")
+  await expect(page.getByRole('link', { name: 'Continue with Google' })).toBeVisible()
 
   await logInWithProfile(page, newLoginLink(`Coaching ${Date.now()}`), 1200)
   await page.getByLabel('I played White').check()

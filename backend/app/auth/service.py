@@ -4,7 +4,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.config import AuthSettings
@@ -50,6 +50,25 @@ def find_user(session: Session, name: str) -> User | None:
     return session.scalars(select(User).where(User.name_key == name_key(name))).first()
 
 
+def find_account(session: Session, name_or_email: str) -> User | None:
+    """For owner commands: a player by name, or by email when it looks like one (any case)."""
+    if "@" in name_or_email:
+        email = name_or_email.strip().casefold()
+        return session.scalars(select(User).where(func.lower(User.email) == email)).first()
+    return find_user(session, name_or_email)
+
+
+def unique_name(session: Session, wanted: str) -> str:
+    """`wanted`, or `wanted 2`, `wanted 3`... when taken (names are unique ignoring case)."""
+    base = wanted.strip()[:MAX_NAME_CHARS] or "Player"
+    candidate, number = base, 1
+    while find_user(session, candidate) is not None:
+        number += 1
+        suffix = f" {number}"
+        candidate = base[: MAX_NAME_CHARS - len(suffix)] + suffix
+    return candidate
+
+
 def create_invite(session: Session, user: User, now: datetime, settings: AuthSettings) -> str:
     """A new one-time login token for `user`. Returns the raw token (shown once, never stored)."""
     token = new_token()
@@ -77,16 +96,25 @@ def redeem_invite(session: Session, token: str, now: datetime, settings: AuthSet
     if claimed.rowcount != 1:  # type: ignore[attr-defined]
         session.rollback()
         raise InvalidInviteError
+    user = session.get(User, invite.user_id)
+    if user is None:
+        raise InvalidInviteError
+    raw = start_session(session, user, now, settings)
+    session.commit()
+    return raw
+
+
+def start_session(session: Session, user: User, now: datetime, settings: AuthSettings) -> str:
+    """Add a login session for `user` to the caller's transaction. Returns the raw cookie token."""
     raw = new_token()
     session.add(
         AuthSession(
-            user_id=invite.user_id,
+            user_id=user.id,
             token_hash=hash_token(raw),
             expires_at=now + timedelta(days=settings.session_ttl_days),
             created_at=now,
         )
     )
-    session.commit()
     return raw
 
 

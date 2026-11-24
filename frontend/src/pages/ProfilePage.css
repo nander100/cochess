@@ -213,3 +213,8 @@
   flex-direction: column;
   gap: var(--space-4);
 }
+
+/* Connect Google (GoogleAccount): the link sits under the text like a form's button. */
+.profile-google-connect {
+  align-self: flex-start;
+}

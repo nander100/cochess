@@ -5,16 +5,21 @@ Run by Playwright (frontend/playwright.config.ts) as
 move validation and the test can tell which call it got.
 """
 
+import html
 import json
+from urllib.parse import urlencode
 
 import httpx
 from anthropic.types import ContentBlock, TextBlock, ToolUseBlock
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse, RedirectResponse
 
+from app.auth.google import GoogleClient
 from app.coach.client import CoachReply, CoachRequest, Usage, system_prompt
 from app.coach.payload import Task
 from app.config import get_settings
 from app.main import create_app
+from tests.google_fakes import CLIENT_ID, CLIENT_SECRET, FakeGoogle
 
 TASKS: tuple[Task, ...] = (
     "synopsis", "chat", "explain", "moment_intro", "moment_feedback", "baseline_report",
@@ -141,6 +146,39 @@ def make() -> FastAPI:
     engine = settings.engine
     for tier, ms in ((engine.scan, 10), (engine.verify, 20), (engine.deep, 20)):
         tier.min_time_ms = ms
+    settings.google.client_id, settings.google.client_secret = CLIENT_ID, CLIENT_SECRET
+    settings.google.authorize_url = "/api/e2e/google/authorize"  # the fake chooser below
     app = create_app(settings, ScriptedCoach())
     app.state.import_transport = httpx.MockTransport(_fake_platforms)
+    _fake_google(app)
     return app
+
+
+def _fake_google(app: FastAPI) -> None:
+    """Google for the E2E flows (SPEC_V4 §14.3): "Continue with Google" lands on a chooser where
+    the test types a name and email; the chooser signs an ID token for that account with the
+    test key and returns to the real callback, which checks it like Google's."""
+    google = FakeGoogle()
+    app.state.google_client = GoogleClient(app.state.settings.google, google.transport())
+
+    @app.get("/api/e2e/google/authorize", include_in_schema=False)
+    def authorize(state: str, nonce: str) -> HTMLResponse:
+        hidden = "".join(
+            f'<input type="hidden" name="{key}" value="{html.escape(value)}">'
+            for key, value in (("state", state), ("nonce", nonce))
+        )
+        return HTMLResponse(
+            "<!doctype html><title>Fake Google</title><h1>Choose an account</h1>"
+            '<form action="/api/e2e/google/choose">'
+            '<label>Name <input name="name"></label> <label>Email <input name="email"></label>'
+            f'{hidden}<button type="submit">Continue as this account</button></form>'
+        )
+
+    @app.get("/api/e2e/google/choose", include_in_schema=False)
+    def choose(state: str, nonce: str, name: str, email: str) -> RedirectResponse:
+        code = f"e2e-{email}-{nonce[:8]}"
+        google.will_return(
+            code, google.id_token(sub=f"e2e-{email}", email=email, name=name, nonce=nonce)
+        )
+        query = urlencode({"code": code, "state": state})
+        return RedirectResponse(f"/api/auth/google/callback?{query}", status_code=303)

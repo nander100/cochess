@@ -7,6 +7,7 @@ import type { CoachEvent } from './api/sse'
 import type { BoardMove } from './board/Board'
 import type { GameDetail, MomentInfo } from './api/types'
 import { DEFAULT_SETTINGS, DETAIL, MOMENT, PROFILE, fakeDeps } from './test/fakes'
+import { GOOGLE_SIGN_IN } from './pages/AccountPages'
 
 // chessground needs real layout; the analysis board is tested with a stand-in that shows the
 // position and can play a move.
@@ -296,19 +297,35 @@ test('a what-if question in the chat runs the deep tier on the engine', async ()
   )
 })
 
-test('without a session the app asks for a login link', async () => {
+test('without a session the app offers Google sign-in', async () => {
   renderApp(fakeDeps({ me: vi.fn().mockRejectedValue(LOGGED_OUT) }))
 
-  expect(await screen.findByRole('alert')).toHaveTextContent("You're not logged in")
+  expect(await screen.findByRole('link', { name: 'Continue with Google' })).toHaveAttribute('href', GOOGLE_SIGN_IN)
   expect(screen.queryByLabelText(/your game/i)).not.toBeInTheDocument()
 })
 
-test('a 401 in the middle of a session shows the logged-out message', async () => {
+test('a waitlisted account sees its status page instead of the app', async () => {
+  const waiting = { ...PROFILE, status: 'waitlisted' as const, email: 'alex@example.com' }
+  const deps = fakeDeps({ me: vi.fn(async () => waiting) })
+  renderApp(deps, '/games')
+
+  expect(await screen.findByRole('heading', { name: `You're on the list, ${PROFILE.name}.` })).toBeInTheDocument()
+  expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+  expect(deps.api.listGames).not.toHaveBeenCalled()
+})
+
+test('the sign-up form and the terms open without a session', async () => {
+  renderApp(fakeDeps({ me: vi.fn().mockRejectedValue(LOGGED_OUT) }), '/signup')
+
+  expect(await screen.findByLabelText('What year were you born?')).toBeInTheDocument()
+})
+
+test('a 401 in the middle of a session shows the sign-in page', async () => {
   renderApp(fakeDeps({ createGame: vi.fn().mockRejectedValue(LOGGED_OUT) }))
 
   await submitGame()
 
-  expect(await screen.findByRole('alert')).toHaveTextContent("You're not logged in")
+  expect(await screen.findByRole('link', { name: 'Continue with Google' })).toHaveAttribute('href', GOOGLE_SIGN_IN)
 })
 
 test('the header shows who is logged in, and logging out ends the session', async () => {
@@ -318,7 +335,7 @@ test('the header shows who is logged in, and logging out ends the session', asyn
   expect(await screen.findByText('Alex')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Log out' }))
 
-  expect(await screen.findByRole('alert')).toHaveTextContent("You're not logged in")
+  expect(await screen.findByRole('link', { name: 'Continue with Google' })).toHaveAttribute('href', GOOGLE_SIGN_IN)
   expect(deps.api.logout).toHaveBeenCalled()
 })
 

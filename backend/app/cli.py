@@ -3,6 +3,10 @@
 create-user --name "Alex"     add a player
 invite --user Alex            print a one-time login link (valid 7 days)
 assign-games --user Alex      give every game without an owner (v1 games) to a player
+admit --user NAME_OR_EMAIL      accept a player from the waitlist (sends the acceptance email)
+suspend --user X --reason TEXT  pause a player's access (signs them out everywhere)
+restore --user X              give a paused player their access back
+set-role --user X --role owner|player
 migrate-sqlite --from URL --to URL [--check-only]
                               copy the v3 SQLite database into an empty Postgres database
 """
@@ -15,7 +19,8 @@ from typing import TextIO
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.auth.service import UserExistsError, create_invite, create_user, find_user
+from app.auth.accounts import AccountError, admit, restore, set_role, suspend
+from app.auth.service import UserExistsError, create_invite, create_user, find_account, find_user
 from app.config import Settings, get_settings
 from app.db.copy_sqlite import CopyError, copy_database, describe, find_problems
 from app.db.games import assign_unowned_games, fill_fingerprints, rebuild_summaries
@@ -73,9 +78,35 @@ def _run(args: argparse.Namespace, session: Session, settings: Settings) -> str:
                 ids = ", ".join(f"{g.id} ({g.user_color})" for g in games)
                 lines.append(f"Duplicate uploads of one game: {ids}")
         return "\n".join(lines)
+    if args.command in ("admit", "suspend", "restore", "set-role"):
+        return _account_action(args, session)
     user = _user(session, args.user)
     count = assign_unowned_games(session, user)
     return f"Assigned {count} game(s) to {user.name}."
+
+
+def _account_action(args: argparse.Namespace, session: Session) -> str:
+    user = find_account(session, args.user)
+    if user is None:
+        raise CliError(f'no player named or with the email "{args.user}"')
+    now = datetime.now(UTC)
+    try:
+        if args.command == "admit":
+            admit(session, user, now)
+            message = f'Accepted "{user.name}": they can sign in now (acceptance email queued).'
+        elif args.command == "suspend":
+            suspend(session, user, now, reason=args.reason, tell_reason=args.tell_reason)
+            message = f'Paused "{user.name}": signed out everywhere (email queued).'
+        elif args.command == "restore":
+            restore(session, user, now)
+            message = f'Restored "{user.name}" (status: {user.status}).'
+        else:
+            set_role(user, args.role)
+            message = f'"{user.name}" is now {args.role}.'
+    except AccountError as error:
+        raise CliError(str(error)) from error
+    session.commit()
+    return message
 
 
 def _migrate_sqlite(args: argparse.Namespace, out: TextIO) -> int:
@@ -133,6 +164,21 @@ def _parser() -> argparse.ArgumentParser:
         "backfill", help="rebuild analyzed games' summaries from stored engine results"
     )
     backfill.add_argument("--user", help="only this player's games (default: everyone's)")
+    for name, text in (
+        ("admit", "accept a player from the waitlist"),
+        ("suspend", "pause a player's access"),
+        ("restore", "give a paused player their access back"),
+        ("set-role", "make a player the owner, or a player again"),
+    ):
+        action = commands.add_parser(name, help=text)
+        action.add_argument("--user", required=True, help="the player's name or email")
+        if name == "suspend":
+            action.add_argument("--reason", required=True, help="kept with the owner")
+            action.add_argument(
+                "--tell-reason", action="store_true", help="also put the reason in the email"
+            )
+        if name == "set-role":
+            action.add_argument("--role", required=True, choices=["owner", "player"])
     copy = commands.add_parser(
         "migrate-sqlite", help="copy the v3 SQLite database into an empty Postgres database"
     )

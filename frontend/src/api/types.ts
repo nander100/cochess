@@ -82,6 +82,9 @@ export interface ImportResponse {
 
 export type TimeControl = 'bullet' | 'blitz' | 'rapid' | 'classical'
 
+/** SPEC_V4 §4: a waitlisted or paused account sees only its status page. */
+export type AccountStatus = 'waitlisted' | 'active' | 'suspended'
+
 export interface Profile {
   name: string
   elo: number | null
@@ -89,6 +92,25 @@ export interface Profile {
   playstyle: string | null
   /** Elo and time control are set: the player can analyze games. */
   complete: boolean
+  status: AccountStatus
+  role: 'player' | 'owner'
+  email: string | null
+  google_connected: boolean
+  waitlisted_at: string | null
+  age_band: '13_17' | '18_plus' | null
+}
+
+/** The Google account waiting for the sign-up form (GET /api/auth/signup). */
+export interface SignupInfo {
+  name: string
+  email: string
+  terms_version: string
+}
+
+export interface SignupRequest {
+  birth_year: number
+  accept_terms: boolean
+  terms_version: string
 }
 
 /** PATCH /api/me: only the fields sent change. A blank playstyle clears it. */

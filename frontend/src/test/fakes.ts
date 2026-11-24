@@ -37,6 +37,12 @@ export const PROFILE: Profile = {
   time_control: 'rapid',
   playstyle: null,
   complete: true,
+  status: 'active',
+  role: 'player',
+  email: null,
+  google_connected: false,
+  waitlisted_at: null,
+  age_band: null,
 }
 
 export const SYNOPSIS_TEXT = '### Overall\nA tidy game.\n\n### Your turn\nWhat would you try on move 2?'
@@ -238,6 +244,8 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     redeem: vi.fn(async () => {}),
     logout: vi.fn(async () => {}),
     me: vi.fn(async () => PROFILE),
+    signupInfo: vi.fn(async () => ({ name: 'Sam Player', email: 'sam@example.com', terms_version: '2026-11-draft' })),
+    signUp: vi.fn(async () => {}),
     updateMe: vi.fn(async (update) => ({ ...PROFILE, ...update, complete: true })),
     createGame: vi.fn(async () => GAME),
     listGames: vi.fn(async () => []),

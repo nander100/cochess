@@ -15,7 +15,17 @@ from tests.auth_helpers import BASE_URL, log_in
 from tests.coach_fakes import FakeCoachClient
 from tests.databases import fresh_database_url
 
-PUBLIC = {("GET", "/api/health"), ("POST", "/api/auth/redeem"), ("POST", "/api/auth/logout")}
+PUBLIC = {
+    ("GET", "/api/health"),
+    ("POST", "/api/auth/redeem"),
+    ("POST", "/api/auth/logout"),
+    # Signing in with Google (SPEC_V4 §4) starts logged out; the sign-up form is tied to its own
+    # short-lived cookie instead (tests/auth/test_google_routes.py).
+    ("GET", "/api/auth/google/start"),
+    ("GET", "/api/auth/google/callback"),
+    ("GET", "/api/auth/signup"),
+    ("POST", "/api/auth/signup"),
+}
 
 
 def _app() -> FastAPI:

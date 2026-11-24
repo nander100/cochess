@@ -6,7 +6,9 @@ import type { EngineConfig, Profile } from './api/types'
 import { type EngineHandle, StockfishEngine } from './engine/StockfishEngine'
 import { GamesPage } from './pages/GamesPage'
 import { LatestGamePage } from './pages/LatestGamePage'
+import { AccountStatusPage, LegalPage, SignInPage } from './pages/AccountPages'
 import { RedeemPage } from './pages/RedeemPage'
+import { SignupPage } from './pages/SignupPage'
 import { errorText, tokenFromHash } from './pages/util'
 import { SettingsProvider } from './settings/SettingsProvider'
 import { ShortcutHelp } from './shortcuts/ShortcutHelp'
@@ -14,7 +16,7 @@ import { useShortcuts } from './shortcuts/useShortcuts'
 import { useSettings } from './settings/settingsContext'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { useTheme } from './theme/themeContext'
-import { EmptyState, ErrorState, Header, type NavItem, Skeleton, ToastProvider } from './ui'
+import { ErrorState, Header, type NavItem, Skeleton, ToastProvider } from './ui'
 
 // Loaded when first opened: the board, chessground, chess.js and the coach panel stay out of the
 // first download (the Games page is home and loads with the app).
@@ -79,6 +81,8 @@ function Shell({ deps }: AppProps) {
   // Read once: the fragment is removed from the address bar as soon as the link is used.
   const [redeemToken] = useState(() => tokenFromHash(location.hash))
   const onRedeemPage = location.pathname === '/redeem'
+  // Pages with their own layout that don't need a session (SPEC_V4 §4.2, §11).
+  const standalone = ['/redeem', '/signup', '/terms', '/privacy'].includes(location.pathname)
 
   const loadProfile = useCallback(() => {
     pipeline.api.me().then(
@@ -89,11 +93,19 @@ function Shell({ deps }: AppProps) {
   }, [pipeline])
 
   useEffect(() => {
-    if (!onRedeemPage) loadProfile()
-  }, [onRedeemPage, loadProfile])
+    if (!standalone) loadProfile()
+  }, [standalone, loadProfile])
 
   const redeemed = useCallback(() => navigate('/games', { replace: true }), [navigate])
   const loggedOut = useCallback(() => setSession({ kind: 'logged-out' }), [])
+  const joined = useCallback(() => navigate('/', { replace: true }), [navigate])
+  const accepted = useCallback(
+    (profile: Profile) => {
+      setSession({ kind: 'in', profile })
+      navigate('/', { replace: true })
+    },
+    [navigate],
+  )
 
   async function logOut() {
     await pipeline.api.logout().catch(() => undefined) // logged out either way
@@ -102,6 +114,23 @@ function Shell({ deps }: AppProps) {
 
   // The invite page has its own layout (Redeem.dc.html): a brand panel instead of the header.
   if (onRedeemPage) return <RedeemPage api={pipeline.api} token={redeemToken} onRedeemed={redeemed} />
+  if (location.pathname === '/signup') return <SignupPage api={pipeline.api} onJoined={joined} />
+  if (location.pathname === '/terms' || location.pathname === '/privacy') {
+    return <LegalPage kind={location.pathname === '/terms' ? 'terms' : 'privacy'} />
+  }
+  if (session.kind === 'logged-out') {
+    return <SignInPage reason={new URLSearchParams(location.search).get('signin')} />
+  }
+  if (session.kind === 'in' && session.profile.status !== 'active') {
+    return (
+      <AccountStatusPage
+        api={pipeline.api}
+        profile={session.profile}
+        onActive={accepted}
+        onLogOut={() => void logOut()}
+      />
+    )
+  }
 
   return (
     <SettingsProvider api={pipeline.api} enabled={session.kind === 'in'}>
@@ -109,13 +138,6 @@ function Shell({ deps }: AppProps) {
       <main className="page">
       {session.kind === 'loading' && <Skeleton label="Connecting…" />}
       {session.kind === 'error' && <ErrorState message={session.message} onRetry={loadProfile} />}
-      {session.kind === 'logged-out' && (
-        <div role="alert">
-          <EmptyState title="You're not logged in">
-            <p>Ask the owner for a login link, then open it in this browser.</p>
-          </EmptyState>
-        </div>
-      )}
       {session.kind === 'in' && (
         <Suspense fallback={<Skeleton lines={4} label="Loading…" />}>
         <Routes>

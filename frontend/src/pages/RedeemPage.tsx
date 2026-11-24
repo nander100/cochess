@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import type { ApiClient } from '../api/client'
 import type { Profile } from '../api/types'
-import { useTheme } from '../theme/themeContext'
-import { Button, Pill, ProgressBar } from '../ui'
-import './RedeemPage.css'
+import { Pill, ProgressBar } from '../ui'
+import { AccountLayout } from './AccountLayout'
 import { errorText } from './util'
 
 interface RedeemPageProps {
@@ -45,43 +44,26 @@ export function RedeemPage({ api, token, onRedeemed }: RedeemPageProps) {
   }, [api, token, onRedeemed])
 
   return (
-    <div className="redeem">
-      <section className="redeem-brand" aria-hidden="true">
-        <div className="redeem-logo">
-          <span className="redeem-logo-tile">♞︎</span>
-          <span className="redeem-wordmark">CoChess</span>
+    <AccountLayout>
+      {state.kind === 'checking' && (
+        <>
+          <h1 className="redeem-title-small">Checking your invite…</h1>
+          <ProgressBar label="Checking invite" done={2} total={5} />
+        </>
+      )}
+      {state.kind === 'accepted' && <Accepted profile={state.profile} />}
+      {state.kind === 'invalid' && (
+        <div className="redeem-state" role="alert">
+          <span className="redeem-badge">Link not valid</span>
+          <h1 className="redeem-title">This invite link can't be used.</h1>
+          <p className="redeem-lead">{state.message}</p>
+          <p className="redeem-lead">
+            Ask the owner to send you a new one. Your games and progress are kept.
+          </p>
+          <div className="redeem-note">Already signed in on another device? Open CoChess there instead.</div>
         </div>
-        <div className="redeem-tiles">
-          {Array.from({ length: 16 }, (_, i) => (
-            <span key={i} className={(Math.floor(i / 4) + i) % 2 === 0 ? 'light' : 'dark'} />
-          ))}
-        </div>
-        <p className="redeem-tagline">The engine finds the moves. Your coach explains them.</p>
-      </section>
-      <main className="redeem-main">
-        <div className="redeem-card">
-          {state.kind === 'checking' && (
-            <>
-              <h1 className="redeem-title-small">Checking your invite…</h1>
-              <ProgressBar label="Checking invite" done={2} total={5} />
-            </>
-          )}
-          {state.kind === 'accepted' && <Accepted profile={state.profile} />}
-          {state.kind === 'invalid' && (
-            <div className="redeem-state" role="alert">
-              <span className="redeem-badge">Link not valid</span>
-              <h1 className="redeem-title">This invite link can't be used.</h1>
-              <p className="redeem-lead">{state.message}</p>
-              <p className="redeem-lead">
-                Ask the owner to send you a new one. Your games and progress are kept.
-              </p>
-              <div className="redeem-note">Already signed in on another device? Open CoChess there instead.</div>
-            </div>
-          )}
-          <ThemeButton />
-        </div>
-      </main>
-    </div>
+      )}
+    </AccountLayout>
   )
 }
 
@@ -117,14 +99,5 @@ function Accepted({ profile }: { profile: Profile | null }) {
         owner for a new link.
       </p>
     </div>
-  )
-}
-
-function ThemeButton() {
-  const { theme, toggle } = useTheme()
-  return (
-    <Button variant="outline" className="redeem-theme" onClick={toggle}>
-      {theme === 'dark' ? 'Light mode' : 'Dark mode'}
-    </Button>
   )
 }

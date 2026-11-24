@@ -240,6 +240,29 @@ This works on SQLite and, after the move below, on Postgres.
 
 Multiply by the current per-token prices for each model to get the cost.
 
+## Google sign-in and account email (v4)
+
+**Google sign-in.** In the [Google Cloud console](https://console.cloud.google.com/):
+1. Create a project (for example `cochess`), then *APIs & Services* → *OAuth consent screen*: user type **External**, app name **CoChess**, your support email, and the app's home page and privacy policy links. Scopes: only `openid`, `email` and `profile` (the defaults for sign-in). Leave it in **Testing** and add yourself and your testers as test users (up to 100) until the domain and the privacy policy are ready; then publish it and submit it for brand verification (which needs a domain you own).
+2. *Credentials* → *Create credentials* → *OAuth client ID* → **Web application**. Authorized redirect URI: `https://<your hostname>/api/auth/google/callback` (exactly `PUBLIC_BASE_URL` plus that path). No JavaScript origins are needed: the backend does the whole exchange.
+3. Put the client ID and secret in `backend/.env` as `GOOGLE__CLIENT_ID` and `GOOGLE__CLIENT_SECRET`, then `docker compose up -d`. The sign-in page's "Continue with Google" now works; without them it says Google sign-in isn't set up.
+
+New players land on the waitlist. Accept one (they get the acceptance email if email is on):
+
+```bash
+docker compose exec backend uv run --no-dev python -m app.cli admit --user player@example.com
+```
+
+`suspend --user X --reason "..." [--tell-reason]`, `restore --user X` and `set-role --user X --role owner` work the same way (a name or an email). Invite links keep working for players you create with `create-user`; those players can connect Google from their Profile page.
+
+**Account email (Amazon SES)**, in the same region as the server:
+1. SES → *Identities* → *Create identity* → **Domain** (needs a domain you own; `sslip.io` won't work). Add the DKIM records it shows to your DNS, plus an SPF record and a DMARC record (`v=DMARC1; p=none;` to start). Wait until the identity says *Verified*.
+2. SES → *SMTP settings* → *Create SMTP credentials* (this makes an IAM user that can only send). Keep the username and password.
+3. While the account is in the SES sandbox it can only send to verified addresses: verify your own email under *Identities* to test. Before launch, *Account dashboard* → **Request production access** (describe the account emails and that bounces go to SES's suppression list), and turn on the **account-level suppression list** for bounces and complaints.
+4. In `backend/.env`: `EMAIL__ENABLED=true`, `EMAIL__SMTP_HOST=email-smtp.<region>.amazonaws.com`, `EMAIL__SMTP_USERNAME`, `EMAIL__SMTP_PASSWORD`, `EMAIL__FROM_ADDRESS="CoChess <account@<your domain>>"`, optional `EMAIL__REPLY_TO`. On staging also `EMAIL__ALLOW_LIST=["you@example.com"]`. Then `docker compose up -d`.
+
+Sent, skipped and failed emails are in the `email_outbox` table (kind, player, status, attempts); the logs name the kind and player, never the address.
+
 ## Moving the database to Postgres (RDS)
 
 v4 moves the database from the SQLite file on the `cochess-data` volume to Amazon RDS for PostgreSQL: managed daily backups with point-in-time recovery, and the database the v4 payment features need. It costs about $15 a month (the smallest instance plus 20 GB of storage). Do this once; nothing else on the server changes.
@@ -307,7 +330,7 @@ Then log in and open a game, the dashboard and the profile.
 
 - Game import fetches at most 50 games at a time, one import per player every 10 seconds, and imported games count toward the daily limit of new games.
 
-- Login links from the owner only; Google sign-in arrives in v4.
+- Players join with Google (a waitlist you accept from) or by your invite links.
 - At most 10 new games a day per player (onboarding's 12 don't count) and 30 questions per game (see the configuration table in the README to change them).
 - Optional: `USER_DAILY_TOKEN_LIMIT` in `backend/.env` caps each player's Claude tokens per rolling 24 hours (off by default).
 - A single backend process, with SQLite or Postgres (RDS); v4 hardens it for public traffic.

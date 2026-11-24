@@ -178,3 +178,16 @@
   background: transparent;
   font-weight: 500;
 }
+
+/* The sign-up form's terms checkbox (SignupPage). */
+.signup-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font: var(--text-ui);
+}
+
+.signup-consent input {
+  margin-top: var(--space-1);
+  accent-color: var(--color-primary);
+}

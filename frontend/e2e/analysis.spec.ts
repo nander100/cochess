@@ -41,7 +41,7 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
   await page.waitForLoadState('networkidle')
   await expect(page.getByRole('heading', { name: 'CoChess' })).toBeVisible()
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(true)
-  await expect(page.getByRole('alert')).toContainText("You're not logged in")
+  await expect(page.getByRole('link', { name: 'Continue with Google' })).toBeVisible()
 
   await logInWithProfile(page, link, 950)
   await page.getByLabel(`I played ${COLOR}`).check()
