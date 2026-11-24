@@ -1,6 +1,6 @@
 # CoChess v3: as built
 
-What v3 became, measured against `SPEC_V3.md`. Every decision behind a difference is in the decision log of `docs/PLAN_V3.md`, with who made it. Branch `v3` (pushed 2026-11-06, not yet merged into `main` or deployed).
+What v3 became, measured against `SPEC_V3.md`. Every decision behind a difference is in the decision log of `docs/PLAN_V3.md`, with who made it. Branch `v3` (pushed 2026-11-06), deployed to the EC2 server and approved by the owner on 2026-11-23, then merged into `main`.
 
 ## What v3 added, by milestone
 
@@ -35,16 +35,16 @@ Migrations 0009 to 0018: `user_settings`, `game_variations` and `games.variation
 |---|---|---|
 | No color pre-selected; no game submitted without one | Met | API tests (missing color is a 422, or `needs_color` in the assessment), Vitest form tests, e2e `color.spec.ts` (three flows, including username detection). |
 | No raw notation outside move tags; no more than one move in a row | Met in tests and real replies | `coach/markup.py` checks with one regeneration then removal; plain-language tests; M5 checkpoint replies at three detail levels. |
-| A newer player (under 1000) can follow a Plain-level synopsis | **Needs the owner** | Ask a trusted newer player to read one Plain synopsis of their own game. |
-| Playback stops where the difference shows, on 5 owner lines, never mid-exchange | **Needs the owner** (3 shown at M5) | Settle-point tests (piece win, even exchange, mate, quiet line); M5 screenshots of 3 playbacks. Two more lines to review. |
+| A newer player (under 1000) can follow a Plain-level synopsis | Met (owner, 2026-11-23) | Owner approval of the deployed v3. |
+| Playback stops where the difference shows, on 5 owner lines, never mid-exchange | Met (owner, 2026-11-23) | Settle-point tests (piece win, even exchange, mate, quiet line); M5 screenshots of 3 playbacks; owner approval of the deployed v3. |
 | No arrow drawn that fails validation; green only on good moves | Met | Annotation tests for every arrow type and color (including a green arrow on a bad move rejected); `annotation_log` in the M3 demo shows 13 bad tags dropped (8 malformed, 5 not in the data) and none drawn. |
-| The owner agrees with walkthroughs on 5 lines | **Needs the owner** (3 shown at M4) | M4 checkpoint walkthroughs; two more lines to review. |
-| Dashboard focus areas match the owner's baseline report and recent games; loads within target | Load target met; match **needs the owner** | 200-game test under 300 ms; M6 screenshots of the owner's dashboard. |
+| The owner agrees with walkthroughs on 5 lines | Met (owner, 2026-11-23) | M4 checkpoint walkthroughs; owner approval of the deployed v3. |
+| Dashboard focus areas match the owner's baseline report and recent games; loads within target | Met (owner, 2026-11-23) | 200-game test under 300 ms; M6 screenshots of the owner's dashboard; owner approval of the deployed v3. |
 | Zero `moment_leak` incidents, including annotations | Met so far | `moment_progress.leaks` sums to 0 in the owner's dev database (10 practiced moments) and in the M3/M5 demo databases; leak tests for text, move tags, line links and annotations. |
 | Exported PGNs re-import cleanly | Met | Backend round-trip tests; e2e `variations.spec.ts` re-imports an export as another player and gets the same moves and final position. |
 | All tests, lint, type checks and e2e pass | Met | See the final check run in the M8 report. |
 
-Carried from v2 (PLAN_V3 adjustment 10): **the owner steps through critical moments on 5 games on the deployed app.** Still open; it needs the v3 deploy.
+Carried from v2 (PLAN_V3 adjustment 10): **the owner steps through critical moments on 5 games on the deployed app.** Done: v3 deployed and approved by the owner on 2026-11-23.
 
 ## Performance
 
