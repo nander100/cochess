@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from app.analysis.engine import EngineResult
 from app.api import sse
-from app.api.budget import check_token_budget
 from app.api.coach import (
     ClientDep,
     SessionDep,
@@ -21,6 +20,7 @@ from app.api.coach import (
     stream_coach,
     text_events,
 )
+from app.api.credits import require_credit
 from app.api.scoping import OwnedGame
 from app.api.turns import current_player
 from app.auth.deps import CurrentUser
@@ -39,9 +39,7 @@ from app.coach.moments import (
 from app.config import Settings
 from app.db.moments import load_progress
 
-router = APIRouter(
-    prefix="/api/games", tags=["moments"], dependencies=[Depends(check_token_budget)]
-)
+router = APIRouter(prefix="/api/games", tags=["moments"], dependencies=[Depends(require_credit)])
 
 
 class AttemptRequest(BaseModel):

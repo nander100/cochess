@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_session
 from app.auth.deps import CurrentUser
 from app.coach.payload import DETAIL_FOR_BAND, DetailLevel, rating_band
+from app.config import CoachTier
 from app.db.models import User, UserSettingsRow
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -34,6 +35,8 @@ class UserSettings(BaseModel):
     playback_seconds: Seconds = 1.5  # one move every this many seconds (§9.5)
     chesscom_username: Username = ""
     lichess_username: Username = ""
+    # SPEC_V4 §7: Deep uses a stronger coach and credits about 3.5 times faster.
+    coach_strength: CoachTier = "standard"
 
 
 class SettingsResponse(UserSettings):
@@ -53,6 +56,7 @@ class SettingsUpdate(BaseModel):
     playback_seconds: Seconds | None = None
     chesscom_username: Username | None = None
     lichess_username: Username | None = None
+    coach_strength: CoachTier | None = None
 
 
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -71,6 +75,7 @@ def _of(row: UserSettingsRow | None) -> UserSettings:
         playback_seconds=row.playback_seconds,
         chesscom_username=row.chesscom_username or "",
         lichess_username=row.lichess_username or "",
+        coach_strength="deep" if row.coach_strength == "deep" else "standard",
     )
 
 
@@ -92,6 +97,7 @@ def _columns(settings: UserSettings) -> dict[str, object]:
     )
     for field in ("chesscom_username", "lichess_username"):
         values[field] = values[field].strip() or None
+    values["coach_strength"] = None if settings.coach_strength == "standard" else "deep"
     return values
 
 

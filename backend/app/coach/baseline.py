@@ -148,7 +148,7 @@ async def generate_baseline(
     allowed = allowed_moves(payload.model_dump(mode="json"))
     messages: list[MessageParam] = [{"role": "user", "content": render(payload, INSTRUCTION)}]
     request = CoachRequest(
-        model=settings.coach_model_synopsis,
+        model=settings.coach_model("baseline_report"),
         system=system_blocks("baseline_report"),
         messages=messages,
         max_tokens=settings.coach.baseline_max_tokens,
@@ -163,7 +163,7 @@ async def generate_baseline(
         words_only_evals=plain,
         puzzles=settings.puzzles,
     )
-    reply = await _call(client, request, sessions, user_id)
+    reply = await _call(client, request, sessions, user_id, settings=settings)
     done = process(reply.text, rules)
     if done.problems.any:
         retry: list[MessageParam] = [
@@ -171,7 +171,9 @@ async def generate_baseline(
             {"role": "assistant", "content": reply.text},
             {"role": "user", "content": note(done.problems)},
         ]
-        reply = await _call(client, replace(request, messages=retry), sessions, user_id)
+        reply = await _call(
+            client, replace(request, messages=retry), sessions, user_id, settings=settings
+        )
         done = process(reply.text, rules)
     if done.removed:
         logger.warning(
@@ -193,9 +195,22 @@ async def generate_baseline(
 
 
 async def _call(
-    client: CoachClient, request: CoachRequest, sessions: sessionmaker[Session], user_id: str
+    client: CoachClient,
+    request: CoachRequest,
+    sessions: sessionmaker[Session],
+    user_id: str,
+    *,
+    settings: Settings,
 ) -> CoachReply:
     reply = await client.complete(request)
     with sessions() as session:
-        record_usage(session, None, "baseline_report", reply.model, reply.usage, user_id=user_id)
+        record_usage(
+            session,
+            None,
+            "baseline_report",
+            reply.model,
+            reply.usage,
+            settings=settings,
+            user_id=user_id,
+        )
     return reply

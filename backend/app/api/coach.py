@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.analysis.engine import EngineResult, EngineResultError
 from app.api import sse
-from app.api.budget import check_token_budget
-from app.api.deps import get_app_settings, get_session
+from app.api.credits import CoachSettingsDep, require_credit
+from app.api.deps import get_session
 from app.api.scoping import OwnedGame
 from app.api.turns import prepare_turn
 from app.auth.deps import CurrentUser
@@ -36,13 +36,18 @@ from app.coach.service import SynopsisResult, generate_synopsis
 from app.coach.walkthrough import WalkthroughError
 from app.config import Settings
 from app.db.chat import count_player_messages
+from app.db.coach import load_synopsis
 from app.db.engine_results import load_summary
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/games", tags=["coach"], dependencies=[Depends(check_token_budget)])
+# Credit is checked per route (SPEC_V4 §5.3, §5.4): every chat and explain call, and a
+# synopsis only when one has to be written (a stored one is free to show again).
+router = APIRouter(prefix="/api/games", tags=["coach"])
 
 SessionDep = Annotated[Session, Depends(get_session)]
-SettingsDep = Annotated[Settings, Depends(get_app_settings)]
+# The app's settings with the player's coach strength (SPEC_V4 §7); moments and walkthroughs
+# import this too, so every coach call picks its model by tier.
+SettingsDep = CoachSettingsDep
 
 
 def get_coach_client(request: Request) -> CoachClient:
@@ -83,15 +88,22 @@ class EngineResultSubmission(BaseModel):
 
 @router.post("/{game_id}/synopsis")
 def synopsis(
-    game: OwnedGame, request: Request, session: SessionDep, settings: SettingsDep, client: ClientDep
+    game: OwnedGame,
+    user: CurrentUser,
+    request: Request,
+    session: SessionDep,
+    settings: SettingsDep,
+    client: ClientDep,
 ) -> StreamingResponse:
     game_id = game.id
     require_summary(session, game_id)
+    if load_synopsis(session, game_id) is None:
+        require_credit(user, session, settings)
     work = generate_synopsis(client, settings, session_factory(request), game_id)
     return stream_coach(work, _synopsis_events, settings, game_id)
 
 
-@router.post("/{game_id}/chat")
+@router.post("/{game_id}/chat", dependencies=[Depends(require_credit)])
 def chat(
     game: OwnedGame,
     user: CurrentUser,
@@ -116,7 +128,7 @@ def chat(
     return stream_coach(work, _chat_events, settings, game_id)
 
 
-@router.post("/{game_id}/explain")
+@router.post("/{game_id}/explain", dependencies=[Depends(require_credit)])
 def explain_position(
     game: OwnedGame,
     user: CurrentUser,

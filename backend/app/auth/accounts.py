@@ -8,6 +8,8 @@ from datetime import datetime
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
+from app.billing.ledger import grant_trial
+from app.config import CreditSettings
 from app.db.models import AuthSession, User
 from app.email.outbox import queue_email
 
@@ -18,11 +20,15 @@ class AccountError(ValueError):
     pass
 
 
-def admit(session: Session, user: User, now: datetime) -> None:
-    """Waitlisted to active, with the acceptance email (sent once per player)."""
+def admit(
+    session: Session, user: User, now: datetime, credits: CreditSettings | None = None
+) -> None:
+    """Waitlisted to active, with the free trial and the acceptance email (each once per player,
+    SPEC_V4 §4.3, §6.1)."""
     if user.status != "waitlisted":
         raise AccountError(f'"{user.name}" is not on the waitlist (status: {user.status})')
     user.status, user.admitted_at = "active", now
+    grant_trial(session, user, now, credits or CreditSettings())
     queue_email(session, user, "accepted", f"accepted:{user.id}", now=now)
 
 

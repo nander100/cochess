@@ -6,7 +6,7 @@ before the coach is called; the answer streams as SSE like the other coach route
 from collections.abc import Sequence
 
 import chess
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -17,7 +17,6 @@ from app.analysis.moments import good_first_moves
 from app.analysis.paths import PathError, ResolvedPath, position_key, resolve_path
 from app.analysis.pgn import parse_pgn
 from app.api import sse
-from app.api.budget import check_token_budget
 from app.api.coach import (
     MAX_PATH,
     ClientDep,
@@ -27,6 +26,7 @@ from app.api.coach import (
     session_factory,
     stream_coach,
 )
+from app.api.credits import require_credit
 from app.api.scoping import OwnedGame
 from app.api.turns import current_player
 from app.auth.deps import CurrentUser
@@ -37,9 +37,7 @@ from app.db.models import Game
 from app.db.moments import load_progress
 from app.db.walkthroughs import load_walkthrough, save_walkthrough, walkthroughs_written
 
-router = APIRouter(
-    prefix="/api/games", tags=["walkthrough"], dependencies=[Depends(check_token_budget)]
-)
+router = APIRouter(prefix="/api/games", tags=["walkthrough"])
 
 UNSOLVED = "Solve or reveal this critical moment first: its best line is yours to find."
 NEEDS_SCAN = "Analyze every position of the line with the engine first."
@@ -70,13 +68,14 @@ def walkthrough(
     start, fens = _replay(game, body, settings)
     _check_not_withheld(session, settings, game, start, body.line_uci[0])
 
-    cached = load_walkthrough(session, user.id, start.fen, body.line_uci)
+    cached = load_walkthrough(session, user.id, start.fen, body.line_uci, settings.coach_tier)
     if cached is not None:
         ready = Walkthrough.model_validate(cached.steps).model_copy(
             update={"start_path_uci": start.path_uci}
         )
         return stream_coach(_ready(ready), _events, settings, game.id)
 
+    require_credit(user, session, settings)  # a cached walkthrough above is free (§5.4)
     if walkthroughs_written(session, game.id) >= settings.coach.walkthrough_max_per_game:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
@@ -101,6 +100,7 @@ def walkthrough(
                 start_fen=start.fen,
                 line_uci=body.line_uci,
                 steps=written.model_dump(mode="json"),
+                tier=settings.coach_tier,
             )
         return written
 

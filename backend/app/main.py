@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request, Response
 from sqlalchemy.orm import sessionmaker
 
 from app.api import coach as coach_routes
+from app.api import credits as credit_routes
 from app.api import dashboard as dashboard_routes
 from app.api import engine as engine_routes
 from app.api import games, profile, settings_routes, validation
@@ -97,4 +98,5 @@ def create_app(
     app.include_router(dashboard_routes.router)
     app.include_router(import_routes.router)
     app.include_router(onboarding_import_routes.router)
+    app.include_router(credit_routes.router)
     return app

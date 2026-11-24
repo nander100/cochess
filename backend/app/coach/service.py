@@ -70,7 +70,7 @@ async def generate_synopsis(
         {"role": "user", "content": render(payload, SYNOPSIS_INSTRUCTION)}
     ]
     request = CoachRequest(
-        model=settings.coach_model_synopsis,
+        model=settings.coach_model("synopsis"),
         system=system_blocks("synopsis"),
         messages=messages,
         max_tokens=settings.coach.synopsis_max_tokens,
@@ -83,7 +83,7 @@ async def generate_synopsis(
         allowed=frozenset(allowed), limits=settings.coach, lines=lines,
         words_only_evals=player.detail_level == "plain", puzzles=settings.puzzles,
     )  # fmt: skip
-    reply = await _call(client, request, sessions, game_id)
+    reply = await _call(client, request, sessions, game_id, settings=settings)
     done = process(reply.text, rules)
     if done.problems.any:
         retry: list[MessageParam] = [
@@ -91,7 +91,9 @@ async def generate_synopsis(
             {"role": "assistant", "content": reply.text},
             {"role": "user", "content": note(done.problems)},
         ]
-        reply = await _call(client, replace(request, messages=retry), sessions, game_id)
+        reply = await _call(
+            client, replace(request, messages=retry), sessions, game_id, settings=settings
+        )
         done = process(reply.text, rules)
     if done.removed:
         logger.warning(
@@ -114,9 +116,14 @@ async def generate_synopsis(
 
 
 async def _call(
-    client: CoachClient, request: CoachRequest, sessions: sessionmaker[Session], game_id: str
+    client: CoachClient,
+    request: CoachRequest,
+    sessions: sessionmaker[Session],
+    game_id: str,
+    *,
+    settings: Settings,
 ) -> CoachReply:
     reply = await client.complete(request)
     with sessions() as session:
-        record_usage(session, game_id, "synopsis", reply.model, reply.usage)
+        record_usage(session, game_id, "synopsis", reply.model, reply.usage, settings=settings)
     return reply

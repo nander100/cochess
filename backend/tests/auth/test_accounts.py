@@ -175,3 +175,73 @@ def test_the_cli_accepts_pauses_and_restores_a_player_found_by_name_or_email(
     assert _cli(cli_settings, "set-role", "--user", "Sam", "--role", "owner")[0] == 0
     assert _cli(cli_settings, "admit", "--user", "Sam")[0] == 1  # already active
     assert _cli(cli_settings, "admit", "--user", "nobody@example.com")[0] == 1
+
+
+def test_the_cli_grants_and_removes_credits_with_a_note(cli_settings: Settings) -> None:
+    from app.billing.ledger import balance
+
+    _cli(cli_settings, "create-user", "--name", "Sam")  # created players get the trial too
+
+    assert (
+        _cli(cli_settings, "grant-credits", "--user", "Sam", "--credits", "20", "--note", "beta")[0]
+        == 0
+    )
+    code, out = _cli(
+        cli_settings, "grant-credits", "--user", "Sam", "--credits", "-5", "--note", "fix"
+    )
+    assert (code, out) == (0, 'Removed 5 credits for "Sam".\n')
+    assert (
+        _cli(cli_settings, "grant-credits", "--user", "Sam", "--credits", "1", "--note", " ")[0]
+        == 1
+    )
+    with sessionmaker(make_engine(cli_settings.database_url))() as session:
+        user = session.scalars(select(User)).one()
+        assert balance(session, user.id).total == (50 + 20 - 5) * 10_000
+
+
+def test_the_cli_turns_metering_off_and_on(cli_settings: Settings) -> None:
+    _cli(cli_settings, "create-user", "--name", "Tester")
+
+    assert _cli(cli_settings, "metering", "--user", "Tester", "--off")[1].endswith("(unmetered).\n")
+    with sessionmaker(make_engine(cli_settings.database_url))() as session:
+        assert session.scalars(select(User.unmetered)).one() is True
+    _cli(cli_settings, "metering", "--user", "Tester", "--on")
+    with sessionmaker(make_engine(cli_settings.database_url))() as session:
+        assert session.scalars(select(User.unmetered)).one() is False
+
+
+def test_grant_trials_covers_existing_players_once(cli_settings: Settings) -> None:
+    from app.db.models import CreditLedgerRow
+
+    _cli(cli_settings, "create-user", "--name", "New")  # gets the trial at creation
+    with sessionmaker(make_engine(cli_settings.database_url))() as session:
+        # A v3 player from before credits: active, no trial.
+        session.add(User(name="Old", name_key="old"))
+        session.commit()
+
+    assert _cli(cli_settings, "grant-trials") == (0, "Gave the free trial to 1 player(s).\n")
+    assert _cli(cli_settings, "grant-trials") == (0, "Gave the free trial to 0 player(s).\n")
+    with sessionmaker(make_engine(cli_settings.database_url))() as session:
+        trials = session.scalars(select(CreditLedgerRow).where(CreditLedgerRow.kind == "trial"))
+        assert len(trials.all()) == 2
+
+
+def test_price_usage_prices_old_calls_without_charging(cli_settings: Settings) -> None:
+    from app.billing.ledger import balance
+    from app.db.models import LlmUsageRow
+
+    _cli(cli_settings, "create-user", "--name", "Old")
+    with sessionmaker(make_engine(cli_settings.database_url))() as session:
+        user = session.scalars(select(User)).one()
+        session.add(
+            LlmUsageRow(
+                user_id=user.id, endpoint="chat", task="chat", model="claude-haiku-5-5",
+                input_tokens=1000, output_tokens=0, cache_read_tokens=0, cache_write_tokens=0,
+            )
+        )  # fmt: skip
+        session.commit()
+
+    assert _cli(cli_settings, "price-usage")[0] == 0
+    with sessionmaker(make_engine(cli_settings.database_url))() as session:
+        assert session.scalars(select(LlmUsageRow.cost_microusd)).one() == 100
+        assert balance(session, session.scalars(select(User.id)).one()).total == 50 * 10_000

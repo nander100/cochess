@@ -6,6 +6,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     Float,
     ForeignKey,
@@ -15,6 +16,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -69,6 +71,8 @@ class User(Base):
     admitted_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     # Updated at most once an hour (auth/deps.py), for the owner dashboard's activity numbers.
     last_active_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    # Owner and test accounts: usage is still recorded and priced, but never charged (§5.3).
+    unmetered: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)
 
@@ -269,7 +273,45 @@ class LlmUsageRow(Base):
     output_tokens: Mapped[int] = mapped_column(Integer)
     cache_read_tokens: Mapped[int] = mapped_column(Integer)
     cache_write_tokens: Mapped[int] = mapped_column(Integer)
+    # SPEC_V4 §5.1: priced when written, never repriced. NULL only on rows from before v4 until
+    # `cli price-usage` fills them in. `tier` is the player's coach strength for the call.
+    cost_microusd: Mapped[int | None] = mapped_column(BigInteger)
+    tier: Mapped[str | None] = mapped_column(String(10))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+
+
+class CreditLedgerRow(Base):
+    """Every change to a player's credits (SPEC_V4 §5.2), in microdollars. (kind, source) is
+    unique, so a replayed webhook or a retried charge can't apply twice. `bucket` says which part
+    of the balance it touched: the period's allowance (spent first, expires) or lasting credit
+    (trial, top-ups, owner grants)."""
+
+    __tablename__ = "credit_ledger"
+    __table_args__ = (UniqueConstraint("kind", "source", name="uq_credit_ledger_kind_source"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # NULL once the player's account is deleted (the money record is kept, anonymized).
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
+    delta_microusd: Mapped[int] = mapped_column(BigInteger)
+    # trial | allowance | top_up | usage | refund | expiry | owner_grant | owner_removal
+    kind: Mapped[str] = mapped_column(String(16))
+    source: Mapped[str] = mapped_column(String(120))  # what caused it: usage row, event, grant
+    bucket: Mapped[str] = mapped_column(String(10))  # allowance | lasting | split
+    note: Mapped[str | None] = mapped_column(String(200))
+    expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+
+
+class CreditBalanceRow(Base):
+    """A player's balance, kept with each ledger entry in the same transaction so the check
+    before a coach call is one read (SPEC_V4 §5.2). Row-locked while it changes on Postgres."""
+
+    __tablename__ = "credit_balances"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    allowance_microusd: Mapped[int] = mapped_column(BigInteger, default=0)
+    lasting_microusd: Mapped[int] = mapped_column(BigInteger, default=0)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)
 
 
 class PendingToolCallRow(Base):
@@ -378,6 +420,8 @@ class UserSettingsRow(Base):
     # The player's own usernames: their color is detected from the PGN's player names.
     chesscom_username: Mapped[str | None] = mapped_column(String(50))
     lichess_username: Mapped[str | None] = mapped_column(String(50))
+    # SPEC_V4 §7: standard | deep; NULL is standard.
+    coach_strength: Mapped[str | None] = mapped_column(String(8))
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)
 
 
@@ -423,7 +467,10 @@ class WalkthroughRow(Base):
 
     __tablename__ = "walkthroughs"
     __table_args__ = (
-        UniqueConstraint("user_id", "start_fen", "line_key", name="uq_walkthroughs_user_line"),
+        # SPEC_V4 §7: cached per coach strength, so a Deep player never gets a Standard one.
+        UniqueConstraint(
+            "user_id", "start_fen", "line_key", "tier", name="uq_walkthroughs_user_line_tier"
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -433,6 +480,7 @@ class WalkthroughRow(Base):
     start_fen: Mapped[str] = mapped_column(String(100))
     line_key: Mapped[str] = mapped_column(String(64))  # the line's UCI moves joined by spaces
     steps: Mapped[dict[str, Any]] = mapped_column(JSON)  # the Walkthrough as returned
+    tier: Mapped[str] = mapped_column(String(10), default="standard", server_default="standard")
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
 
 

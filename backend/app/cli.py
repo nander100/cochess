@@ -7,6 +7,10 @@ admit --user NAME_OR_EMAIL      accept a player from the waitlist (sends the acc
 suspend --user X --reason TEXT  pause a player's access (signs them out everywhere)
 restore --user X              give a paused player their access back
 set-role --user X --role owner|player
+grant-credits --user X --credits N --note TEXT   add (or, negative, remove) coaching credits
+metering --user X --off|--on  never charge this player (owner, testers), or charge again
+grant-trials                  give the free trial to every active player who hasn't had it
+price-usage                   price coach calls recorded before v4 (no charge)
 migrate-sqlite --from URL --to URL [--check-only]
                               copy the v3 SQLite database into an empty Postgres database
 """
@@ -17,15 +21,19 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import TextIO
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.auth.accounts import AccountError, admit, restore, set_role, suspend
 from app.auth.service import UserExistsError, create_invite, create_user, find_account, find_user
+from app.billing.ledger import adjust_by_owner, grant_trial
+from app.billing.pricing import cost_microusd
+from app.coach.client import Usage
 from app.config import Settings, get_settings
 from app.db.copy_sqlite import CopyError, copy_database, describe, find_problems
 from app.db.games import assign_unowned_games, fill_fingerprints, rebuild_summaries
 from app.db.migrate import upgrade
-from app.db.models import User
+from app.db.models import CreditLedgerRow, LlmUsageRow, User
 from app.db.session import make_engine
 
 
@@ -60,6 +68,8 @@ def _run(args: argparse.Namespace, session: Session, settings: Settings) -> str:
             raise CliError(f'a user named "{args.name.strip()}" already exists') from error
         except ValueError as error:
             raise CliError(str(error)) from error
+        grant_trial(session, user, datetime.now(UTC), settings.credits)  # as if accepted
+        session.commit()
         return f'Created user "{user.name}". Next: invite --user "{user.name}"'
     if args.command == "invite":
         user = _user(session, args.user)
@@ -79,20 +89,22 @@ def _run(args: argparse.Namespace, session: Session, settings: Settings) -> str:
                 lines.append(f"Duplicate uploads of one game: {ids}")
         return "\n".join(lines)
     if args.command in ("admit", "suspend", "restore", "set-role"):
-        return _account_action(args, session)
+        return _account_action(args, session, settings)
+    if args.command in ("grant-credits", "metering", "grant-trials", "price-usage"):
+        return _credit_action(args, session, settings)
     user = _user(session, args.user)
     count = assign_unowned_games(session, user)
     return f"Assigned {count} game(s) to {user.name}."
 
 
-def _account_action(args: argparse.Namespace, session: Session) -> str:
+def _account_action(args: argparse.Namespace, session: Session, settings: Settings) -> str:
     user = find_account(session, args.user)
     if user is None:
         raise CliError(f'no player named or with the email "{args.user}"')
     now = datetime.now(UTC)
     try:
         if args.command == "admit":
-            admit(session, user, now)
+            admit(session, user, now, settings.credits)
             message = f'Accepted "{user.name}": they can sign in now (acceptance email queued).'
         elif args.command == "suspend":
             suspend(session, user, now, reason=args.reason, tell_reason=args.tell_reason)
@@ -144,6 +156,48 @@ def _migrate_sqlite(args: argparse.Namespace, out: TextIO) -> int:
     return 1
 
 
+def _credit_action(args: argparse.Namespace, session: Session, settings: Settings) -> str:
+    """Owner credit commands (SPEC_V4 §5). The dashboard (M5) adds the same with an audit log."""
+    now = datetime.now(UTC)
+    per_credit = settings.credits.microusd_per_credit
+    if args.command == "grant-trials":
+        players = session.scalars(select(User).where(User.status == "active")).all()
+        had = set(
+            session.scalars(select(CreditLedgerRow.user_id).where(CreditLedgerRow.kind == "trial"))
+        )
+        given = [p for p in players if p.id not in had]
+        for player in given:
+            grant_trial(session, player, now, settings.credits)
+        session.commit()
+        return f"Gave the free trial to {len(given)} player(s)."
+    if args.command == "price-usage":
+        rows = session.scalars(select(LlmUsageRow).where(LlmUsageRow.cost_microusd.is_(None)))
+        priced = 0
+        for row in rows:
+            usage = Usage(
+                row.input_tokens, row.output_tokens, row.cache_read_tokens, row.cache_write_tokens
+            )
+            row.cost_microusd = cost_microusd(settings.pricing, row.model, usage)
+            priced += 1
+        session.commit()
+        return f"Priced {priced} earlier coach call(s); nobody was charged for them."
+    user = find_account(session, args.user)
+    if user is None:
+        raise CliError(f'no player named or with the email "{args.user}"')
+    if args.command == "metering":
+        user.unmetered = args.off
+        session.commit()
+        state = "never charged (unmetered)" if args.off else "charged for coaching again"
+        return f'"{user.name}" is now {state}.'
+    try:
+        adjust_by_owner(session, user, round(args.credits * per_credit), note=args.note, now=now)
+    except ValueError as error:
+        raise CliError(str(error)) from error
+    session.commit()
+    verb = "Added" if args.credits >= 0 else "Removed"
+    return f'{verb} {abs(args.credits):g} credits for "{user.name}".'
+
+
 def _user(session: Session, name: str) -> User:
     user = find_user(session, name)
     if user is None:
@@ -179,6 +233,17 @@ def _parser() -> argparse.ArgumentParser:
             )
         if name == "set-role":
             action.add_argument("--role", required=True, choices=["owner", "player"])
+    grant = commands.add_parser("grant-credits", help="add or remove coaching credits")
+    grant.add_argument("--user", required=True, help="the player's name or email")
+    grant.add_argument("--credits", required=True, type=float, help="negative to remove")
+    grant.add_argument("--note", required=True, help="why (kept with the entry)")
+    metering = commands.add_parser("metering", help="charge a player for coaching or not")
+    metering.add_argument("--user", required=True, help="the player's name or email")
+    switch = metering.add_mutually_exclusive_group(required=True)
+    switch.add_argument("--off", action="store_true", help="never charge them")
+    switch.add_argument("--on", action="store_true", help="charge them again")
+    commands.add_parser("grant-trials", help="give the trial to active players without one")
+    commands.add_parser("price-usage", help="price coach calls recorded before v4")
     copy = commands.add_parser(
         "migrate-sqlite", help="copy the v3 SQLite database into an empty Postgres database"
     )

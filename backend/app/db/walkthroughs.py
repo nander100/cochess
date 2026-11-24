@@ -13,13 +13,15 @@ def line_key(line_uci: Sequence[str]) -> str:
 
 
 def load_walkthrough(
-    session: Session, user_id: str, start_fen: str, line_uci: Sequence[str]
+    session: Session, user_id: str, start_fen: str, line_uci: Sequence[str], tier: str
 ) -> WalkthroughRow | None:
+    """Per coach strength (SPEC_V4 §7): a Deep player is never served a Standard walkthrough."""
     return session.scalars(
         select(WalkthroughRow).where(
             WalkthroughRow.user_id == user_id,
             WalkthroughRow.start_fen == start_fen,
             WalkthroughRow.line_key == line_key(line_uci),
+            WalkthroughRow.tier == tier,
         )
     ).first()
 
@@ -33,9 +35,10 @@ def save_walkthrough(
     start_fen: str,
     line_uci: Sequence[str],
     steps: dict[str, object],
+    tier: str,
 ) -> None:
     """Store (or replace) one walkthrough, and commit."""
-    existing = load_walkthrough(session, user_id, start_fen, line_uci)
+    existing = load_walkthrough(session, user_id, start_fen, line_uci, tier)
     if existing is not None:
         session.delete(existing)
         session.flush()
@@ -47,6 +50,7 @@ def save_walkthrough(
             start_fen=start_fen,
             line_key=line_key(line_uci),
             steps=steps,
+            tier=tier,
         )
     )
     session.commit()

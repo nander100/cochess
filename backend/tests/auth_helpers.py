@@ -19,12 +19,16 @@ def log_in(
     elo: int | None = 1350,
     time_control: str | None = "rapid",
     playstyle: str | None = None,
+    metered: bool = False,
 ) -> TestClient:
     """A client logged in as a new user `name` with the given profile."""
     settings: Settings = app.state.settings
     with app.state.session_factory() as session:
         user = create_user(session, name)
         user.elo, user.time_control, user.playstyle = elo, time_control, playstyle
+        # Coach tests aren't about credits: these players are never charged (SPEC_V4 §5.3).
+        # Credit tests set up metered players themselves (tests/api/test_credits_api.py).
+        user.unmetered = metered is False
         session.commit()
         token = create_invite(session, user, datetime.now(UTC), settings.auth)
     client = TestClient(app, base_url=BASE_URL)

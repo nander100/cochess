@@ -209,7 +209,7 @@ async def generate(
 ) -> Walkthrough:
     messages: list[MessageParam] = [{"role": "user", "content": render(call.payload, INSTRUCTION)}]
     request = CoachRequest(
-        model=settings.coach_model_chat,
+        model=settings.coach_model("walkthrough"),
         system=system_blocks("walkthrough"),
         messages=messages,
         max_tokens=settings.coach.walkthrough_max_tokens,
@@ -217,11 +217,13 @@ async def generate(
         tools=[LINE_WALKTHROUGH],
         tool_choice={"type": "tool", "name": TOOL_NAME},
     )
-    reply = await _complete(client, request, sessions, call.game_id)
+    reply = await _complete(client, request, sessions, call.game_id, settings=settings)
     output, problems = _check(reply, call, settings)
     if problems:
         retry = [*messages, *_retry_turns(reply, problems, len(call.line_uci))]
-        reply = await _complete(client, replace(request, messages=retry), sessions, call.game_id)
+        reply = await _complete(
+            client, replace(request, messages=retry), sessions, call.game_id, settings=settings
+        )
         output, problems = _check(reply, call, settings)
     if output is None:
         logger.warning("walkthrough failed: game=%s problems=%s", call.game_id, problems)
@@ -357,9 +359,14 @@ def _facts_after(call: WalkthroughCall, i: int, settings: Settings) -> BoardFact
 
 
 async def _complete(
-    client: CoachClient, request: CoachRequest, sessions: sessionmaker[Session], game_id: str
+    client: CoachClient,
+    request: CoachRequest,
+    sessions: sessionmaker[Session],
+    game_id: str,
+    *,
+    settings: Settings,
 ) -> CoachReply:
     reply = await client.complete(request)
     with sessions() as session:
-        record_usage(session, game_id, "walkthrough", reply.model, reply.usage)
+        record_usage(session, game_id, "walkthrough", reply.model, reply.usage, settings=settings)
     return reply

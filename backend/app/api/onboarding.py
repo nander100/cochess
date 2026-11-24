@@ -24,8 +24,8 @@ from app.analysis.onboarding import (
     time_control_category,
 )
 from app.analysis.pgn import ParsedGame, PgnError, parse_pgn
-from app.api.budget import check_token_budget
 from app.api.coach import ClientDep, session_factory, stream_coach, text_events
+from app.api.credits import CoachSettingsDep, require_credit
 from app.api.deps import get_app_settings, get_session
 from app.api.games import PROFILE_FIRST
 from app.api.onboarding_schemas import (
@@ -173,12 +173,12 @@ def get_report(user: CurrentUser, session: SessionDep) -> BaselineReport:
     return _report(report)
 
 
-@router.post("/report", dependencies=[Depends(check_token_budget)])
+@router.post("/report")
 def write_report(
     user: CurrentUser,
     request: Request,
     session: SessionDep,
-    settings: SettingsDep,
+    settings: CoachSettingsDep,
     client: ClientDep,
 ) -> StreamingResponse:
     """The baseline report (§10.4) as SSE. Written once for a set of 12 games, then shown again
@@ -193,6 +193,7 @@ def write_report(
             stored.text, list(stored.invalid_moves_removed), stored.game_ids, moves
         )
         return stream_coach(_ready(result), _events, settings, "baseline")
+    require_credit(user, session, settings)  # a stored report above is free (§5.4)
     work = generate_baseline(client, settings, session_factory(request), user.id)
     return stream_coach(work, _events, settings, "baseline")
 

@@ -174,7 +174,7 @@ async def explain(
         _cancel_pending(session, game_id)
         _save_player_turn(session, game_id, "explain", turn, "Explain this position")
     request = _request(settings, sessions, context, "explain", tool_calls_used=0)
-    reply = await _call(client, request, sessions, context.game_id, "explain")
+    reply = await _call(client, request, sessions, context.game_id, "explain", settings=settings)
     return await _finish(client, settings, sessions, context, turn.position, reply, "explain")
 
 
@@ -239,7 +239,7 @@ async def _loop(
     """
     while True:
         request = _request(settings, sessions, context, "chat", tool_calls_used)
-        reply = await _call(client, request, sessions, context.game_id, "chat")
+        reply = await _call(client, request, sessions, context.game_id, "chat", settings=settings)
         tool_uses = [block for block in reply.content if block.type == "tool_use"]
         if reply.stop_reason != "tool_use" or not tool_uses:
             return await _finish(client, settings, sessions, context, board, reply, "chat")
@@ -272,7 +272,7 @@ def _request(
         messages = load_messages(session, context.game_id)
     no_tools = task == "explain" or tool_calls_used >= settings.coach.chat_max_tool_calls
     return CoachRequest(
-        model=settings.coach_model_chat,
+        model=settings.coach_model(task),
         # Chat and Explain share one system prompt so they share the cached prefix.
         system=system_blocks("chat", context.context_block),
         messages=history_breakpoint(messages),
@@ -340,7 +340,7 @@ async def _finish(
             messages=retry,
             tool_choice={"type": "none"},
         )
-        reply = await _call(client, request, sessions, context.game_id, task)
+        reply = await _call(client, request, sessions, context.game_id, task, settings=settings)
         done = process(reply.text, rules)
     if done.removed:
         logger.warning(
@@ -527,10 +527,12 @@ async def _call(
     sessions: sessionmaker[Session],
     game_id: str,
     task: Task,
+    *,
+    settings: Settings,
 ) -> CoachReply:
     reply = await client.complete(request)
     with sessions() as session:
-        record_usage(session, game_id, task, reply.model, reply.usage)
+        record_usage(session, game_id, task, reply.model, reply.usage, settings=settings)
     return reply
 
 

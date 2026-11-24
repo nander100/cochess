@@ -359,14 +359,14 @@ async def answer(
         {"role": "user", "content": render(call.payload, MOMENT_INSTRUCTION)}
     ]
     request = CoachRequest(
-        model=settings.coach_model_chat,
+        model=settings.coach_model(call.task),
         system=system_blocks(call.task, call.context_block),
         messages=messages,
         max_tokens=settings.coach.chat_max_tokens,
         effort=settings.coach.chat_effort,
     )
     rules = _rules(call, settings)
-    text = await _complete(client, request, sessions, call)
+    text = await _complete(client, request, sessions, call, settings=settings)
     done = process(text, rules)
     if done.problems.any:
         if done.problems.leaked:  # logged even though the retry replaces this answer
@@ -376,7 +376,9 @@ async def answer(
             {"role": "assistant", "content": text},
             {"role": "user", "content": note(done.problems)},
         ]
-        text = await _complete(client, replace(request, messages=retry), sessions, call)
+        text = await _complete(
+            client, replace(request, messages=retry), sessions, call, settings=settings
+        )
         done = process(text, rules)
     leaked = done.problems.leaked
     if leaked:
@@ -427,11 +429,16 @@ def _rules(call: MomentCall, settings: Settings) -> Rules:
 
 
 async def _complete(
-    client: CoachClient, request: CoachRequest, sessions: sessionmaker[Session], call: MomentCall
+    client: CoachClient,
+    request: CoachRequest,
+    sessions: sessionmaker[Session],
+    call: MomentCall,
+    *,
+    settings: Settings,
 ) -> str:
     reply = await client.complete(request)
     with sessions() as session:
-        record_usage(session, call.game_id, call.task, reply.model, reply.usage)
+        record_usage(session, call.game_id, call.task, reply.model, reply.usage, settings=settings)
     return reply.text
 
 

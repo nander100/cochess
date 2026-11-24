@@ -20,6 +20,7 @@ DEFAULTS = {
     "playback_seconds": 1.5,
     "chesscom_username": "",
     "lichess_username": "",
+    "coach_strength": "standard",
     "effective_detail_level": "standard",  # "auto" for the test player's 1350 (intermediate)
 }
 

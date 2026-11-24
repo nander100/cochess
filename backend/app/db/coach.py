@@ -1,14 +1,17 @@
 """Persistence for the coach: the stored synopsis and per-call token usage."""
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.billing.ledger import charge_usage
+from app.billing.pricing import cost_microusd
 from app.coach.client import Usage
 from app.coach.markup import MessageTokens
-from app.db.models import ChatMessageRow, Game, LlmUsageRow
+from app.config import Settings
+from app.db.models import ChatMessageRow, Game, LlmUsageRow, User
 
 SYNOPSIS = "synopsis"
 
@@ -20,23 +23,33 @@ def record_usage(
     model: str,
     usage: Usage,
     *,
+    settings: Settings,
     user_id: str | None = None,
 ) -> None:
-    """One call's tokens, for the game's owner, or `user_id` for a call about no one game."""
+    """One call's tokens and cost (SPEC_V4 §5.1), for the game's owner, or `user_id` for a call
+    about no one game, charged to the player's credits unless they're unmetered (§5.3)."""
     game = session.get(Game, game_id) if game_id is not None else None
-    session.add(
-        LlmUsageRow(
-            game_id=game_id,
-            user_id=game.user_id if game is not None else user_id,
-            endpoint=endpoint,
-            task=endpoint,  # v1's two endpoints are also the task names (SPEC_V2 §6.1)
-            model=model,
-            input_tokens=usage.input_tokens,
-            output_tokens=usage.output_tokens,
-            cache_read_tokens=usage.cache_read_tokens,
-            cache_write_tokens=usage.cache_write_tokens,
-        )
+    owner_id = game.user_id if game is not None else user_id
+    now = datetime.now(UTC)
+    row = LlmUsageRow(
+        game_id=game_id,
+        user_id=owner_id,
+        endpoint=endpoint,
+        task=endpoint,  # v1's two endpoints are also the task names (SPEC_V2 §6.1)
+        model=model,
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        cache_read_tokens=usage.cache_read_tokens,
+        cache_write_tokens=usage.cache_write_tokens,
+        cost_microusd=cost_microusd(settings.pricing, model, usage),
+        tier=settings.coach_tier,
+        created_at=now,
     )
+    session.add(row)
+    session.flush()
+    owner = session.get(User, owner_id) if owner_id is not None else None
+    if owner is not None and not owner.unmetered and row.cost_microusd:
+        charge_usage(session, owner.id, row.id, row.cost_microusd, now)
     session.commit()
 
 
@@ -80,21 +93,3 @@ def load_synopsis(session: Session, game_id: str) -> StoredText | None:
                 tokens=MessageTokens.model_validate(content),
             )
     return None
-
-
-def tokens_used_since(session: Session, user_id: str, since: datetime) -> int:
-    """All of a player's Claude tokens since `since`: input, output, and cache reads and writes."""
-    total = session.scalar(
-        select(
-            func.coalesce(
-                func.sum(
-                    LlmUsageRow.input_tokens
-                    + LlmUsageRow.output_tokens
-                    + LlmUsageRow.cache_read_tokens
-                    + LlmUsageRow.cache_write_tokens
-                ),
-                0,
-            )
-        ).where(LlmUsageRow.user_id == user_id, LlmUsageRow.created_at >= since)
-    )
-    return int(total or 0)

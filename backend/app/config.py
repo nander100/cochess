@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -302,6 +302,49 @@ class AuthSettings(BaseModel):
     cookie_secure: bool = True
 
 
+CoachTier = Literal["standard", "deep"]
+CoachTask = Literal[
+    "synopsis", "baseline_report", "chat", "explain", "moment_intro", "moment_feedback",
+    "walkthrough",
+]  # fmt: skip
+
+
+class ModelPrice(BaseModel):
+    """US dollars per million tokens (platform.claude.com pricing page). One dollar per million
+    tokens is one microdollar per token, so a call's cost is tokens times these numbers."""
+
+    input: float
+    output: float
+    cache_write: float  # 5-minute cache writes, the only kind the coach uses
+    cache_read: float
+
+
+class PricingSettings(BaseModel):
+    """What each coach call costs (SPEC_V4 §5.1). Checked against Anthropic's published prices at
+    M0 (2026-11-23) and whenever a model changes. Haiku's rates are for prompts up to 100,000
+    tokens, which every coach prompt is."""
+
+    effective_from: str = "2026-11-23"
+    models: dict[str, ModelPrice] = {
+        "claude-haiku-5-5": ModelPrice(input=0.10, output=0.50, cache_write=0.125, cache_read=0.01),
+        "claude-sonnet-5-5": ModelPrice(input=2, output=10, cache_write=2.5, cache_read=0.10),
+        "claude-opus-5-5": ModelPrice(input=4, output=20, cache_write=5, cache_read=0.20),
+    }
+
+
+class CreditSettings(BaseModel):
+    """Coaching credits (SPEC_V4 §5, §6). 1 credit = $0.01 of API cost."""
+
+    microusd_per_credit: int = 10_000
+    trial_credits: int = 50  # given once, when a player is accepted (or created by the owner)
+    # Warn when the balance falls below this share of the player's last allowance or trial.
+    warn_fraction: float = 0.2
+    # A player's API spend in any rolling 24 hours stops here, whatever their balance (§5.3).
+    daily_cap_microusd: int = 2_000_000
+    # Shown on the Profile page next to each coach strength; measured at M0 (PLAN_V4 §2).
+    credits_per_game: dict[str, float] = {"standard": 3.3, "deep": 12}
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", extra="ignore")
 
@@ -310,17 +353,20 @@ class Settings(BaseSettings):
     # Stronger models are a config change away (SPEC §11 v4: user-selectable coach strength).
     coach_model_synopsis: str = "claude-sonnet-5-5"
     coach_model_chat: str = "claude-haiku-5-5"
+    # The Deep coach's writing model (SPEC_V4 §7, M0 option c).
+    coach_model_deep: str = "claude-opus-5-5"
+    # Set per request from the player's coach strength (api/credits.py); not an env setting.
+    coach_tier: CoachTier = "standard"
     database_url: str = "sqlite:///./cochess.db"
     # Where players open CoChess; invite links are built from it.
     public_base_url: str = "http://localhost:5173"
-    # Optional safety valve (SPEC_V2 §12), off by default: Claude tokens one player may use in a
-    # rolling 24 hours (input, output and cache, all counted). v4 replaces it with credits.
-    user_daily_token_limit: int | None = None
 
     auth: AuthSettings = AuthSettings()
     google: GoogleSettings = GoogleSettings()
     legal: LegalSettings = LegalSettings()
     email: EmailSettings = EmailSettings()
+    pricing: PricingSettings = PricingSettings()
+    credits: CreditSettings = CreditSettings()
     engine: EngineSettings = EngineSettings()
     thresholds: Thresholds = Thresholds()
     detectors: DetectorSettings = DetectorSettings()
@@ -332,6 +378,31 @@ class Settings(BaseSettings):
     tendencies: TendencySettings = TendencySettings()
     onboarding: OnboardingSettings = OnboardingSettings()
     imports: ImportSettings = ImportSettings()
+
+    @model_validator(mode="after")
+    def _every_coach_model_is_priced(self) -> "Settings":
+        """An unpriced model would be a free call (SPEC_V4 §5.1): refuse to start instead."""
+        missing = {
+            model
+            for model in (self.coach_model_synopsis, self.coach_model_chat, self.coach_model_deep)
+            if model not in self.pricing.models
+        }
+        if missing:
+            raise ValueError(f"no price for coach model(s) {sorted(missing)}: add them to PRICING")
+        return self
+
+    def coach_model(self, task: CoachTask) -> str:
+        """The model for a coach task at this request's tier (SPEC_V4 §7). Standard: Sonnet writes
+        the synopsis and baseline report, Haiku the rest. Deep (option c): Opus writes, Sonnet
+        talks (chat, explain), Haiku keeps moments and walkthroughs."""
+        writes = task in ("synopsis", "baseline_report")
+        if self.coach_tier == "deep":
+            if writes:
+                return self.coach_model_deep
+            return (
+                self.coach_model_synopsis if task in ("chat", "explain") else self.coach_model_chat
+            )
+        return self.coach_model_synopsis if writes else self.coach_model_chat
 
 
 @lru_cache
