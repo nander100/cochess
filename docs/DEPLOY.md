@@ -281,8 +281,11 @@ On your laptop, the Stripe CLI forwards test webhooks to the dev server and prin
 
 ```bash
 stripe login
-stripe listen --forward-to localhost:8000/api/billing/webhook
+stripe listen --forward-to localhost:8000/api/billing/webhook \
+  --events checkout.session.completed,invoice.paid,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted,charge.refunded
 ```
+
+Put the printed `whsec_...` in `STRIPE__WEBHOOK_SECRET` and restart the backend. Newer CLIs refuse `listen` without `--events`. An event that arrived while the secret was missing can be sent again with `stripe events resend <evt_id>` while `listen` runs.
 
 Credits only ever come from these webhooks: if a player paid but has no credits, check the endpoint's recent deliveries in the Dashboard (a failed delivery is retried by Stripe for up to three days). Every event received is kept in the `billing_events` table.
 
