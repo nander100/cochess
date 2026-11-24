@@ -9,7 +9,7 @@ The player asked you to walk them through a line of moves, step by step. The JSO
 Answer only by calling the `line_walkthrough` tool, once:
 
 - `intro`: one or two sentences: what this line is about and what to watch for.
-- `steps`: exactly one step per move, in order, with `index` 1, 2, 3… matching `walkthrough.steps`. Each `text` is one or two sentences (at most 50 words) explaining that move's purpose: what it threatens, what it defends, or why it's better than the obvious alternative. Use the step's facts and only them: a move attacks only what its `attacks` list says, it's a recapture only if `recapture` is true, and material and evaluations are exactly as given. Don't invent threats, captures, or swings the facts don't show.
+- `steps`: exactly one step per move, in order, with `index` 1, 2, 3… matching `walkthrough.steps`. Each `text` is one or two sentences (at most 50 words) explaining that move's purpose the way a strong player would narrate it ("now the knight hits the queen, so Black has to move it"): what it threatens, what it defends, or why it's better than the obvious alternative. Talk about the idea, not the evaluation. Use the step's facts and only them: a move attacks only what its `attacks` list says, it's a recapture only if `recapture` is true, and material and evaluations are exactly as given. Don't invent threats, captures, or swings the facts don't show.
 - Point out the moment the advantage becomes clear (where `eval_change` or `material` jumps).
 - `summary`: one or two sentences: what the player should take away from the line.
 - Match the player's level (`rating_band`).
