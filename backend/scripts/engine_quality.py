@@ -4,9 +4,11 @@ Usage (from backend/): uv run python -m scripts.engine_quality [--new DIR] [game
 
 `npm run e2e:real` with new engine settings re-captures tests/fixtures/engine/<game>.json; the v3
 results stay in tests/fixtures/engine/v3/. Both are run through the app's own summary (labels,
-key moments, critical moments), and each game passes when every move v3 called a mistake or a
-blunder is still one, at least 95% of move labels are unchanged, and the timing is shown next to
-v3's. Exits 1 if any game fails.
+key moments, critical moments). Multi-threaded Stockfish isn't deterministic, so the bar is v3's
+own run-to-run variation (owner decision, M3): a game passes when no move v3 called a blunder
+stops being a mistake or blunder, and its label agreement is no lower than a re-run of v3's
+settings got on that game, minus one point. Lost mistakes and changed critical moments are listed
+for review. Exits 1 if any game fails.
 """
 
 import argparse
@@ -25,14 +27,19 @@ from app.config import Settings
 FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
 ENGINE = FIXTURES / "engine"
 BASELINE = ENGINE / "v3"
-MIN_SAME_LABELS = 0.95
 SERIOUS = ("mistake", "blunder")
+# Label agreement of a re-run of v3's own settings with v3 (PLAN_V4 M3 log); unmeasured games use
+# the lowest measured. The bar is this minus one point.
+V3_RERUN_AGREEMENT = {"game5b": 0.946, "game1w": 0.976, "game3w": 0.961}
+SLACK = 0.01
 
 
 class Quality(BaseModel):
     game: str
     same_labels: float  # share of moves whose label didn't change
-    lost: list[str]  # v3's mistakes and blunders that aren't one any more ("14. Nxe5")
+    bar: float  # the lowest label agreement that passes
+    lost: list[str]  # v3's mistakes and blunders that aren't one any more ("14. Nxe5 (mistake)")
+    lost_blunders: list[str]
     moments_before: list[int]  # critical-moment plies
     moments_after: list[int]
     scan_s: tuple[float, float]  # v3, new
@@ -40,7 +47,7 @@ class Quality(BaseModel):
 
     @property
     def passed(self) -> bool:
-        return not self.lost and self.same_labels >= MIN_SAME_LABELS
+        return not self.lost_blunders and self.same_labels >= self.bar
 
 
 def summary_from(game: str, fixture: Path) -> tuple[GameSummary, dict[str, float]]:
@@ -68,15 +75,24 @@ def compare(
     old = {m.ply: m for m in before.move_list}
     new = {m.ply: m.classification for m in after.move_list}
     same = sum(1 for ply, move in old.items() if new.get(ply) == move.classification)
-    lost = [
-        f"{m.move_number}{'.' if m.side == 'white' else '...'} {m.san} ({m.classification})"
+    lost_moves = [
+        m
         for ply, m in sorted(old.items())
         if m.classification in SERIOUS and new.get(ply) not in SERIOUS
     ]
+    named = [
+        f"{m.move_number}{'.' if m.side == 'white' else '...'} {m.san} ({m.classification})"
+        for m in lost_moves
+    ]
+    floor = V3_RERUN_AGREEMENT.get(game, min(V3_RERUN_AGREEMENT.values()))
     return Quality(
         game=game,
         same_labels=same / len(old) if old else 1.0,
-        lost=lost,
+        bar=floor - SLACK,
+        lost=named,
+        lost_blunders=[
+            n for n, m in zip(named, lost_moves, strict=True) if m.classification == "blunder"
+        ],
         moments_before=[m.ply for m in before.moments],
         moments_after=[m.ply for m in after.moments],
         scan_s=(seconds[0].get("scan", 0.0), seconds[1].get("scan", 0.0)),
@@ -93,7 +109,8 @@ def check(game: str, new: Path = ENGINE) -> Quality:
 def report(quality: Quality) -> str:
     verdict = "ok" if quality.passed else "FAILS"
     lines = [
-        f"{quality.game}: {verdict}. Labels unchanged {quality.same_labels:.1%}. "
+        f"{quality.game}: {verdict}. Labels unchanged {quality.same_labels:.1%} "
+        f"(bar {quality.bar:.1%}). "
         f"Scan {quality.scan_s[0]:.1f}s -> {quality.scan_s[1]:.1f}s, "
         f"verify {quality.verify_s[0]:.1f}s -> {quality.verify_s[1]:.1f}s."
     ]
