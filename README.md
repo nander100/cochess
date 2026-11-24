@@ -46,7 +46,7 @@ Settings come from `backend/.env` (never commit it). Nested settings use `__`.
 | `COACH_MODEL_CHAT` | `claude-haiku-5-5` | Model for the chat. `claude-sonnet-5-5` reasons more carefully at about 20× the cost per message. |
 | `DATABASE_URL` | `sqlite:///./cochess.db` | Docker overrides it to a file on the `cochess-data` volume. |
 | `LIMITS__MAX_GAMES_PER_DAY` | `10` | New single games per player per rolling 24 hours, pasted or imported (onboarding games don't count). |
-| `USER_DAILY_TOKEN_LIMIT` | *(off)* | Claude tokens one player may use in a rolling 24 hours; past it, coach requests are refused until the next day. |
+| `CREDITS__DAILY_CAP_MICROUSD` | 2000000 | A player's API spend in any 24 hours ($2); past it, coach requests are refused until it rolls over. Credits themselves are per player (v4). |
 | `COACH__CHAT_MAX_MESSAGES` | `30` | Questions per game (chat and critical moments together). |
 | `COACH__SYNOPSIS_EFFORT`, `COACH__CHAT_EFFORT` | `low`, `medium` | Claude effort level (`low` … `max`): trades depth for speed and cost. |
 | `THRESHOLDS__INACCURACY` / `__MISTAKE` / `__BLUNDER` | `0.10` / `0.20` / `0.30` | Winning-chances drop for each label. |
@@ -112,7 +112,7 @@ uv run python -m scripts.print_tendencies --user "Alex"   # tendencies with the 
 
 ## Cost
 
-With the default models, a game costs about **$0.02**: the synopsis (Claude Sonnet 5.5 at low effort, about 4.7k input / 0.7k output tokens) plus well under a cent per chat question or critical-moment step (Claude Haiku 5.5). The baseline report is one Sonnet call over all 12 games (about 13k input / 1.2k output tokens), a few cents, written once. A line walkthrough is one Haiku call (about 3k input / 0.9k output tokens) and is cached per player and line, so walking the same line again is free; at most 30 new walkthroughs per game. A reply that fails the move or drawing checks is regenerated once, which can double that reply's cost. The coach only sees a compact view of the analysis, and the system prompt and game context are prompt-cached. Every call's token usage is logged in the `llm_usage` table, per player and task, and `USER_DAILY_TOKEN_LIMIT` caps it per player if you need to.
+With the default models, a game costs about **$0.02**: the synopsis (Claude Sonnet 5.5 at low effort, about 4.7k input / 0.7k output tokens) plus well under a cent per chat question or critical-moment step (Claude Haiku 5.5). The baseline report is one Sonnet call over all 12 games (about 13k input / 1.2k output tokens), a few cents, written once. A line walkthrough is one Haiku call (about 3k input / 0.9k output tokens) and is cached per player and line, so walking the same line again is free; at most 30 new walkthroughs per game. A reply that fails the move or drawing checks is regenerated once, which can double that reply's cost. The coach only sees a compact view of the analysis, and the system prompt and game context are prompt-cached. Every call's token usage and cost is logged in the `llm_usage` table, per player and task, and charged to the player's coaching credits (v4).
 
 ## Licensing
 

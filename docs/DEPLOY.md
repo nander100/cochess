@@ -240,6 +240,26 @@ This works on SQLite and, after the move below, on Postgres.
 
 Multiply by the current per-token prices for each model to get the cost.
 
+## Coaching credits (v4)
+
+Every coach call is priced from its tokens and charged to the player's credits (1 credit = $0.01 of API cost). Engine analysis runs in the browser and is never charged. New players get a 50-credit trial when you accept them (or create them with `create-user`).
+
+When the server first runs v4, give the trial to the players you already have, mark your own account (and any testers) as never charged, and price the coach calls recorded before v4 (nobody is charged for those):
+
+```bash
+docker compose exec backend uv run --no-dev python -m app.cli grant-trials
+docker compose exec backend uv run --no-dev python -m app.cli metering --user "Alex" --off
+docker compose exec backend uv run --no-dev python -m app.cli price-usage
+```
+
+Add or remove credits for a player (the note is kept with the entry):
+
+```bash
+docker compose exec backend uv run --no-dev python -m app.cli grant-credits --user player@example.com --credits 20 --note "beta tester"
+```
+
+A player at zero credits can still analyze games and reread any synopsis, walkthrough or report already written; new coach answers wait until they have credits. Each player's coaching also stops for the day after $2 of API cost (`CREDITS__DAILY_CAP_MICROUSD`).
+
 ## Google sign-in and account email (v4)
 
 **Google sign-in.** In the [Google Cloud console](https://console.cloud.google.com/):
@@ -332,5 +352,5 @@ Then log in and open a game, the dashboard and the profile.
 
 - Players join with Google (a waitlist you accept from) or by your invite links.
 - At most 10 new games a day per player (onboarding's 12 don't count) and 30 questions per game (see the configuration table in the README to change them).
-- Optional: `USER_DAILY_TOKEN_LIMIT` in `backend/.env` caps each player's Claude tokens per rolling 24 hours (off by default).
+- Coaching credits: every coach call is charged to the player's credits, and each player stops for the day at $2 of API cost (see *Coaching credits*).
 - A single backend process, with SQLite or Postgres (RDS); v4 hardens it for public traffic.
