@@ -1,6 +1,6 @@
 # CoChess v4 — Implementation Plan (M0)
 
-Status: **awaiting owner approval at the M0 checkpoint (2026-11-23).** Sources: `SPEC_V4.md`, `docs/v3-as-built.md`, the code on branch `v4` (main `7bd264e` + the spec commits), `llm_usage` from the deployed server (pasted by the owner on 2026-11-23), the stored real engine runs in `backend/tests/fixtures/engine/`, and the official pricing pages of Anthropic and Stripe (read 2026-11-23).
+Status: **M0 approved by the owner (2026-11-23); M1 in progress.** Sources: `SPEC_V4.md`, `docs/v3-as-built.md`, the code on branch `v4` (main `7bd264e` + the spec commits), `llm_usage` from the deployed server (pasted by the owner on 2026-11-23), the stored real engine runs in `backend/tests/fixtures/engine/`, and the official pricing pages of Anthropic and Stripe (read 2026-11-23).
 
 ## Context
 
@@ -172,3 +172,7 @@ Per milestone: `uv run pytest` on SQLite and on Postgres (from M1), `ruff`, `myp
 | 2026-11-23 | Stripe at launch, US customers only; billing provider-neutral so a later move (Stripe Managed Payments or Paddle) for international sales stays small. | Owner |
 | 2026-11-23 | Faster game analysis is a v4 requirement, built in M3 (SPEC_V4 §8). | Owner |
 | 2026-11-23 | Still open: D4 (tax, with a CPA), D6 (terms and privacy text), D10 (domain). | Owner |
+| 2026-11-23 | M0 approved. Deep coach tier is option (c): Opus synopsis and baseline, Sonnet chat and explain, Haiku moments and walkthroughs (about 12 credits a game, 3.5x Standard). | Owner |
+| 2026-11-23 | All M0 adjustments approved (§5: measured credits per game, Stripe Managed Payments as the first international option, the domain gates launch not M2, Postgres data checks and SQLite foreign keys, verify settings tied to the quality test). | Owner |
+| 2026-11-23 | Dependencies approved: `psycopg[binary]`, `stripe`, `google-auth`. | Owner |
+| 2026-11-23 | CI added: a GitHub Actions workflow runs backend tests on SQLite and Postgres, frontend tests, lint and type checks on every push (adjustment 6). | Owner |

@@ -149,8 +149,8 @@ Unpaid players are those on the trial (or with only owner grants); they use ever
 
 ## 7. Coach strength (owner approved)
 
-- `user_settings.coach_strength`: `standard` (today's defaults: Sonnet at low effort for synopsis and baseline, Haiku for chat, moments and walkthroughs) or `deep` (Opus for synopsis and baseline, Sonnet for the rest; efforts set at M0). Each tier is a whole `CoachTier` in config (model and effort per task), like engine tiers; models still come from env.
-- The Profile page shows both with the measured credits per game for each (e.g. "about 2 credits a game" vs "about 8") and says Deep uses credits about 4× faster. Trial players can choose Deep too. The choice applies to new coach calls only.
+- `user_settings.coach_strength`: `standard` (today's defaults: Sonnet at low effort for synopsis and baseline, Haiku for chat, moments and walkthroughs) or `deep` (owner decision at M0, option c: Opus for synopsis and baseline, Sonnet for chat and explain, Haiku for moments and walkthroughs; about 12 credits a game against Standard's 3). Each tier is a whole `CoachTier` in config (model and effort per task), like engine tiers; models still come from env.
+- The Profile page shows both with the measured credits per game for each (measured: about 3 credits a game at Standard, about 12 at Deep) and says Deep uses credits about 3.5× faster. Trial players can choose Deep too. The choice applies to new coach calls only.
 - Cached walkthroughs record their tier; a Deep player is not served a Standard walkthrough.
 
 ## 8. Faster game analysis (owner request, M3)
@@ -380,7 +380,7 @@ Stop for owner review at every ✅.
 | D2 | Sign-up | Waitlist, joined with Google sign-in; accepted users sign in with the same Google account |
 | D3 | Prices | $10/month with 300 credits, a 50-credit free trial for unpaid users, $5 top-ups for 150 credits (to be checked against M0's measured cost) |
 | D5 | Rollover | Unused allowance expires each period; trial, top-ups and owner grants don't (recommended, not contested) |
-| D8 | Deep coach | In v4 |
+| D8 | Deep coach | In v4; at M0, option c: Opus synopsis and baseline, Sonnet chat, Haiku moments and walkthroughs |
 | D9 | Mobile layout | A later version |
 | D12 | Owner dashboard | In v4: all users, usage, site stats, paid vs unpaid, accept/revoke access, add credits |
 | D1 | Where Postgres runs | Amazon RDS (§12.1) |
