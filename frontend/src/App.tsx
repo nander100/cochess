@@ -27,6 +27,9 @@ import { ErrorState, Header, type NavItem, Skeleton, ToastProvider } from './ui'
 const GamePage = lazy(() => import('./pages/GamePage').then((m) => ({ default: m.GamePage })))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage').then((m) => ({ default: m.OnboardingPage })))
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })))
+const BillingReturnPage = lazy(() =>
+  import('./pages/BillingReturnPage').then((m) => ({ default: m.BillingReturnPage })),
+)
 
 type Session =
   | { kind: 'loading' }
@@ -190,6 +193,7 @@ function Shell({ deps }: AppProps) {
                 />
             }
           />
+          <Route path="/billing/return" element={<BillingReturnPage api={pipeline.api} />} />
           {session.profile.complete ? (
             <>
               <Route path="/" element={<Navigate to="/games" replace />} />

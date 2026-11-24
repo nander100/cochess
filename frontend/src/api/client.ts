@@ -1,6 +1,7 @@
 import { type CoachEvent, readCoachEvents } from './sse'
 import type {
   Billing,
+  ProductKey,
   AssessmentImport,
   LatestGame,
   Platform,
@@ -84,6 +85,10 @@ export interface ApiClient {
   updateSettings(change: Partial<UserSettings>): Promise<UserSettings>
   /** Coaching credits: balance, warnings, recent history (SPEC_V4 §5). */
   billing(): Promise<Billing>
+  /** Stripe's payment page for one product (SPEC_V4 §6.2); the browser goes there next. */
+  checkout(product: ProductKey): Promise<{ url: string }>
+  /** Stripe's customer portal: change or cancel the subscription, see invoices. */
+  billingPortal(): Promise<{ url: string }>
   engineConfig(): Promise<EngineConfig>
   submitScan(gameId: string, results: EngineResult[]): Promise<ScanResponse>
   submitVerify(gameId: string, results: EngineResult[]): Promise<VerifyResponse>
@@ -218,6 +223,8 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
     settings: () => request('/api/settings'),
     updateSettings: (change) => request('/api/settings', { method: 'PATCH', body: JSON.stringify(change) }),
     billing: () => request('/api/billing'),
+    checkout: (product) => post('/api/billing/checkout', { product }),
+    billingPortal: () => request('/api/billing/portal', { method: 'POST' }),
     engineConfig: () => request('/api/engine-config'),
     submitScan: (gameId, results) => post(`/api/games/${gameId}/engine/scan`, { results }),
     submitVerify: (gameId, results) => post(`/api/games/${gameId}/engine/verify`, { results }),

@@ -25,6 +25,8 @@ PUBLIC = {
     ("GET", "/api/auth/google/callback"),
     ("GET", "/api/auth/signup"),
     ("POST", "/api/auth/signup"),
+    # The payment provider's webhook: its signature is the check (tests/billing).
+    ("POST", "/api/billing/webhook"),
 }
 
 

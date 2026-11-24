@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
+import { type ApiClient, ApiError } from '../api/client'
 import type { Billing } from '../api/types'
 import { CreditsCard } from '../pages/CreditsCard'
 import { SettingsProvider } from '../settings/SettingsProvider'
@@ -44,17 +45,90 @@ test('an unmetered account never sees a warning', async () => {
   expect(screen.queryByRole('status')).not.toBeInTheDocument()
 })
 
-function card(billing: Billing) {
-  const api = fakeApi({ billing: vi.fn(async () => billing) })
+function card(billing: Billing, redirect = vi.fn(), overrides: Partial<ApiClient> = {}) {
+  const api = fakeApi({ billing: vi.fn(async () => billing), ...overrides })
   render(
     <MemoryRouter>
       <SettingsProvider api={api} enabled>
-        <CreditsCard api={api} />
+        <CreditsCard api={api} redirect={redirect} />
       </SettingsProvider>
     </MemoryRouter>,
   )
   return api
 }
+
+test('subscribing goes to Stripe, and the buttons stay off while the browser leaves', async () => {
+  const redirect = vi.fn()
+  card(BILLING, redirect)
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Subscribe: $10 a month for 300 credits' }))
+
+  await vi.waitFor(() => expect(redirect).toHaveBeenCalledWith('https://stripe.test/checkout/monthly'))
+  expect(screen.getByRole('button', { name: 'Buy 150 credits for $5' })).toBeDisabled()
+  expect(screen.getByText(/Prices are before tax/)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /Receipts|Manage/ })).not.toBeInTheDocument()
+})
+
+test('buying credits goes to Stripe for the top-up', async () => {
+  const redirect = vi.fn()
+  const api = card(BILLING, redirect)
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Buy 150 credits for $5' }))
+
+  await vi.waitFor(() => expect(redirect).toHaveBeenCalledWith('https://stripe.test/checkout/top_up'))
+  expect(api.checkout).toHaveBeenCalledWith('top_up')
+})
+
+test('a subscriber sees renewal and manage, not a second subscribe', async () => {
+  const redirect = vi.fn()
+  const subscribed: Billing = {
+    ...BILLING,
+    has_billing_account: true,
+    subscription: { status: 'active', period_end: '2026-12-24T00:00:00Z' },
+  }
+  const api = card(subscribed, redirect)
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Manage subscription' }))
+
+  await vi.waitFor(() => expect(redirect).toHaveBeenCalledWith('https://stripe.test/portal'))
+  expect(api.billingPortal).toHaveBeenCalled()
+  expect(screen.getByText(/Your subscription renews on/)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /Subscribe/ })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Buy 150 credits for $5' })).toBeInTheDocument()
+})
+
+test('a failed renewal asks for a card update; players under 18 see the guardian note', async () => {
+  card({
+    ...BILLING,
+    has_billing_account: true,
+    subscription: { status: 'past_due', period_end: null },
+    needs_guardian: true,
+  })
+
+  expect(await screen.findByText(/Your last payment didn't go through/)).toBeInTheDocument()
+  expect(screen.getByText(/need a parent or guardian to pay/)).toBeInTheDocument()
+})
+
+test('no payment buttons while payments are off', async () => {
+  card({ ...BILLING, payments_enabled: false })
+
+  await screen.findByText(/credits left/)
+  expect(screen.queryByRole('button', { name: /Subscribe|Buy/ })).not.toBeInTheDocument()
+})
+
+test('a checkout that fails leaves the buttons usable and goes nowhere', async () => {
+  const redirect = vi.fn()
+  const checkout = vi.fn(async () => {
+    throw new ApiError(503, "Payments aren't set up yet.")
+  })
+  card(BILLING, redirect, { checkout })
+
+  fireEvent.click(await screen.findByRole('button', { name: /Buy 150 credits/ }))
+
+  await vi.waitFor(() => expect(checkout).toHaveBeenCalled())
+  await vi.waitFor(() => expect(screen.getByRole('button', { name: /Buy 150 credits/ })).toBeEnabled())
+  expect(redirect).not.toHaveBeenCalled()
+})
 
 test('the credits card shows the balance in games and the history', async () => {
   card(BILLING)

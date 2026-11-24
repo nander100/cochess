@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
-import type { ApiClient } from '../api/client'
-import type { Billing, CoachStrength, CreditEntry } from '../api/types'
+import { ApiError, type ApiClient } from '../api/client'
+import type { Billing, BillingProduct, CoachStrength, CreditEntry, ProductKey } from '../api/types'
 import { useSettings } from '../settings/settingsContext'
-import { Card, SegmentedToggle, type ToggleOption } from '../ui'
+import { Button, Card, SegmentedToggle, type ToggleOption, useToast } from '../ui'
 import { formatCredits } from './util'
+
+/** Subscriptions in these states still bill (the backend refuses a second one). */
+const LIVE_STATUSES = new Set(['active', 'trialing', 'past_due', 'incomplete'])
 
 const STRENGTHS: ToggleOption<CoachStrength>[] = [
   { value: 'standard', label: 'Standard' },
@@ -23,7 +26,14 @@ const KINDS: Record<CreditEntry['kind'], string> = {
 
 /** Coaching credits and coach strength (SPEC_V4 §5, §7). Credits pay for the coach only; the
  * engine runs in the browser and costs nothing. */
-export function CreditsCard({ api }: { api: ApiClient }) {
+export function CreditsCard({
+  api,
+  redirect = (url) => window.location.assign(url),
+}: {
+  api: ApiClient
+  /** Where checkout and the portal take the browser (tests watch it). */
+  redirect?: (url: string) => void
+}) {
   const { settings, update } = useSettings()
   const [billing, setBilling] = useState<Billing | null>(null)
   const [failed, setFailed] = useState(false)
@@ -50,6 +60,9 @@ export function CreditsCard({ api }: { api: ApiClient }) {
       <p id="coach-strength-help" className="profile-intro">
         {strengthText(billing)} It applies to new coaching from now on.
       </p>
+      {billing && billing.payments_enabled && !billing.unmetered && (
+        <Plans api={api} billing={billing} redirect={redirect} />
+      )}
       {billing && billing.history.length > 0 && (
         <ul className="profile-credits-history" aria-label="Recent credit changes">
           {billing.history.slice(0, 5).map((entry, i) => (
@@ -89,4 +102,77 @@ function strengthText(billing: Billing | null): string {
     `reviews and questions, about ${formatCredits(deep)} credits a game, so credits go about ` +
     `${formatCredits(Math.round((deep / standard) * 10) / 10)} times faster.`
   )
+}
+
+/** Subscribe, top up, or manage the subscription (SPEC_V4 §6.2): each opens Stripe's own page, so
+ * card details never reach CoChess. Prices are shown before tax; Stripe adds any tax. */
+function Plans({ api, billing, redirect }: { api: ApiClient; billing: Billing; redirect: (url: string) => void }) {
+  const { show } = useToast()
+  const [busy, setBusy] = useState(false)
+  const subscribed = billing.subscription !== null && LIVE_STATUSES.has(billing.subscription.status)
+  const status = subscriptionText(billing)
+
+  async function go(open: () => Promise<{ url: string }>) {
+    setBusy(true)
+    try {
+      redirect((await open()).url)
+    } catch (error) {
+      show(error instanceof ApiError ? error.message : "The payment page couldn't be opened. Try again.", 'error')
+      setBusy(false)
+    }
+  }
+
+  const buy = (key: ProductKey) => () => void go(() => api.checkout(key))
+  return (
+    <div className="profile-plans">
+      {status && <p className="profile-intro">{status}</p>}
+      <div className="profile-plans-actions">
+        {billing.products.map((product) =>
+          product.recurring && subscribed ? null : (
+            <Button
+              key={product.key}
+              variant={product.recurring ? 'primary' : 'outline'}
+              disabled={busy}
+              onClick={buy(product.key)}
+            >
+              {productLabel(product)}
+            </Button>
+          ),
+        )}
+        {billing.has_billing_account && (
+          <Button variant="link" disabled={busy} onClick={() => void go(() => api.billingPortal())}>
+            {subscribed ? 'Manage subscription' : 'Receipts and payments'}
+          </Button>
+        )}
+      </div>
+      <p className="profile-intro">
+        Prices are before tax; Stripe, which sells for CoChess, adds any tax at checkout.
+        {billing.needs_guardian && ' Players under 18 need a parent or guardian to pay.'}
+      </p>
+    </div>
+  )
+}
+
+function productLabel(product: BillingProduct): string {
+  const dollars = product.price_cents / 100
+  const price = `$${Number.isInteger(dollars) ? dollars : dollars.toFixed(2)}`
+  return product.recurring
+    ? `Subscribe: ${price} a month for ${product.credits} credits`
+    : `Buy ${product.credits} credits for ${price}`
+}
+
+function subscriptionText(billing: Billing): string | null {
+  const sub = billing.subscription
+  if (sub === null) return null
+  const until = sub.period_end ? new Date(sub.period_end).toLocaleDateString() : null
+  switch (sub.status) {
+    case 'active':
+    case 'trialing':
+      return until ? `Your subscription renews on ${until}.` : 'Your subscription is active.'
+    case 'past_due':
+    case 'incomplete':
+      return "Your last payment didn't go through. Update your card to get this month's credits."
+    default:
+      return 'Your subscription has ended. Your top-up credits are still yours.'
+  }
 }

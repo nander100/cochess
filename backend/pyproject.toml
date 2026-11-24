@@ -14,6 +14,7 @@ dependencies = [
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.1",
     "sqlalchemy>=2.1.6",
+    "stripe>=12",
     "uvicorn[standard]>=0.54.0",
 ]
 
@@ -23,6 +24,10 @@ package = false
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.ruff.format]
+# Applied migrations are never edited (CLAUDE.md), not even by the formatter.
+exclude = ["alembic/versions/*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]

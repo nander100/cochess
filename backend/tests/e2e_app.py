@@ -7,18 +7,23 @@ move validation and the test can tell which call it got.
 
 import html
 import json
+import time
+from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import urlencode
 
 import httpx
 from anthropic.types import ContentBlock, TextBlock, ToolUseBlock
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.auth.google import GoogleClient
+from app.billing.webhooks import apply_event
 from app.coach.client import CoachReply, CoachRequest, Usage, system_prompt
 from app.coach.payload import Task
 from app.config import get_settings
 from app.main import create_app
+from tests import billing_fakes
 from tests.google_fakes import CLIENT_ID, CLIENT_SECRET, FakeGoogle
 
 TASKS: tuple[Task, ...] = (
@@ -151,7 +156,59 @@ def make() -> FastAPI:
     app = create_app(settings, ScriptedCoach())
     app.state.import_transport = httpx.MockTransport(_fake_platforms)
     _fake_google(app)
+    _fake_stripe(app)
     return app
+
+
+def _fake_stripe(app: FastAPI) -> None:
+    """Stripe for the E2E flows (SPEC_V4 §6.2): Checkout opens a fake payment page here; its Pay
+    button makes the events Stripe would send, signs them with the test secret, and puts them
+    through the real webhook parser and rules before going back to the success URL."""
+    fake = billing_fakes.install(app, billing_fakes.FakeStripeClient(url_prefix="/api/e2e/stripe"))
+
+    def session_params(number: int) -> dict[str, Any]:
+        sessions: list[dict[str, Any]] = fake.params("checkout.create")
+        if not 1 <= number <= len(sessions):
+            raise HTTPException(404)
+        return sessions[number - 1]
+
+    @app.get("/api/e2e/stripe/checkout/{number}", include_in_schema=False)
+    def checkout_page(number: int) -> HTMLResponse:
+        params = session_params(number)
+        what = "CoChess monthly" if params["mode"] == "subscription" else "150 coaching credits"
+        return HTMLResponse(
+            f"<!doctype html><title>Fake Stripe</title><h1>Pay for {what}</h1>"
+            f'<form method="post" action="/api/e2e/stripe/pay/{number}">'
+            '<button type="submit">Pay (test)</button></form>'
+        )
+
+    @app.post("/api/e2e/stripe/pay/{number}", include_in_schema=False)
+    def pay(number: int) -> RedirectResponse:
+        params = session_params(number)
+        user, customer = params["client_reference_id"], params["customer"]
+        if params["mode"] == "subscription":
+            period_end = int(time.time()) + 30 * 86_400
+            payloads = [
+                billing_fakes.subscription(
+                    f"evt_e2e_sub_{number}", "created", customer, "active", period_end
+                ),
+                billing_fakes.invoice_paid(
+                    f"evt_e2e_inv_{number}", customer, f"in_e2e_{number}", period_end
+                ),
+            ]
+        else:
+            payloads = [
+                billing_fakes.top_up_completed(
+                    f"evt_e2e_{number}", user, customer, intent=f"pi_e2e_{number}"
+                )
+            ]
+        provider = app.state.billing_provider
+        with app.state.session_factory() as session:
+            for payload in payloads:
+                event = provider.parse_event(payload, billing_fakes.sign(payload))
+                apply_event(session, event, app.state.settings, datetime.now(UTC))
+            session.commit()
+        return RedirectResponse(params["success_url"], status_code=303)
 
 
 def _fake_google(app: FastAPI) -> None:

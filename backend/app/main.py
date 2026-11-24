@@ -6,11 +6,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from sqlalchemy.orm import sessionmaker
 
+from app.api import billing_routes, games, profile, settings_routes, validation
 from app.api import coach as coach_routes
 from app.api import credits as credit_routes
 from app.api import dashboard as dashboard_routes
 from app.api import engine as engine_routes
-from app.api import games, profile, settings_routes, validation
 from app.api import imports as import_routes
 from app.api import lines as line_routes
 from app.api import moments as moment_routes
@@ -21,6 +21,7 @@ from app.api import variations as variation_routes
 from app.api import walkthrough as walkthrough_routes
 from app.auth import google_routes
 from app.auth import routes as auth_routes
+from app.billing.stripe_provider import StripeProvider
 from app.coach.client import AnthropicCoachClient, CoachClient
 from app.config import Settings, get_settings
 from app.db.migrate import upgrade
@@ -66,6 +67,10 @@ def create_app(
     if coach_client is None and settings.anthropic_api_key:
         coach_client = AnthropicCoachClient(settings.anthropic_api_key)
     app.state.coach_client = coach_client
+    # Payments (SPEC_V4 §6): off without a Stripe key (checkout answers 503); tests put a fake here.
+    app.state.billing_provider = (
+        StripeProvider(settings.stripe) if settings.stripe.enabled else None
+    )
 
     # Every API route except health, redeem and the Google sign-in routes requires a login
     # session (app/auth), checked per route: CurrentUser for active players, CurrentAccount for
@@ -99,4 +104,5 @@ def create_app(
     app.include_router(import_routes.router)
     app.include_router(onboarding_import_routes.router)
     app.include_router(credit_routes.router)
+    app.include_router(billing_routes.router)
     return app

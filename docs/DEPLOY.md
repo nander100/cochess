@@ -260,6 +260,32 @@ docker compose exec backend uv run --no-dev python -m app.cli grant-credits --us
 
 A player at zero credits can still analyze games and reread any synopsis, walkthrough or report already written; new coach answers wait until they have credits. Each player's coaching also stops for the day after $2 of API cost (`CREDITS__DAILY_CAP_MICROUSD`).
 
+## Payments with Stripe (v4)
+
+Stripe Managed Payments sells CoChess's plans for you: Stripe is the merchant of record, so it adds, collects and files sales tax and VAT, and sends players their receipts. Payments stay off (the Subscribe and Buy buttons are hidden) until `STRIPE__SECRET_KEY` is set.
+
+Once, in Stripe's Dashboard (test mode first):
+
+1. Activate Managed Payments (Settings, Managed Payments) and complete the business details it asks for.
+2. Turn on the Customer portal (Settings, Billing, Customer portal) and allow players to cancel and update their payment method.
+3. Put the keys in `backend/.env`: `STRIPE__SECRET_KEY` and `STRIPE__PUBLISHABLE_KEY` (Developers, API keys).
+4. Create the products and prices (safe to run again; it refuses a live key unless you pass `--live`):
+
+   ```bash
+   docker compose exec backend uv run --no-dev python -m scripts.stripe_setup
+   ```
+
+5. Add the webhook endpoint (Developers, Webhooks): `https://YOUR-HOSTNAME/api/billing/webhook`, with the events `checkout.session.completed`, `invoice.paid`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted` and `charge.refunded`. Put its signing secret in `STRIPE__WEBHOOK_SECRET` and restart the backend.
+
+On your laptop, the Stripe CLI forwards test webhooks to the dev server and prints the secret to use:
+
+```bash
+stripe login
+stripe listen --forward-to localhost:8000/api/billing/webhook
+```
+
+Credits only ever come from these webhooks: if a player paid but has no credits, check the endpoint's recent deliveries in the Dashboard (a failed delivery is retried by Stripe for up to three days). Every event received is kept in the `billing_events` table.
+
 ## Google sign-in and account email (v4)
 
 **Google sign-in.** In the [Google Cloud console](https://console.cloud.google.com/):

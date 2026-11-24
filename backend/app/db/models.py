@@ -73,6 +73,11 @@ class User(Base):
     last_active_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     # Owner and test accounts: usage is still recorded and priced, but never charged (§5.3).
     unmetered: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # SPEC_V4 §6.3: the payment provider's customer, and the subscription as its webhooks say.
+    billing_provider: Mapped[str | None] = mapped_column(String(10))
+    billing_customer_id: Mapped[str | None] = mapped_column(String(64), unique=True)
+    subscription_status: Mapped[str | None] = mapped_column(String(20))  # active, past_due...
+    subscription_period_end: Mapped[datetime | None] = mapped_column(UtcDateTime())
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)
 
@@ -312,6 +317,28 @@ class CreditBalanceRow(Base):
     allowance_microusd: Mapped[int] = mapped_column(BigInteger, default=0)
     lasting_microusd: Mapped[int] = mapped_column(BigInteger, default=0)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)
+
+
+class BillingEventRow(Base):
+    """Every payment-provider webhook event, stored once (SPEC_V4 §6.2): a repeat is acknowledged
+    and ignored, and the amounts feed the owner dashboard's revenue."""
+
+    __tablename__ = "billing_events"
+    __table_args__ = (
+        UniqueConstraint("provider", "event_id", name="uq_billing_events_provider_event_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    provider: Mapped[str] = mapped_column(String(10))
+    event_id: Mapped[str] = mapped_column(String(80))
+    type: Mapped[str] = mapped_column(String(60))
+    # NULL when the event names no player of ours, or once their account is deleted.
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
+    amount_cents: Mapped[int | None] = mapped_column(Integer)  # money in (negative: refunded)
+    currency: Mapped[str | None] = mapped_column(String(3))
+    # applied | ignored | unmatched (no player found) | failed
+    outcome: Mapped[str] = mapped_column(String(10))
+    received_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
 
 
 class PendingToolCallRow(Base):

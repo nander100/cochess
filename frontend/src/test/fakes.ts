@@ -44,6 +44,14 @@ export const BILLING: Billing = {
   coach_strength: 'standard',
   credits_per_game: { standard: 3.3, deep: 12 },
   history: [{ kind: 'trial', credits: 50, note: null, created_at: '2026-11-24T12:00:00Z' }],
+  payments_enabled: true,
+  has_billing_account: false,
+  subscription: null,
+  products: [
+    { key: 'monthly', name: 'CoChess monthly', credits: 300, price_cents: 1000, recurring: true },
+    { key: 'top_up', name: '150 coaching credits', credits: 150, price_cents: 500, recurring: false },
+  ],
+  needs_guardian: false,
 }
 
 export const PROFILE: Profile = {
@@ -263,6 +271,8 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     signupInfo: vi.fn(async () => ({ name: 'Sam Player', email: 'sam@example.com', terms_version: '2026-11-draft' })),
     signUp: vi.fn(async () => {}),
     billing: vi.fn(async () => BILLING),
+    checkout: vi.fn(async (product: string) => ({ url: `https://stripe.test/checkout/${product}` })),
+    billingPortal: vi.fn(async () => ({ url: 'https://stripe.test/portal' })),
     updateMe: vi.fn(async (update) => ({ ...PROFILE, ...update, complete: true })),
     createGame: vi.fn(async () => GAME),
     listGames: vi.fn(async () => []),

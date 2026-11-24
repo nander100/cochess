@@ -236,3 +236,17 @@
   gap: var(--space-4);
   color: var(--color-muted);
 }
+
+/* Subscribe, top up and manage (CreditsCard). */
+.profile-plans {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.profile-plans-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}

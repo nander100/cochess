@@ -4,16 +4,16 @@ coach strength for the call, and GET /api/billing for the credits UI."""
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, cast
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_app_settings, get_session
 from app.auth.deps import CurrentUser
-from app.billing.ledger import balance, history
+from app.billing.ledger import balance, expire_due_allowance, history
 from app.config import CoachTier, Settings
-from app.db.models import CreditLedgerRow, LlmUsageRow, UserSettingsRow
+from app.db.models import CreditLedgerRow, LlmUsageRow, User, UserSettingsRow
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 
@@ -32,6 +32,7 @@ def require_credit(user: CurrentUser, session: SessionDep, settings: SettingsDep
     Unmetered players (the owner, testers) always pass; their usage is still priced."""
     if user.unmetered:
         return
+    _expire_due(session, user)
     if balance(session, user.id).total <= 0:
         raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED, detail=OUT_OF_CREDITS)
     since = datetime.now(UTC) - timedelta(days=1)
@@ -67,6 +68,19 @@ class LedgerEntry(BaseModel):
     created_at: datetime
 
 
+class Product(BaseModel):
+    key: str
+    name: str
+    credits: int
+    price_cents: int  # before tax; Checkout adds any tax
+    recurring: bool
+
+
+class Subscription(BaseModel):
+    status: str
+    period_end: datetime | None
+
+
 class Billing(BaseModel):
     credits: float
     allowance_credits: float
@@ -77,10 +91,20 @@ class Billing(BaseModel):
     coach_strength: CoachTier
     credits_per_game: dict[str, float]
     history: list[LedgerEntry]
+    payments_enabled: bool
+    # The payment provider knows this player (so the portal can open), and their subscription.
+    has_billing_account: bool
+    subscription: Subscription | None
+    products: list[Product]
+    # 13 to 17: paying needs a parent or guardian (SPEC_V4 §11).
+    needs_guardian: bool
 
 
 @router.get("")
-def read_billing(user: CurrentUser, session: SessionDep, settings: SettingsDep) -> Billing:
+def read_billing(
+    user: CurrentUser, session: SessionDep, settings: SettingsDep, request: Request
+) -> Billing:
+    _expire_due(session, user)
     per_credit = settings.credits.microusd_per_credit
     now = balance(session, user.id)
     reference = _last_top_up(session, user.id) or settings.credits.trial_credits * per_credit
@@ -101,7 +125,31 @@ def read_billing(user: CurrentUser, session: SessionDep, settings: SettingsDep) 
             )
             for entry in history(session, user.id)
         ],
+        payments_enabled=request.app.state.billing_provider is not None,
+        has_billing_account=user.billing_customer_id is not None,
+        subscription=(
+            Subscription(status=user.subscription_status, period_end=user.subscription_period_end)
+            if user.subscription_status
+            else None
+        ),
+        products=[
+            Product(
+                key=key,
+                name=item.name,
+                credits=item.credits,
+                price_cents=item.price_cents,
+                recurring=item.recurring,
+            )
+            for key, item in settings.stripe.products.items()
+        ],
+        needs_guardian=user.age_band == "13_17",
     )
+
+
+def _expire_due(session: Session, user: User) -> None:
+    """Allowances whose period has ended are removed when next looked at (SPEC_V4 §5.2)."""
+    expire_due_allowance(session, user, datetime.now(UTC))
+    session.commit()
 
 
 def _last_top_up(session: Session, user_id: str) -> int | None:

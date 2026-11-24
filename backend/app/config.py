@@ -352,6 +352,49 @@ class CreditSettings(BaseModel):
     credits_per_game: dict[str, float] = {"standard": 3.3, "deep": 12}
 
 
+class BillingProduct(BaseModel):
+    """Something players can buy (SPEC_V4 §6.1). Found in Stripe by `lookup_key`, so no price ids
+    go in config; `scripts.stripe_setup` creates them."""
+
+    lookup_key: str
+    name: str
+    credits: int
+    price_cents: int  # before tax; Stripe, as merchant of record, adds tax where it applies
+    recurring: bool  # a monthly subscription, or a one-time purchase
+
+
+class StripeSettings(BaseModel):
+    """Payments through Stripe Checkout with Managed Payments: Stripe is the merchant of record
+    (SPEC_V4 §6, D13). Off until STRIPE__SECRET_KEY is set; keys are backend-only, never logged."""
+
+    secret_key: str = ""
+    publishable_key: str = ""
+    webhook_secret: str = ""  # from `stripe listen` locally, or the dashboard's webhook endpoint
+    managed_payments: bool = True
+    # Software as a service, personal use: eligible for Managed Payments (Stripe's list).
+    tax_code: str = "txcd_10103000"
+    products: dict[str, BillingProduct] = {
+        "monthly": BillingProduct(
+            lookup_key="cochess_monthly_300",
+            name="CoChess monthly",
+            credits=300,
+            price_cents=1000,
+            recurring=True,
+        ),
+        "top_up": BillingProduct(
+            lookup_key="cochess_top_up_150",
+            name="150 coaching credits",
+            credits=150,
+            price_cents=500,
+            recurring=False,
+        ),
+    }
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.secret_key)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", extra="ignore")
 
@@ -374,6 +417,7 @@ class Settings(BaseSettings):
     email: EmailSettings = EmailSettings()
     pricing: PricingSettings = PricingSettings()
     credits: CreditSettings = CreditSettings()
+    stripe: StripeSettings = StripeSettings()
     engine: EngineSettings = EngineSettings()
     thresholds: Thresholds = Thresholds()
     detectors: DetectorSettings = DetectorSettings()

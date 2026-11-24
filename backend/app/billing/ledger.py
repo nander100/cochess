@@ -11,7 +11,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -68,6 +68,54 @@ def expire_allowance(session: Session, user: User, source: str, now: datetime) -
     _record(session, user.id, -remaining, "expiry", f"expiry:{source}", "allowance", now)
 
 
+def grant_top_up(session: Session, user: User, microusd: int, source: str, now: datetime) -> bool:
+    """A paid one-time purchase: lasting credit. False when this payment was already counted."""
+    return _record(session, user.id, microusd, "top_up", source, "lasting", now) is not None
+
+
+def expire_due_allowance(
+    session: Session, user: User, now: datetime, *, everything: bool = False
+) -> None:
+    """Expire every allowance whose period has ended (read lazily: before a credit check and
+    when the balance is shown, so no scheduler is needed), or all of them (`everything`: the
+    subscription ended)."""
+    for source in _unexpired_allowances(session, user.id, before=None if everything else now):
+        expire_allowance(session, user, source, now)
+
+
+def start_allowance(
+    session: Session, user: User, microusd: int, source: str, expires_at: datetime, now: datetime
+) -> bool:
+    """A newly paid period: what's left of earlier allowances goes, then this one is granted.
+    A replay of the same period changes nothing (and never expires the current one)."""
+    if _exists(session, "allowance", source):
+        return False
+    for earlier in _unexpired_allowances(session, user.id, before=None):
+        expire_allowance(session, user, earlier, now)
+    grant_allowance(session, user, microusd, source, expires_at, now)
+    return True
+
+
+def refund_credits(
+    session: Session, user: User, payment: str, refunded_microusd: int, event: str, now: datetime
+) -> int:
+    """Take back credits for money refunded on `payment`. `refunded_microusd` is the credit value
+    of everything refunded on it so far (providers report the running total), so a later partial
+    refund only removes the difference. Allowance goes first; the balance may go below zero.
+    Returns what was removed."""
+    prefix = f"refund:{payment}:"
+    query = select(func.coalesce(func.sum(CreditLedgerRow.delta_microusd), 0)).where(
+        CreditLedgerRow.kind == "refund", CreditLedgerRow.source.startswith(prefix)
+    )
+    already = -int(session.scalar(query) or 0)
+    owed = refunded_microusd - already
+    source = prefix + event
+    if owed <= 0 or _exists(session, "refund", source):
+        return 0
+    _debit(session, user.id, owed, "refund", source, now)
+    return owed
+
+
 def adjust_by_owner(
     session: Session, user: User, microusd: int, *, note: str, now: datetime
 ) -> CreditLedgerRow:
@@ -91,23 +139,45 @@ def charge_usage(
     source = f"llm_usage:{usage_row_id}"
     if _exists(session, "usage", source):
         return
+    _debit(session, user_id, cost_microusd, "usage", source, now)
+
+
+def _debit(
+    session: Session, user_id: str, microusd: int, kind: str, source: str, now: datetime
+) -> None:
+    """Remove `microusd`: allowance first, then lasting credit (which may go below zero)."""
     row = _locked(session, user_id)
-    from_allowance = min(cost_microusd, max(row.allowance_microusd, 0))
-    from_lasting = cost_microusd - from_allowance
+    from_allowance = min(microusd, max(row.allowance_microusd, 0))
+    from_lasting = microusd - from_allowance
     bucket = "allowance" if from_lasting == 0 else "lasting" if from_allowance == 0 else "split"
     row.allowance_microusd -= from_allowance
     row.lasting_microusd -= from_lasting
     session.add(
         CreditLedgerRow(
             user_id=user_id,
-            delta_microusd=-cost_microusd,
-            kind="usage",
+            delta_microusd=-microusd,
+            kind=kind,
             source=source,
             bucket=bucket,
             created_at=now,
         )
     )
     session.flush()
+
+
+def _unexpired_allowances(session: Session, user_id: str, before: datetime | None) -> list[str]:
+    """Sources of this player's allowances with no expiry yet (ending before `before`, if set)."""
+    expired = select(CreditLedgerRow.source).where(
+        CreditLedgerRow.user_id == user_id, CreditLedgerRow.kind == "expiry"
+    )
+    query = select(CreditLedgerRow.source).where(
+        CreditLedgerRow.user_id == user_id,
+        CreditLedgerRow.kind == "allowance",
+        ("expiry:" + CreditLedgerRow.source).not_in(expired),
+    )
+    if before is not None:
+        query = query.where(CreditLedgerRow.expires_at <= before)
+    return list(session.scalars(query.order_by(CreditLedgerRow.id)))
 
 
 def _record(

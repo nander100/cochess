@@ -612,6 +612,31 @@ export interface Billing {
   coach_strength: CoachStrength
   credits_per_game: Record<CoachStrength, number>
   history: CreditEntry[]
+  /** SPEC_V4 §6: false until Stripe is set up (checkout would answer 503). */
+  payments_enabled: boolean
+  /** Stripe knows this player, so the customer portal can open. */
+  has_billing_account: boolean
+  subscription: BillingSubscription | null
+  products: BillingProduct[]
+  /** 13 to 17: paying needs a parent or guardian (SPEC_V4 §11). */
+  needs_guardian: boolean
+}
+
+export type ProductKey = 'monthly' | 'top_up'
+
+export interface BillingProduct {
+  key: ProductKey
+  name: string
+  credits: number
+  /** Before tax; Stripe's checkout adds any tax. */
+  price_cents: number
+  recurring: boolean
+}
+
+export interface BillingSubscription {
+  /** As Stripe says it: active, past_due, canceled, ... */
+  status: string
+  period_end: string | null
 }
 
 export interface CreditEntry {
