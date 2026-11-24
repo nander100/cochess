@@ -1,6 +1,6 @@
 # CoChess v4 — Implementation Plan (M0)
 
-Status: **M0 approved by the owner (2026-11-23); M1 in progress.** Sources: `SPEC_V4.md`, `docs/v3-as-built.md`, the code on branch `v4` (main `7bd264e` + the spec commits), `llm_usage` from the deployed server (pasted by the owner on 2026-11-23), the stored real engine runs in `backend/tests/fixtures/engine/`, and the official pricing pages of Anthropic and Stripe (read 2026-11-23).
+Status: **M0 and M1 approved by the owner (2026-11-23, 2026-11-24); M2 in progress.** Sources: `SPEC_V4.md`, `docs/v3-as-built.md`, the code on branch `v4` (main `7bd264e` + the spec commits), `llm_usage` from the deployed server (pasted by the owner on 2026-11-23), the stored real engine runs in `backend/tests/fixtures/engine/`, and the official pricing pages of Anthropic and Stripe (read 2026-11-23).
 
 ## Context
 
@@ -185,3 +185,4 @@ Per milestone: `uv run pytest` on SQLite and on Postgres (from M1), `ruff`, `myp
 | 2026-11-23 | `docker-compose.yml` reads `DATABASE_URL` from `./.env` next to it (variable substitution), defaulting to the SQLite volume, so the switch to RDS is one line and going back is deleting it. Connections use `sslmode=require` (RDS for PostgreSQL 15+ refuses unencrypted connections by default). Migrations still run at backend startup (one process). | Claude |
 | 2026-11-23 | Trial on real data: a copy of the owner's dev database (1,418 rows in 19 tables) had no problems, copied into Postgres 17 in under a second with every table matching, and the app served login, the games list, the dashboard, a game, variations, PGN export, settings and the baseline report from the copy. | Claude |
 | 2026-11-24 | M1 checkpoint on the server's data: a copy of the deployed database (revision 0018, SQLite integrity check ok) had no problems, copied into Postgres 17 in about a second (4,075 rows in 19 tables: 5 players, 38 games, 3,500 engine results), every table matched, and the app served all 134 pages of all five players from the copy (129 OK; the 5 not-found answers are the baseline report, which no player has yet). The throwaway copies were deleted afterwards. | Claude |
+| 2026-11-24 | M1 approved. The server stays on SQLite (and v3) until M8; branch `v4` pushed to GitHub for CI. | Owner |
