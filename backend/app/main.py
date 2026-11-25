@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from sqlalchemy.orm import sessionmaker
 
+from app.account import routes as account_routes
 from app.admin import routes as admin_routes
 from app.api import billing_routes, games, profile, settings_routes, validation
 from app.api import coach as coach_routes
@@ -28,6 +29,7 @@ from app.config import Settings, get_settings
 from app.db.migrate import upgrade
 from app.db.session import make_engine
 from app.email.smtp import EmailSender, SmtpTransport
+from app.legal import routes as legal_routes
 
 # Required for SharedArrayBuffer, which multi-threaded Stockfish WASM needs (SPEC §4.1).
 CROSS_ORIGIN_ISOLATION_HEADERS = {
@@ -68,6 +70,7 @@ def create_app(
     if coach_client is None and settings.anthropic_api_key:
         coach_client = AnthropicCoachClient(settings.anthropic_api_key)
     app.state.coach_client = coach_client
+    app.state.export_times = {}  # user id -> when they last exported (SPEC_V4 §11)
     # Payments (SPEC_V4 §6): off without a Stripe key (checkout answers 503); tests put a fake here.
     app.state.billing_provider = (
         StripeProvider(settings.stripe) if settings.stripe.enabled else None
@@ -107,4 +110,6 @@ def create_app(
     app.include_router(credit_routes.router)
     app.include_router(billing_routes.router)
     app.include_router(admin_routes.router)
+    app.include_router(legal_routes.router)
+    app.include_router(account_routes.router)
     return app

@@ -139,6 +139,9 @@ class EmailOutboxRow(Base):
     kind: Mapped[str] = mapped_column(String(30))
     dedupe_key: Mapped[str] = mapped_column(String(120), unique=True)  # each email sent once
     details: Mapped[dict[str, str]] = mapped_column(JSON, default=dict)  # e.g. the owner's reason
+    # Only for an email to an account that no longer exists (account_deleted, SPEC_V4 §11): the
+    # address it goes to, wiped (with `details`) as soon as the row is sent, skipped or failed.
+    to_address: Mapped[str | None] = mapped_column(String(320))
     # pending | sent | failed | skipped
     status: Mapped[str] = mapped_column(String(10), default="pending", server_default="pending")
     attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
@@ -146,6 +149,18 @@ class EmailOutboxRow(Base):
     last_error: Mapped[str | None] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
     sent_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+
+
+class EmailPreferenceRow(Base):
+    """An email a player turned off or back on (SPEC_V4 §12.4): only the kinds that can be turned
+    off have rows; no row means the email is sent."""
+
+    __tablename__ = "email_preferences"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(30), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)
 
 
 class Invite(Base):

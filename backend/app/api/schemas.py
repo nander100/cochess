@@ -65,6 +65,9 @@ class Profile(BaseModel):
     google_connected: bool
     waitlisted_at: datetime | None
     age_band: AgeBand | None
+    # SPEC_V4 §11: the current terms version, and whether this account accepted it.
+    terms_version: str
+    terms_accepted: bool
 
 
 class ProfileUpdate(BaseModel):

@@ -12,6 +12,7 @@ metering --user X --off|--on  never charge this player (owner, testers), or char
 grant-trials                  give the free trial to every active player who hasn't had it
 price-usage                   price coach calls recorded before v4 (no charge)
 usage-report [--period 7d|30d|month|all]   the owner dashboard's overview as text
+notify-terms                  email everyone who hasn't accepted the current terms version (once)
 migrate-sqlite --from URL --to URL [--check-only]
                               copy the v3 SQLite database into an empty Postgres database
 """
@@ -36,8 +37,10 @@ from app.config import Settings, get_settings
 from app.db.copy_sqlite import CopyError, copy_database, describe, find_problems
 from app.db.games import assign_unowned_games, fill_fingerprints, rebuild_summaries
 from app.db.migrate import upgrade
-from app.db.models import CreditLedgerRow, LlmUsageRow, User
+from app.db.models import CreditLedgerRow, EmailOutboxRow, LlmUsageRow, User
 from app.db.session import make_engine
+from app.email.outbox import queue_email
+from app.legal import has_accepted
 
 
 class CliError(Exception):
@@ -91,6 +94,8 @@ def _run(args: argparse.Namespace, session: Session, settings: Settings) -> str:
                 ids = ", ".join(f"{g.id} ({g.user_color})" for g in games)
                 lines.append(f"Duplicate uploads of one game: {ids}")
         return "\n".join(lines)
+    if args.command == "notify-terms":
+        return _notify_terms(session, settings)
     if args.command == "usage-report":
         return usage_report(overview(session, args.period, datetime.now(UTC)))
     if args.command in ("admit", "suspend", "restore", "set-role"):
@@ -126,6 +131,31 @@ def _account_action(args: argparse.Namespace, session: Session, settings: Settin
         raise CliError(str(error)) from error
     session.commit()
     return message
+
+
+def _notify_terms(session: Session, settings: Settings) -> str:
+    """After LEGAL__TERMS_VERSION changes (SPEC_V4 §12.4 terms_updated): one email per account
+    with an address that hasn't accepted this version. Safe to run again: each is sent once."""
+    version, now = settings.legal.terms_version, datetime.now(UTC)
+    accounts = session.scalars(
+        select(User).where(User.status != "deleted", User.email.is_not(None))
+    ).all()
+    queued = 0
+    for user in accounts:
+        key = f"terms_updated:{version}:{user.id}"
+        if has_accepted(session, user, version) or _queued(session, key):
+            continue
+        queue_email(session, user, "terms_updated", key, now=now)
+        queued += 1
+    session.commit()
+    return f"Queued {queued} terms_updated email(s) for version {version}."
+
+
+def _queued(session: Session, key: str) -> bool:
+    return (
+        session.scalar(select(EmailOutboxRow.id).where(EmailOutboxRow.dedupe_key == key))
+        is not None
+    )
 
 
 def _migrate_sqlite(args: argparse.Namespace, out: TextIO) -> int:
@@ -252,6 +282,7 @@ def _parser() -> argparse.ArgumentParser:
     switch.add_argument("--on", action="store_true", help="charge them again")
     commands.add_parser("grant-trials", help="give the trial to active players without one")
     commands.add_parser("price-usage", help="price coach calls recorded before v4")
+    commands.add_parser("notify-terms", help="email everyone about a new terms version")
     report = commands.add_parser("usage-report", help="the owner dashboard's numbers as text")
     report.add_argument("--period", choices=["7d", "30d", "month", "all"], default="30d")
     copy = commands.add_parser(

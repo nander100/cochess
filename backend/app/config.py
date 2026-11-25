@@ -224,6 +224,9 @@ class Limits(BaseModel):
     """Input size limits for user-submitted data."""
 
     max_pgn_chars: int = 100_000
+    # A player's data export (SPEC_V4 §11) builds a zip of everything: at most one per this many
+    # seconds, per player (kept in the process; M8 moves limits into the database).
+    export_cooldown_seconds: float = 300
     max_plies: int = 600
     # New single-game uploads per player per rolling 24 hours (PLAN_V2 §6 Q8). Onboarding games
     # don't count.
@@ -283,6 +286,8 @@ class LegalSettings(BaseModel):
     """Terms, privacy and the age check (SPEC_V4 §11). The texts are the owner's (D6)."""
 
     terms_version: str = "2026-11-draft"
+    # Where terms.md and privacy.md are read from; empty: the drafts in app/legal/texts.
+    texts_dir: str = ""
     min_age: int = 13  # COPPA: no accounts for children under 13
     adult_age: int = 18  # 13 to 17 need a parent or guardian to agree and to pay
     age_block_hours: int = 24  # after an under-13 answer, sign-up stays closed in that browser

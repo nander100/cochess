@@ -40,6 +40,13 @@ Your access to CoChess is back. Sign in with Google at $app_url to pick up where
 
 The CoChess team
 """,
+    "terms_updated": """Hi $name,
+
+We've updated the CoChess Terms of Service and Privacy Policy. You'll be asked to review and accept
+them the next time you sign in at $app_url
+
+The CoChess team
+""",
 }
 
 

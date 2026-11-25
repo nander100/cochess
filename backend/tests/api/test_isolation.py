@@ -27,6 +27,8 @@ PUBLIC = {
     ("POST", "/api/auth/signup"),
     # The payment provider's webhook: its signature is the check (tests/billing).
     ("POST", "/api/billing/webhook"),
+    # The terms and privacy texts (SPEC_V4 §11) are read before anyone signs up.
+    ("GET", "/api/legal/{kind}"),
 }
 
 

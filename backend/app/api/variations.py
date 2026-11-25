@@ -49,6 +49,17 @@ def put_variations(
 @router.get("/{game_id}/export.pgn")
 def export_game(game: OwnedGame, session: SessionDep, settings: SettingsDep) -> Response:
     """The game as an annotated PGN download (SPEC_V3 §5.2)."""
+    text, filename = annotated_pgn(session, game, settings)
+    return Response(
+        content=text,
+        media_type="application/x-chess-pgn",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def annotated_pgn(session: Session, game: Game, settings: Settings) -> tuple[str, str]:
+    """The game's annotated PGN (labels, moment notes, evaluations, saved variations) and its
+    file name. Also used by the account export (SPEC_V4 §11)."""
     parsed = _parsed(game, settings)
     by_fen = best_by_fen(load_results(session, game.id, ["scan", "verify", "deep"]))
     try:
@@ -73,12 +84,7 @@ def export_game(game: OwnedGame, session: SessionDep, settings: SettingsDep) -> 
         moments=moments,
         variations=load_variations(session, game) or [],
     )
-    filename = export_filename(parsed.headers)
-    return Response(
-        content=text,
-        media_type="application/x-chess-pgn",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    return text, export_filename(parsed.headers)
 
 
 def _parsed(game: Game, settings: Settings) -> ParsedGame:

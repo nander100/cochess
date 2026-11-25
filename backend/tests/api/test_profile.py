@@ -22,6 +22,8 @@ def test_read_profile(app: FastAPI) -> None:
         "google_connected": False,
         "waitlisted_at": None,
         "age_band": None,
+        "terms_version": "2026-11-draft",
+        "terms_accepted": False,
     }
 
 
@@ -49,6 +51,8 @@ def test_update_changes_only_the_fields_sent(app: FastAPI) -> None:
         "google_connected": False,
         "waitlisted_at": None,
         "age_band": None,
+        "terms_version": "2026-11-draft",
+        "terms_accepted": False,
     }
     assert client.get("/api/me").json() == response.json()
 

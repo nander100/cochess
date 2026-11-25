@@ -35,6 +35,7 @@ EMAILS: dict[str, EmailKind] = {
     "accepted": EmailKind("You've been accepted to CoChess"),
     "access_paused": EmailKind("Your CoChess access is paused"),
     "access_restored": EmailKind("Your CoChess access is back"),
+    "terms_updated": EmailKind("We've updated the CoChess terms"),
 }
 
 
