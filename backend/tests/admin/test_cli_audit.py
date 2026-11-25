@@ -3,6 +3,7 @@
 the overview."""
 
 import io
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,7 @@ from app.auth.service import create_user
 from app.cli import main
 from app.config import Settings
 from app.db.migrate import upgrade
-from app.db.models import AdminActionRow, CreditLedgerRow
+from app.db.models import AdminActionRow, CreditLedgerRow, LlmUsageRow
 from app.db.session import make_engine
 from tests.databases import fresh_database_url, is_postgres
 
@@ -92,3 +93,21 @@ def test_usage_report_prints_the_overview(settings: Settings) -> None:
     assert "Players: 1 (1 active); waitlist 0" in text
     assert "API cost $0.00" in text
     assert "Coach calls by task: none" in text
+
+
+def test_spend_sums_the_last_hours_of_api_cost(settings: Settings) -> None:
+    now = datetime.now(UTC)
+    with _session(settings) as session:
+        for hours_ago, cost in ((1, 12_500), (5, 7_500), (30, 999_000)):
+            session.add(
+                LlmUsageRow(
+                    endpoint="chat", task="chat", model="m", input_tokens=1, output_tokens=1,
+                    cache_read_tokens=0, cache_write_tokens=0, cost_microusd=cost,
+                    created_at=now - timedelta(hours=hours_ago),
+                )
+            )  # fmt: skip
+        session.commit()
+    out = io.StringIO()
+
+    assert main(["spend", "--hours", "24"], settings, out) == 0
+    assert out.getvalue().strip() == "0.0200"

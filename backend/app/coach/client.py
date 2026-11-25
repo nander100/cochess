@@ -1,5 +1,6 @@
 """Claude API access for the coach (SPEC §7.1). Tests use a fake CoachClient, never the API."""
 
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cache
@@ -13,6 +14,7 @@ from app.coach.payload import Task
 from app.config import Effort
 
 _PROMPTS = Path(__file__).parent / "prompts"
+logger = logging.getLogger("app.coach")
 
 
 # Tasks that share one prompt file.
@@ -149,6 +151,9 @@ class AnthropicCoachClient:
             ) as stream:
                 message = await stream.get_final_message()
         except anthropic.APIError as error:
+            # A fixed message: the "Anthropic errors" alarm counts it (deploy/alarms.sh).
+            status = getattr(error, "status_code", None)
+            logger.error("anthropic request failed: %s status=%s", type(error).__name__, status)
             raise CoachUnavailableError(
                 "The coach is unavailable right now. Please try again in a minute."
             ) from error

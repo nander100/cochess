@@ -1,8 +1,6 @@
 """A player's own account (SPEC_V4 §11): export everything that's theirs, or delete the account.
 Any signed-in account may use them, including a waitlisted or paused one."""
 
-import math
-import time
 from datetime import UTC, datetime
 from typing import Annotated, cast
 
@@ -17,6 +15,7 @@ from app.auth.deps import CurrentAccount
 from app.billing.cancel import CancelError, cancel_live_subscription
 from app.billing.provider import BillingProvider
 from app.config import Settings
+from app.limits import DAY, check
 
 router = APIRouter(prefix="/api/me", tags=["account"])
 
@@ -24,6 +23,7 @@ SessionDep = Annotated[Session, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_app_settings)]
 
 WRONG_NAME = "To delete your account, type your name exactly as it appears on your profile."
+TOO_OFTEN = "You've downloaded your data several times today. Please try again tomorrow."
 OWNER = "The owner's account can't be deleted here. Make another account the owner first (CLI)."
 
 
@@ -36,7 +36,7 @@ def export(
     request: Request, user: CurrentAccount, session: SessionDep, settings: SettingsDep
 ) -> Response:
     """Everything that's the player's, as one zip download."""
-    _check_cooldown(request, user.id, settings.limits.export_cooldown_seconds)
+    check(session, f"export:{user.id}", settings.rate_limits.exports_per_day, DAY, TOO_OFTEN)
     now = datetime.now(UTC)
     data = build_export(session, user, settings, now)
     filename = f"cochess-export-{now:%Y-%m-%d}.zip"
@@ -45,17 +45,6 @@ def export(
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
-
-
-def _check_cooldown(request: Request, user_id: str, cooldown: float) -> None:
-    times: dict[str, float] = request.app.state.export_times
-    now = time.monotonic()
-    wait = cooldown - (now - times.get(user_id, -math.inf))
-    if wait > 0:
-        minutes = max(1, math.ceil(wait / 60))
-        detail = f"You just exported your data. Try again in {minutes} minutes."
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail=detail)
-    times[user_id] = now
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)

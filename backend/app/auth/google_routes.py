@@ -34,6 +34,7 @@ from app.auth.service import (
 from app.config import LegalSettings, Settings
 from app.db.models import OAuthState, PendingSignup, TermsAcceptance, User
 from app.email.outbox import queue_email
+from app.limits import per_address
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 log = logging.getLogger("app.auth")
@@ -84,7 +85,10 @@ def get_google_client(request: Request) -> GoogleClient:
 GoogleDep = Annotated[GoogleClient, Depends(get_google_client)]
 
 
-@router.get("/google/start")
+@router.get(
+    "/google/start",
+    dependencies=[Depends(per_address("login", lambda limits: limits.logins_per_minute))],
+)
 def google_start(
     request: Request, session: SessionDep, settings: SettingsDep, intent: Intent = "signin"
 ) -> RedirectResponse:
@@ -131,7 +135,10 @@ def google_start(
     return response
 
 
-@router.get("/google/callback")
+@router.get(
+    "/google/callback",
+    dependencies=[Depends(per_address("login", lambda limits: limits.logins_per_minute))],
+)
 def google_callback(
     request: Request,
     session: SessionDep,
@@ -174,7 +181,12 @@ def signup_info(request: Request, session: SessionDep, settings: SettingsDep) ->
     )
 
 
-@router.post("/signup", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@router.post(
+    "/signup",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    dependencies=[Depends(per_address("login", lambda limits: limits.logins_per_minute))],
+)
 def sign_up(
     body: SignupRequest, request: Request, session: SessionDep, settings: SettingsDep
 ) -> Response:

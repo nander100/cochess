@@ -15,6 +15,7 @@ from app.auth.deps import CurrentUser
 from app.billing.provider import BillingProvider, InvalidEvent
 from app.billing.webhooks import apply_event
 from app.config import Settings
+from app.limits import MINUTE, check
 
 logger = logging.getLogger("app.billing")
 
@@ -61,6 +62,7 @@ def start_checkout(
     settings: SettingsDep,
     provider: ProviderDep,
 ) -> RedirectUrl:
+    check(session, f"checkout:{user.id}", settings.rate_limits.checkouts_per_minute, MINUTE)
     item = settings.stripe.products[body.product]
     if item.recurring and user.subscription_status in LIVE_STATUSES:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=ALREADY_SUBSCRIBED)

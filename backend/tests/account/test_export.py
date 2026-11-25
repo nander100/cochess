@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.billing.ledger import adjust_by_owner
-from app.config import Limits, Settings
+from app.config import Settings
 from app.db.chat import save_turn
 from app.db.models import Game, User
 from app.main import create_app
@@ -109,21 +109,6 @@ def test_only_the_players_own_data_is_exported(app: FastAPI) -> None:
 
     assert not [n for n in archive.namelist() if n.startswith(("games/", "coaching/"))]
     assert b"Theirs" not in b"".join(archive.read(n) for n in archive.namelist())
-
-
-def test_a_second_export_soon_after_is_refused() -> None:
-    settings = Settings(
-        _env_file=None,
-        database_url=fresh_database_url(),
-        limits=Limits(export_cooldown_seconds=600),
-    )
-    client = log_in(create_app(settings, FakeCoachClient()), "Eager")
-
-    assert client.post("/api/me/export").status_code == 200
-    again = client.post("/api/me/export")
-
-    assert again.status_code == 429
-    assert "minutes" in again.json()["detail"]
 
 
 def test_a_paused_account_can_still_export(app: FastAPI) -> None:

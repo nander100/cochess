@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_app_settings, get_session
 from app.auth.service import InvalidInviteError, end_session, redeem_invite
 from app.config import Settings
+from app.limits import per_address
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -23,7 +24,11 @@ class RedeemRequest(BaseModel):
     token: str = Field(min_length=1, max_length=200)
 
 
-@router.post("/redeem", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/redeem",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(per_address("login", lambda limits: limits.logins_per_minute))],
+)
 def redeem(
     body: RedeemRequest, response: Response, session: SessionDep, settings: SettingsDep
 ) -> None:

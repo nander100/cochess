@@ -1,0 +1,23 @@
+# On the EC2 server only (docs/DEPLOY.md, "Monitoring"): ship both containers' logs to CloudWatch
+# Logs through Docker's awslogs driver, using the instance's IAM role. Use it with the main file:
+#
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.aws.yml up -d
+#
+# COCHESS_ENV is "production" or "staging", so the two keep separate log groups.
+services:
+  backend:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-2}
+        awslogs-group: /cochess/${COCHESS_ENV:-production}/backend
+        awslogs-create-group: "true"
+        mode: non-blocking # never slow a request down for a log line
+  frontend:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-2}
+        awslogs-group: /cochess/${COCHESS_ENV:-production}/frontend
+        awslogs-create-group: "true"
+        mode: non-blocking

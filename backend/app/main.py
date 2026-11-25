@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from sqlalchemy.orm import sessionmaker
 
+from app import health as health_routes
 from app.account import routes as account_routes
 from app.admin import routes as admin_routes
 from app.api import billing_routes, games, profile, settings_routes, validation
@@ -31,6 +32,7 @@ from app.db.session import make_engine
 from app.email import routes as email_routes
 from app.email.smtp import EmailSender, SmtpTransport
 from app.legal import routes as legal_routes
+from app.logs import configure_logging, request_context
 
 # Required for SharedArrayBuffer, which multi-threaded Stockfish WASM needs (SPEC §4.1).
 CROSS_ORIGIN_ISOLATION_HEADERS = {
@@ -45,6 +47,8 @@ def create_app(
     """`coach_client` is injected by tests; otherwise it's built from ANTHROPIC_API_KEY (and is
     None without a key, so coach endpoints answer 503 instead of failing at startup)."""
     settings = settings or get_settings()
+    if settings.log_json:
+        configure_logging(as_json=True)  # production: JSON lines for CloudWatch (SPEC_V4 §12.3)
     engine = make_engine(settings.database_url)
     upgrade(engine)
 
@@ -67,6 +71,7 @@ def create_app(
     app.state.email_sender = None
     validation.install(app)
     app.state.settings = settings
+    app.state.engine = engine
     app.state.session_factory = sessionmaker(engine, expire_on_commit=False)
     if coach_client is None and settings.anthropic_api_key:
         coach_client = AnthropicCoachClient(settings.anthropic_api_key)
@@ -80,6 +85,8 @@ def create_app(
     # Every API route except health, redeem and the Google sign-in routes requires a login
     # session (app/auth), checked per route: CurrentUser for active players, CurrentAccount for
     # the status page a waitlisted or paused player sees (SPEC_V4 §4).
+    app.middleware("http")(request_context)  # request id and the access line
+
     @app.middleware("http")
     async def cross_origin_isolation(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
@@ -88,10 +95,7 @@ def create_app(
         response.headers.update(CROSS_ORIGIN_ISOLATION_HEADERS)
         return response
 
-    @app.get("/api/health")
-    async def health() -> dict[str, bool]:
-        return {"ok": True}
-
+    app.include_router(health_routes.router)
     app.include_router(auth_routes.router)
     app.include_router(google_routes.router)
     app.include_router(profile.router)

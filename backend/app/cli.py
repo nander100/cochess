@@ -13,6 +13,7 @@ grant-trials                  give the free trial to every active player who has
 price-usage                   price coach calls recorded before v4 (no charge)
 usage-report [--period 7d|30d|month|all]   the owner dashboard's overview as text
 notify-terms                  email everyone who hasn't accepted the current terms version (once)
+spend [--hours 24]            API cost in the last hours, in dollars (for the spend alarm)
 migrate-sqlite --from URL --to URL [--check-only]
                               copy the v3 SQLite database into an empty Postgres database
 """
@@ -20,10 +21,10 @@ migrate-sqlite --from URL --to URL [--check-only]
 import argparse
 import sys
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TextIO
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.admin import actions
@@ -94,6 +95,12 @@ def _run(args: argparse.Namespace, session: Session, settings: Settings) -> str:
                 ids = ", ".join(f"{g.id} ({g.user_color})" for g in games)
                 lines.append(f"Duplicate uploads of one game: {ids}")
         return "\n".join(lines)
+    if args.command == "spend":
+        since = datetime.now(UTC) - timedelta(hours=args.hours)
+        query = select(func.coalesce(func.sum(LlmUsageRow.cost_microusd), 0)).where(
+            LlmUsageRow.created_at >= since
+        )
+        return f"{int(session.scalar(query) or 0) / 1_000_000:.4f}"
     if args.command == "notify-terms":
         return _notify_terms(session, settings)
     if args.command == "usage-report":
@@ -283,6 +290,8 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("grant-trials", help="give the trial to active players without one")
     commands.add_parser("price-usage", help="price coach calls recorded before v4")
     commands.add_parser("notify-terms", help="email everyone about a new terms version")
+    spend = commands.add_parser("spend", help="API cost in the last hours, in dollars")
+    spend.add_argument("--hours", type=float, default=24)
     report = commands.add_parser("usage-report", help="the owner dashboard's numbers as text")
     report.add_argument("--period", choices=["7d", "30d", "month", "all"], default="30d")
     copy = commands.add_parser(

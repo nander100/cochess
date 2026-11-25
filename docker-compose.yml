@@ -1,10 +1,13 @@
 services:
   backend:
     build: ./backend
-    env_file: ./backend/.env
+    # Staging runs this file as its own project with BACKEND_ENV_FILE=./backend/.env.staging.
+    env_file: ${BACKEND_ENV_FILE:-./backend/.env}
     environment:
       # SQLite on the volume unless DATABASE_URL is set in ./.env (Postgres on RDS, docs/DEPLOY.md).
       DATABASE_URL: ${DATABASE_URL:-sqlite:////data/cochess.db}
+      # JSON log lines with request ids, for CloudWatch (docs/DEPLOY.md).
+      LOG_JSON: "true"
     volumes:
       - cochess-data:/data
     expose:

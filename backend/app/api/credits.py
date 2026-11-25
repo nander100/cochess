@@ -15,6 +15,7 @@ from app.billing.ledger import balance, expire_due_allowance, history
 from app.billing.notices import last_grant
 from app.config import CoachTier, Settings
 from app.db.models import LlmUsageRow, User, UserSettingsRow
+from app.limits import MINUTE, check
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 
@@ -25,12 +26,15 @@ OUT_OF_CREDITS = (
     "You're out of coaching credits. Analysis and everything else still work; top up or "
     "subscribe to keep getting coached."
 )
+COACH_PACE = "That's a lot of questions at once. Please wait {wait} and ask again."
 DAILY_CAP = "You've reached today's coaching limit. It resets within 24 hours."
 
 
 def require_credit(user: CurrentUser, session: SessionDep, settings: SettingsDep) -> None:
     """Before a coach call (SPEC_V4 §5.3): a positive balance, and under the daily spending cap.
-    Unmetered players (the owner, testers) always pass; their usage is still priced."""
+    Unmetered players (the owner, testers) always pass; their usage is still priced. Everyone,
+    unmetered or not, is held to the per-minute limit (SPEC_V4 §12.2), which protects the cost."""
+    check(session, f"coach:{user.id}", settings.rate_limits.coach_per_minute, MINUTE, COACH_PACE)
     if user.unmetered:
         return
     _expire_due(session, user)

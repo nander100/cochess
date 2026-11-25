@@ -147,6 +147,12 @@ def _fake_chesscom(request: httpx.Request) -> httpx.Response:
 def make() -> FastAPI:
     settings = get_settings()
     settings.imports.cooldown_seconds = 0
+    # Every flow signs in and coaches from 127.0.0.1 within minutes: the limits themselves are
+    # tested in tests/test_rate_limits.py.
+    settings.rate_limits.logins_per_minute = 10_000
+    settings.rate_limits.coach_per_minute = 10_000
+    settings.rate_limits.exports_per_day = 10_000
+    settings.rate_limits.checkouts_per_minute = 10_000
     # The scripted engine reports full depth at once: searches only need their minimum time.
     engine = settings.engine
     for tier, ms in ((engine.scan, 10), (engine.verify, 20), (engine.deep, 20)):

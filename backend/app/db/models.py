@@ -163,6 +163,18 @@ class EmailPreferenceRow(Base):
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)
 
 
+class RateLimitRow(Base):
+    """One fixed window of one limit (SPEC_V4 §12.2): `key` names the limit and who it counts
+    (e.g. "login:203.0.113.9", "coach:<user id>"). Kept in the database so limits survive restarts
+    and staging and production don't share them (app/limits.py)."""
+
+    __tablename__ = "rate_limits"
+
+    key: Mapped[str] = mapped_column(String(160), primary_key=True)
+    window_start: Mapped[datetime] = mapped_column(UtcDateTime(), primary_key=True, index=True)
+    count: Mapped[int] = mapped_column(Integer)
+
+
 class Invite(Base):
     """A one-time login link (SPEC_V2 §4.1). Only the token's hash is stored."""
 

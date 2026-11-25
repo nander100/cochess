@@ -2,7 +2,7 @@
 review table. Nothing is stored here: games are added through the usual upload or assessment
 routes, which parse and check them again."""
 
-import time
+import math
 from datetime import UTC, date, datetime
 from typing import Annotated, cast
 
@@ -24,6 +24,7 @@ from app.db.models import Game, UserSettingsRow
 from app.db.user_settings import usernames_for
 from app.importers.base import PLATFORM_NAME, ImportedGame, ImportFailure, ImportQuery
 from app.importers.service import fetch_games
+from app.limits import check
 
 router = APIRouter(prefix="/api/import", tags=["import"])
 
@@ -114,7 +115,7 @@ def latest_game(
     if not linked:
         detail = "Add your Chess.com or Lichess username on your profile first."
         raise HTTPException(status.HTTP_409_CONFLICT, detail=detail)
-    _cool_down(request, user.id, settings)
+    _cool_down(session, user.id, settings)
     transport = getattr(request.app.state, "import_transport", None)
     found: list[ImportedGame] = []
     failures: list[ImportFailure] = []
@@ -174,7 +175,7 @@ def fetch_recent(
     """The player's username on `platform` and their latest games there, after the cooldown.
     Platform failures become HTTP errors with a message the player can act on."""
     username = _username(session, user_id, platform)
-    _cool_down(request, user_id, settings)
+    _cool_down(session, user_id, settings)
     query = ImportQuery(username, max_games, category, since)
     transport = getattr(request.app.state, "import_transport", None)  # tests fake the platforms
     try:
@@ -194,15 +195,14 @@ def _username(session: Session, user_id: str, platform: Platform) -> str:
     return name
 
 
-def _cool_down(request: Request, user_id: str, settings: Settings) -> None:
-    """One import per player every few seconds, so the platforms aren't asked too often."""
-    last: dict[str, float] = request.app.state.__dict__.setdefault("import_times", {})
-    now = time.monotonic()
-    wait = settings.imports.cooldown_seconds - (now - last.get(user_id, -1e9))
-    if wait > 0:
-        detail = f"Please wait {int(wait) + 1} seconds before importing again."
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail=detail)
-    last[user_id] = now
+def _cool_down(session: Session, user_id: str, settings: Settings) -> None:
+    """One import per player every few seconds, so the platforms aren't asked too often (kept in
+    the database, SPEC_V4 §12.2)."""
+    seconds = math.ceil(settings.imports.cooldown_seconds)
+    if seconds > 0:
+        check(
+            session, f"import:{user_id}", 1, seconds, "Please wait {wait} before importing again."
+        )
 
 
 def _known(session: Session, user_id: str, platform: Platform) -> tuple[set[str], set[str]]:

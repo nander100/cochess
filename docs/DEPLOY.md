@@ -385,6 +385,72 @@ Then log in and open a game, the dashboard and the profile.
 
 **After the move:** RDS backs up daily and keeps 14 days, and can restore to any minute in that window (RDS → the database → *Actions* → *Restore to point in time*). Before each update, also take a manual snapshot (*Actions* → *Take snapshot*). The SQLite backup commands above no longer apply.
 
+## Production for v4 (M8)
+
+The order that works: the domain, then RDS (above), then staging, then monitoring, then the restore drill. Every later release goes to staging first.
+
+### Your domain
+
+1. Buy a domain (any registrar; Route 53 is fine). In its DNS, add **A records** for `cochess.example.com` (or the bare domain) and `staging.cochess.example.com`, both pointing at the server's Elastic IP.
+2. Copy `deploy/Caddyfile.example` to `/etc/caddy/Caddyfile`, replace `cochess.example.com` with your domain, then `sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy`. Caddy gets the certificates; the old `sslip.io` address redirects to the domain.
+3. Set `PUBLIC_BASE_URL=https://<your domain>` in `backend/.env`.
+4. **Google:** in your OAuth client, add `https://<your domain>/api/auth/google/callback` as a redirect URI, and the domain, terms and privacy pages on the consent screen. Make a **second OAuth client** for staging with `https://staging.<your domain>/api/auth/google/callback`.
+5. **SES:** verify the domain (*Account email* above) and request production access.
+6. **Stripe:** add the webhook endpoint `https://<your domain>/api/billing/webhook` (and one for staging in test mode), each with its own `STRIPE__WEBHOOK_SECRET`.
+7. In both env files: `RATE_LIMITS__PROXY_HOPS=2` (Caddy and nginx sit in front of the backend; the rate limits read the player's address from behind them).
+
+### Staging
+
+Staging is a second Compose project on the same server: its own containers, volume, port (`8081`), log group and database (a `cochess_staging` database on the same RDS instance), with Stripe in test mode and its own Google client.
+
+1. Create the staging database once: `docker run --rm -it postgres:17 psql "postgresql://cochess:<password>@<endpoint>:5432/cochess?sslmode=require" -c "create database cochess_staging"`.
+2. `cp backend/.env backend/.env.staging` and change in it: `PUBLIC_BASE_URL=https://staging.<your domain>`, the staging Google client, Stripe **test** keys and the staging webhook secret, `EMAIL__ALLOW_LIST=["you@example.com"]`, and a different `EMAIL__LINK_SECRET`.
+3. Create `~/cochess/.env.staging` (next to `docker-compose.yml`, `chmod 600`):
+
+   ```bash
+   BACKEND_ENV_FILE=./backend/.env.staging
+   COCHESS_PORT=127.0.0.1:8081
+   COCHESS_ENV=staging
+   DATABASE_URL=postgresql+psycopg://cochess:<password>@<endpoint>:5432/cochess_staging?sslmode=require
+   ```
+
+4. Start it: `docker compose --env-file .env.staging -p cochess-staging -f docker-compose.yml -f deploy/docker-compose.aws.yml up -d --build`.
+
+Check it end to end on `https://staging.<your domain>`: join the waitlist with Google, accept yourself from the owner dashboard (`set-role` first, against staging: `docker compose -p cochess-staging exec backend uv run --no-dev python -m app.cli set-role --user you@example.com --role owner`), pay with a Stripe test card, analyze a game, ask the coach.
+
+### Monitoring
+
+1. **Give the server permission** (IAM → *Roles* → the instance's role, or create one and attach it under EC2 → *Actions* → *Security* → *Modify IAM role*): attach `CloudWatchAgentServerPolicy` (logs and metrics).
+2. **Logs:** start both projects with `-f deploy/docker-compose.aws.yml` (production: `docker compose -f docker-compose.yml -f deploy/docker-compose.aws.yml up -d --build`). Logs land in CloudWatch Logs under `/cochess/production/backend` and `/cochess/staging/backend`, as JSON lines with a request id; addresses, keys and tokens are blanked before they're written. Set each log group's retention to **30 days** (CloudWatch → *Log groups* → *Actions* → *Edit retention*).
+3. **Metrics:** `crontab -e` on the server and add
+
+   ```cron
+   * * * * * COCHESS_ENV=production /home/ubuntu/cochess/deploy/monitor.sh
+   * * * * * COCHESS_ENV=staging HEALTH_URL=http://127.0.0.1:8081/api/health COMPOSE_PROJECT=cochess-staging /home/ubuntu/cochess/deploy/monitor.sh
+   ```
+
+   Every minute: whether `/api/health` answers and how full the disk is; every hour: the last 24 hours of API spend.
+4. **Alarms**, from your own computer with the AWS CLI (or CloudShell): `deploy/alarms.sh you@example.com`, then `COCHESS_ENV=staging deploy/alarms.sh you@example.com`. Confirm the subscription email. It sets: health failing for 3 minutes (or not reported), disk above 80%, 5 backend errors in 5 minutes, 3 Anthropic errors in 5 minutes, any payment error, API spend above `SPEND_LIMIT_USD` (default $5) in 24 hours, and a monthly AWS budget (`BUDGET_USD`, default $30, emailed at 80%).
+5. **Prove one fires:** `docker compose -p cochess-staging stop backend`, wait 4 minutes for the *health-failing* email, then `docker compose -p cochess-staging start backend` and wait for the *OK* email.
+
+`/api/health` answers 200 only when the database answers and its migrations are at the code's version; anything else is a 503 saying which.
+
+### Releasing
+
+1. `git pull`, then staging: `docker compose --env-file .env.staging -p cochess-staging -f docker-compose.yml -f deploy/docker-compose.aws.yml up -d --build`; check it.
+2. Snapshot production's database: `DB_INSTANCE=cochess deploy/snapshot.sh` (waits until it's ready).
+3. Production: `docker compose -f docker-compose.yml -f deploy/docker-compose.aws.yml up -d --build`. Migrations run at start; `curl -fsS http://127.0.0.1:8080/api/health` should print `"ok":true`.
+4. If the terms changed: `docker compose exec backend uv run --no-dev python -m app.cli notify-terms`.
+
+### Restore drill
+
+Do this once for the M8 checkpoint and every few months after. Nothing touches production.
+
+1. From your computer: `DB_INSTANCE=cochess deploy/restore-drill.sh`. It restores production as of a few minutes ago into a new instance `cochess-restore-drill` (10 to 20 minutes) and prints its endpoint.
+2. Point staging at it: in `~/cochess/.env.staging`, set `DATABASE_URL=postgresql+psycopg://cochess:<password>@<drill endpoint>:5432/cochess?sslmode=require` and restart staging (step 1 of *Releasing*).
+3. Check: `curl -fsS http://127.0.0.1:8081/api/health`, sign in to staging, open a game and the owner dashboard: production's players and games should be there as of the restore time.
+4. Put staging's `DATABASE_URL` back, restart staging, then `DB_INSTANCE=cochess deploy/restore-drill.sh --delete`.
+
 ## Pausing it, and stopping the bill
 
 - **Stop** the instance (EC2 → Instances → select it → *Instance state* → *Stop*) to pause it: compute charges stop, but the disk (about $1.60/month for 20 GB) and the Elastic IP (about $3.60/month) still cost. *Start* brings it back with the same address and data.

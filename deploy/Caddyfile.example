@@ -1,0 +1,20 @@
+# /etc/caddy/Caddyfile on the EC2 server (docs/DEPLOY.md, "Your domain" and "Staging").
+# Replace cochess.example.com with your domain. Caddy gets and renews the HTTPS certificates.
+# Check before reloading: sudo caddy validate --config /etc/caddy/Caddyfile
+
+# Production: the main Compose project (COCHESS_PORT=127.0.0.1:8080).
+cochess.example.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8080
+}
+
+# Staging: the cochess-staging Compose project (COCHESS_PORT=127.0.0.1:8081), test mode everywhere.
+staging.cochess.example.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8081
+}
+
+# The old address keeps working for anyone with a bookmark: it sends them to the domain.
+3-15-12-174.sslip.io {
+	redir https://cochess.example.com{uri} permanent
+}

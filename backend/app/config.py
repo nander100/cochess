@@ -221,13 +221,24 @@ class OnboardingSettings(BaseModel):
     rapid_below_s: int = 1500
 
 
+class RateLimits(BaseModel):
+    """Limits kept in the database (SPEC_V4 §12.2, app/limits.py). Per address: sign-in attempts;
+    per player: coach calls, data exports and checkouts. The import cooldown is
+    IMPORTS__COOLDOWN_SECONDS."""
+
+    logins_per_minute: int = 10  # login links, Google sign-in and sign-up, per address
+    coach_per_minute: int = 20  # per player, metered or not
+    exports_per_day: int = 5  # per player
+    checkouts_per_minute: int = 5  # per player
+    # How many proxies in front of the backend add to X-Forwarded-For (production: Caddy and
+    # nginx, 2). 0 trusts no header: the address is the connection's.
+    proxy_hops: int = 0
+
+
 class Limits(BaseModel):
     """Input size limits for user-submitted data."""
 
     max_pgn_chars: int = 100_000
-    # A player's data export (SPEC_V4 §11) builds a zip of everything: at most one per this many
-    # seconds, per player (kept in the process; M8 moves limits into the database).
-    export_cooldown_seconds: float = 300
     max_plies: int = 600
     # New single-game uploads per player per rolling 24 hours (PLAN_V2 §6 Q8). Onboarding games
     # don't count.
@@ -430,6 +441,8 @@ class Settings(BaseSettings):
     # COACH_ROUTES__STANDARD__SYNOPSIS=claude-haiku-5-5. Every model needs a price.
     coach_routes: dict[CoachTier, dict[CoachTask, str]] = {}
     database_url: str = "sqlite:///./cochess.db"
+    # JSON log lines with request ids (production, read by CloudWatch); plain text otherwise.
+    log_json: bool = False
     # Where players open CoChess; invite links are built from it.
     public_base_url: str = "http://localhost:5173"
 
@@ -445,6 +458,7 @@ class Settings(BaseSettings):
     detectors: DetectorSettings = DetectorSettings()
     coach: CoachSettings = CoachSettings()
     limits: Limits = Limits()
+    rate_limits: RateLimits = RateLimits()
     moments: MomentSettings = MomentSettings()
     playback: PlaybackSettings = PlaybackSettings()
     puzzles: PuzzleSettings = PuzzleSettings()

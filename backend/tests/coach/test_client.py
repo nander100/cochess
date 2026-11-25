@@ -83,7 +83,9 @@ async def test_sends_effort_and_cached_system_and_joins_the_text(
     assert (reply.usage.cache_read_tokens, reply.usage.cache_write_tokens) == (1100, 0)
 
 
-async def test_api_errors_become_a_friendly_error(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_api_errors_become_a_friendly_error(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     client = AnthropicCoachClient(api_key="test-key")
     request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
 
@@ -94,3 +96,9 @@ async def test_api_errors_become_a_friendly_error(monkeypatch: pytest.MonkeyPatc
 
     with pytest.raises(CoachUnavailableError, match="unavailable right now"):
         await client.complete(REQUEST)
+
+    # The fixed message the "Anthropic errors" alarm counts (deploy/alarms.sh); never the key.
+    [record] = [r for r in caplog.records if r.name == "app.coach"]
+    assert record.levelname == "ERROR"
+    assert record.getMessage().startswith("anthropic request failed: APIConnectionError")
+    assert "test-key" not in record.getMessage()
