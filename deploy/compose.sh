@@ -20,7 +20,9 @@ case "$environment" in
   *) echo "unknown environment '$environment': production or staging" >&2; exit 2 ;;
 esac
 if [ ! -f "$env_file" ]; then
-  echo "missing $env_file (docs/DEPLOY.md)" >&2
+  echo "missing $(pwd)/$env_file: it holds LITESTREAM_BUCKET and AWS_REGION (docs/DEPLOY.md," >&2
+  echo "Backups). Until the S3 bucket and the instance role are set up, use plain" >&2
+  echo "'docker compose up -d --build' instead." >&2
   exit 2
 fi
 
