@@ -140,6 +140,15 @@ class Problems:
             self.invalid or self.bare or self.runs or self.misnumbered or self.leaked or self.evals
         )
 
+    def kinds(self) -> list[str]:
+        """What kinds of rule were broken, without the moves: safe to log (M6: a regeneration
+        doubles a call's cost, so its causes are worth counting)."""
+        found = {
+            "invalid": self.invalid, "bare": self.bare, "runs": self.runs,
+            "misnumbered": self.misnumbered, "leaked": self.leaked, "evals": self.evals,
+        }  # fmt: skip
+        return [name for name, value in found.items() if value]
+
 
 @dataclass(frozen=True)
 class Processed:

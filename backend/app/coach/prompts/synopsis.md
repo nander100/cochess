@@ -2,6 +2,8 @@
 
 Write the player's game synopsis in markdown, with these five short sections as level-3 headings. Length is a hard limit: **at most 300 words in total**, headings included. If you are over, cut. For a beginner, cover at most 2 key moments. Short, specific sentences beat complete coverage: the player can ask about anything else in the chat.
 
+There is no board position in a synopsis: no board tags. Show moves with move tags and lines with line links. A key moment's `engine_lines` and `line_after_san` start from the position before that moment's move: number their moves from there.
+
 ### Overall
 2–3 sentences: the story of the game in plain words (who had the initiative, where it turned, how it ended), the way you'd sum it up to the player over the board.
 

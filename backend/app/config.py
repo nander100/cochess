@@ -89,6 +89,16 @@ class CoachSettings(BaseModel):
 
     synopsis_max_tokens: int = 8000
     synopsis_effort: Effort = "low"
+    # Tasks whose system prompt isn't cached (SPEC_V4 §9, M6). The cache is shared by every
+    # player's calls with the same prompt: a write costs 1.25 times the input price and a read
+    # 0.1 times, so caching pays once over about 28% of a task's calls land within 5 minutes of
+    # another. With a handful of players a synopsis rarely does (1 in 8 on the server in
+    # November 2026); with more players it will. The dashboard shows the hit rate.
+    uncached_tasks: frozenset[str] = frozenset()
+
+    def caches(self, task: str) -> bool:
+        return task not in self.uncached_tasks
+
     # The prompt asks for <= 300 words; past this ceiling the backend logs a warning.
     synopsis_max_words: int = 350
     # The baseline report after onboarding (SPEC_V2 §10.4): asks for 400-600 words.
@@ -407,6 +417,9 @@ class Settings(BaseSettings):
     coach_model_deep: str = "claude-opus-5-5"
     # Set per request from the player's coach strength (api/credits.py); not an env setting.
     coach_tier: CoachTier = "standard"
+    # Per strength and task, a model other than the default (SPEC_V4 §9 model routing), e.g.
+    # COACH_ROUTES__STANDARD__SYNOPSIS=claude-haiku-5-5. Every model needs a price.
+    coach_routes: dict[CoachTier, dict[CoachTask, str]] = {}
     database_url: str = "sqlite:///./cochess.db"
     # Where players open CoChess; invite links are built from it.
     public_base_url: str = "http://localhost:5173"
@@ -433,11 +446,9 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _every_coach_model_is_priced(self) -> "Settings":
         """An unpriced model would be a free call (SPEC_V4 §5.1): refuse to start instead."""
-        missing = {
-            model
-            for model in (self.coach_model_synopsis, self.coach_model_chat, self.coach_model_deep)
-            if model not in self.pricing.models
-        }
+        routed = [model for tasks in self.coach_routes.values() for model in tasks.values()]
+        defaults = (self.coach_model_synopsis, self.coach_model_chat, self.coach_model_deep)
+        missing = {model for model in (*defaults, *routed) if model not in self.pricing.models}
         if missing:
             raise ValueError(f"no price for coach model(s) {sorted(missing)}: add them to PRICING")
         return self
@@ -446,6 +457,9 @@ class Settings(BaseSettings):
         """The model for a coach task at this request's tier (SPEC_V4 §7). Standard: Sonnet writes
         the synopsis and baseline report, Haiku the rest. Deep (option c): Opus writes, Sonnet
         talks (chat, explain), Haiku keeps moments and walkthroughs."""
+        routed = self.coach_routes.get(self.coach_tier, {}).get(task)
+        if routed is not None:
+            return routed
         writes = task in ("synopsis", "baseline_report")
         if self.coach_tier == "deep":
             if writes:

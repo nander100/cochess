@@ -71,7 +71,7 @@ async def generate_synopsis(
     ]
     request = CoachRequest(
         model=settings.coach_model("synopsis"),
-        system=system_blocks("synopsis"),
+        system=system_blocks("synopsis", cache=settings.coach.caches("synopsis")),
         messages=messages,
         max_tokens=settings.coach.synopsis_max_tokens,
         effort=settings.coach.synopsis_effort,
@@ -86,6 +86,8 @@ async def generate_synopsis(
     reply = await _call(client, request, sessions, game_id, settings=settings)
     done = process(reply.text, rules)
     if done.problems.any:
+        kinds = ",".join(done.problems.kinds())
+        logger.info("synopsis regenerated: game=%s problems=%s", game_id, kinds)
         retry: list[MessageParam] = [
             *messages,
             {"role": "assistant", "content": reply.text},

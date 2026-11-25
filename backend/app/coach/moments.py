@@ -360,7 +360,7 @@ async def answer(
     ]
     request = CoachRequest(
         model=settings.coach_model(call.task),
-        system=system_blocks(call.task, call.context_block),
+        system=system_blocks(call.task, call.context_block, cache=settings.coach.caches(call.task)),
         messages=messages,
         max_tokens=settings.coach.chat_max_tokens,
         effort=settings.coach.chat_effort,

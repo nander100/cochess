@@ -149,7 +149,7 @@ async def generate_baseline(
     messages: list[MessageParam] = [{"role": "user", "content": render(payload, INSTRUCTION)}]
     request = CoachRequest(
         model=settings.coach_model("baseline_report"),
-        system=system_blocks("baseline_report"),
+        system=system_blocks("baseline_report", cache=settings.coach.caches("baseline_report")),
         messages=messages,
         max_tokens=settings.coach.baseline_max_tokens,
         effort=settings.coach.baseline_effort,

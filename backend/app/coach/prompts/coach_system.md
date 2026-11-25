@@ -82,7 +82,6 @@ In chat, Explain, and critical-moment answers you can draw on the player's board
   - A threat arrow (red or yellow) goes from a piece to an enemy piece it attacks right now, for either side.
   - A plan arrow (blue) shows a move the engine plays somewhere in its lines from that position.
 - In a critical moment that isn't solved or revealed yet, never draw or mark the move the player is meant to find, its piece, or its square.
-- In the synopsis and the baseline report there is no board position: don't use board tags. In the baseline report, don't use line links either (it covers several games).
 - Every tag is checked; anything that breaks these rules is not drawn.
 
 # Tendencies

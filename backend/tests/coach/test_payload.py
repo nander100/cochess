@@ -141,7 +141,9 @@ def test_each_task_gets_only_its_own_instructions() -> None:
 
     for prompt in (synopsis, chat):
         assert "Never calculate, guess, or propose moves yourself" in prompt
-        assert "The `position` object is what the player sees on the board" in prompt
+    # The synopsis has no board: the position rules go only to tasks on a board (M6).
+    assert "The `position` object is what the player sees on the board" in chat
+    assert "The `position` object is what the player sees on the board" not in synopsis
     assert "### Your turn" in synopsis
     assert "candidate_moves_san" in chat
     assert "Where things stand" in explain and "Never calculate" not in explain
@@ -199,7 +201,7 @@ def _report(themes: int) -> TendencyReport:
     )
 
 
-def test_the_coach_gets_the_top_tendencies_without_their_scores() -> None:
+def test_the_coach_gets_the_top_tendencies_without_scores_or_game_ids() -> None:
     player = with_tendencies(player_payload(opera_summary()), _report(7), TendencySettings())
 
     assert [t.theme for t in player.tendencies] == [
@@ -212,7 +214,7 @@ def test_the_coach_gets_the_top_tendencies_without_their_scores() -> None:
         "trend": None,
         "games_seen": 3,
         "provisional": False,
-        "recent_example": {"game_id": "g", "move_number": 14, "move_san": "Nd4"},
+        "recent_example": {"move_number": 14, "move_san": "Nd4"},  # no game id (M6 cost)
     }
     assert player.accuracy_by_phase == {"opening": 90.0, "middlegame": 75.0, "endgame": None}
     assert player.accuracy_by_color == {"white": 82.0, "black": 78.0}
@@ -244,6 +246,6 @@ def test_in_a_moment_an_example_that_matches_the_answer_loses_its_move() -> None
 
     examples = [t.recent_example.model_dump() for t in scrubbed.tendencies]
     assert examples == [
-        {"game_id": "g", "move_number": 14, "move_san": "Nd4"},
-        {"game_id": "g", "move_number": None, "move_san": None},
+        {"move_number": 14, "move_san": "Nd4"},
+        {"move_number": None, "move_san": None},
     ]

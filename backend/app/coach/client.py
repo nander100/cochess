@@ -19,11 +19,35 @@ _PROMPTS = Path(__file__).parent / "prompts"
 _PROMPT_FILE: dict[str, str] = {"moment_intro": "moment", "moment_feedback": "moment"}
 
 
+# Shared sections a task never uses (SPEC_V4 §9, M6): the synopsis and the baseline report have
+# no board, so the board-tag rules and the position rules are dead weight there. Their own
+# prompt files say what they need of them ("no board tags").
+_SKIPPED_SECTIONS: dict[str, frozenset[str]] = {
+    "synopsis": frozenset({"Annotations", "Position awareness"}),
+    "baseline_report": frozenset({"Annotations", "Position awareness"}),
+}
+
+
 @cache
 def system_prompt(task: Task) -> str:
-    """The shared coaching rules plus only this task's instructions (fewer input tokens)."""
-    core = (_PROMPTS / "coach_system.md").read_text()
+    """The shared coaching rules this task uses, plus its own instructions (fewer input tokens)."""
+    core = shared_rules(_SKIPPED_SECTIONS.get(task, frozenset()))
     return f"{core}\n{task_instructions(task)}"
+
+
+@cache
+def shared_rules(skipped: frozenset[str]) -> str:
+    """coach_system.md without the `skipped` sections (top-level `# ` headings)."""
+    text = (_PROMPTS / "coach_system.md").read_text()
+    if not skipped:
+        return text
+    kept, keep = [], True
+    for line in text.splitlines(keepends=True):
+        if line.startswith("# "):
+            keep = line[2:].strip() not in skipped
+        if keep:
+            kept.append(line)
+    return "".join(kept)
 
 
 @cache
@@ -32,10 +56,13 @@ def task_instructions(task: Task) -> str:
     return (_PROMPTS / f"{_PROMPT_FILE.get(task, task)}.md").read_text()
 
 
-def system_blocks(task: Task, *extra: str) -> list[TextBlockParam]:
+def system_blocks(task: Task, *extra: str, cache: bool = True) -> list[TextBlockParam]:
     """The task's system prompt plus any extra blocks (the game context), each its own cache
     breakpoint (PLAN_V2 §6 Q11): the prompt is shared by every game's calls for this task, the
-    game context by every call about this game."""
+    game context by every call about this game. `cache=False` for one-shot tasks, where a cache
+    write (1.25 times the input price) is rarely read back (CoachSettings.uncached_tasks)."""
+    if not cache:
+        return [{"type": "text", "text": text} for text in (system_prompt(task), *extra)]
     return [
         {"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}
         for text in (system_prompt(task), *extra)

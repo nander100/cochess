@@ -12,7 +12,7 @@ from app.analysis.move_facts import StepFacts
 from app.analysis.pgn import Position
 from app.analysis.phase import Phase
 from app.analysis.summary_models import Counts, GameSummary, KeyMoment, LineSummary, MoveLabel
-from app.analysis.tendencies import Example, TendencyReport, Trend
+from app.analysis.tendencies import TendencyReport, Trend
 from app.config import CoachSettings, TendencySettings
 
 RatingBand = Literal["beginner", "intermediate", "advanced"]
@@ -50,6 +50,14 @@ SYNOPSIS_INSTRUCTION = (
 )
 
 
+class CoachExample(BaseModel):
+    """A tendency's latest example as the coach sees it: the move, not the game's id (the coach
+    never uses it, and every coached call carried five of them; M6)."""
+
+    move_number: int | None
+    move_san: str | None
+
+
 class PlayerTendency(BaseModel):
     """SPEC_V2 §9.3. `recent_example`'s move counts as an allowed move for validation."""
 
@@ -59,7 +67,7 @@ class PlayerTendency(BaseModel):
     trend: Trend | None
     games_seen: int
     provisional: bool
-    recent_example: Example
+    recent_example: CoachExample
 
 
 class PlayerPayload(BaseModel):

@@ -210,7 +210,7 @@ async def generate(
     messages: list[MessageParam] = [{"role": "user", "content": render(call.payload, INSTRUCTION)}]
     request = CoachRequest(
         model=settings.coach_model("walkthrough"),
-        system=system_blocks("walkthrough"),
+        system=system_blocks("walkthrough", cache=settings.coach.caches("walkthrough")),
         messages=messages,
         max_tokens=settings.coach.walkthrough_max_tokens,
         effort=settings.coach.walkthrough_effort,

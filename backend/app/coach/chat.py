@@ -274,7 +274,7 @@ def _request(
     return CoachRequest(
         model=settings.coach_model(task),
         # Chat and Explain share one system prompt so they share the cached prefix.
-        system=system_blocks("chat", context.context_block),
+        system=system_blocks("chat", context.context_block, cache=settings.coach.caches("chat")),
         messages=history_breakpoint(messages),
         max_tokens=settings.coach.chat_max_tokens,
         effort=settings.coach.chat_effort,

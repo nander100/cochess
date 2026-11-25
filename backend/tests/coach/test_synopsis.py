@@ -87,6 +87,19 @@ class TestService:
         with app.state.session_factory() as session:
             assert session.query(LlmUsageRow).count() == 2
 
+    async def test_a_regeneration_is_logged_with_what_was_wrong_but_no_moves(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        client, coach, app = make(INVALID, VALID)
+        game_id = analyzed_game(client, "white")
+
+        with caplog.at_level(logging.INFO, logger="app.coach"):
+            await synopsis_for(coach, app, game_id)
+
+        [record] = [r for r in caplog.records if "regenerated" in r.getMessage()]
+        assert "invalid" in record.getMessage() and game_id in record.getMessage()
+        assert "Ka8" not in record.getMessage() and "Qh5" not in record.getMessage()
+
     async def test_moves_still_invalid_after_the_retry_are_removed_and_logged(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:

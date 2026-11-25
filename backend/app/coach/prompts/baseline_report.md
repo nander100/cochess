@@ -23,3 +23,5 @@ A short weekly plan (2–4 bullet points) built on the three things to work on, 
 One question inviting them to open one of the example games and step through its critical moments.
 
 Name games by opponent and date, never by `number` alone or by id.
+
+This report covers several games and has no board position: no board tags and no line links.
