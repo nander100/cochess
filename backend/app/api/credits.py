@@ -2,7 +2,7 @@
 coach strength for the call, and GET /api/billing for the credits UI."""
 
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, cast
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
@@ -12,8 +12,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_app_settings, get_session
 from app.auth.deps import CurrentUser
 from app.billing.ledger import balance, expire_due_allowance, history
+from app.billing.notices import last_grant
 from app.config import CoachTier, Settings
-from app.db.models import CreditLedgerRow, LlmUsageRow, User, UserSettingsRow
+from app.db.models import LlmUsageRow, User, UserSettingsRow
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 
@@ -107,7 +108,7 @@ def read_billing(
     _expire_due(session, user)
     per_credit = settings.credits.microusd_per_credit
     now = balance(session, user.id)
-    reference = _last_top_up(session, user.id) or settings.credits.trial_credits * per_credit
+    reference = last_grant(session, user.id, settings).microusd
     return Billing(
         credits=round(now.total / per_credit, 2),
         allowance_credits=round(max(now.allowance, 0) / per_credit, 2),
@@ -150,17 +151,3 @@ def _expire_due(session: Session, user: User) -> None:
     """Allowances whose period has ended are removed when next looked at (SPEC_V4 §5.2)."""
     expire_due_allowance(session, user, datetime.now(UTC))
     session.commit()
-
-
-def _last_top_up(session: Session, user_id: str) -> int | None:
-    """The latest allowance, top-up or trial: what "running low" is measured against."""
-    query = (
-        select(CreditLedgerRow.delta_microusd)
-        .where(
-            CreditLedgerRow.user_id == user_id,
-            CreditLedgerRow.kind.in_(("allowance", "trial", "top_up")),
-        )
-        .order_by(CreditLedgerRow.created_at.desc(), CreditLedgerRow.id.desc())
-        .limit(1)
-    )
-    return cast(int | None, session.scalar(query))

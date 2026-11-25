@@ -67,6 +67,8 @@ export const PROFILE: Profile = {
   google_connected: false,
   waitlisted_at: null,
   age_band: null,
+  terms_version: '2026-11-draft',
+  terms_accepted: true,
 }
 
 export const SYNOPSIS_TEXT = '### Overall\nA tidy game.\n\n### Your turn\nWhat would you try on move 2?'
@@ -326,6 +328,19 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     streamBaselineReport: vi.fn(coachSays(REPORT_TEXT)),
     baselineReport: vi.fn(async () => null),
     owner: fakeOwnerApi(),
+    account: {
+      legal: vi.fn(async (kind: 'terms' | 'privacy') => ({
+        kind,
+        version: '2026-11-draft',
+        markdown: kind === 'terms' ? '# Terms of Service\n\nPlay fair.' : '# Privacy Policy\n\nYour data is yours.',
+      })),
+      acceptTerms: vi.fn(async () => {}),
+      exportData: vi.fn(async () => ({ filename: 'cochess-export-2026-11-24.zip', blob: new Blob(['zip']) })),
+      deleteAccount: vi.fn(async () => {}),
+      emailPreferences: vi.fn(async () => ({ credits_balance: true, credits_added: true })),
+      updateEmailPreferences: vi.fn(async (change) => ({ credits_balance: true, credits_added: true, ...change })),
+      unsubscribe: vi.fn(async () => ({ group: 'credits_balance' as const })),
+    },
     ...overrides,
   }
 }

@@ -29,6 +29,8 @@ PUBLIC = {
     ("POST", "/api/billing/webhook"),
     # The terms and privacy texts (SPEC_V4 §11) are read before anyone signs up.
     ("GET", "/api/legal/{kind}"),
+    # One-click unsubscribe (SPEC_V4 §12.4): the signed token in the link is the check.
+    ("POST", "/api/email/unsubscribe"),
 }
 
 

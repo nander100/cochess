@@ -8,6 +8,7 @@ kind, the user and the status, never the address or the body.
 """
 
 import logging
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from email.message import EmailMessage
@@ -19,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.db.models import EmailOutboxRow, User
+from app.email.preferences import GROUP_OF, is_enabled, unsubscribe_token
 from app.email.templates import TEXTS, escape, to_html
 
 log = logging.getLogger("app.email")
@@ -27,7 +29,7 @@ log = logging.getLogger("app.email")
 @dataclass(frozen=True)
 class EmailKind:
     subject: str
-    can_turn_off: bool = False  # SPEC_V4 §12.4: only the credit emails can be turned off (M7)
+    can_turn_off: bool = False  # SPEC_V4 §12.4: only the credit emails can be turned off
 
 
 EMAILS: dict[str, EmailKind] = {
@@ -36,6 +38,10 @@ EMAILS: dict[str, EmailKind] = {
     "access_paused": EmailKind("Your CoChess access is paused"),
     "access_restored": EmailKind("Your CoChess access is back"),
     "terms_updated": EmailKind("We've updated the CoChess terms"),
+    "account_deleted": EmailKind("Your CoChess account has been deleted"),
+    "credits_low": EmailKind("You're running low on CoChess credits", can_turn_off=True),
+    "credits_out": EmailKind("You're out of CoChess credits", can_turn_off=True),
+    "credits_added": EmailKind("Coaching credits were added to your account", can_turn_off=True),
 }
 
 
@@ -83,6 +89,22 @@ def queue_email(
     )
 
 
+def queue_farewell(session: Session, address: str, name: str, now: datetime) -> None:
+    """The account_deleted email (SPEC_V4 §11), for an account that's about to be gone: it carries
+    its own address and name, both wiped once the row is finished (`_finish`)."""
+    session.add(
+        EmailOutboxRow(
+            user_id=None,
+            kind="account_deleted",
+            dedupe_key=f"account_deleted:{uuid.uuid4()}",
+            details={"name": name},
+            to_address=address,
+            next_attempt_at=now,
+            created_at=now,
+        )
+    )
+
+
 def send_pending(
     session: Session, settings: Settings, transport: MailTransport, now: datetime
 ) -> SendReport:
@@ -96,6 +118,8 @@ def send_pending(
     counts = {"sent": 0, "skipped": 0, "retrying": 0, "failed": 0}
     for row in rows:
         outcome = _send_one(session, settings, transport, row, now)
+        if outcome != "retrying" and row.to_address is not None:
+            row.to_address, row.details = None, {}  # a deleted account's address and name go
         counts[outcome] += 1
         session.commit()
         log.info("email %s (row %s) for user %s: %s", row.kind, row.id, row.user_id, outcome)
@@ -110,18 +134,21 @@ def _send_one(
     now: datetime,
 ) -> str:
     user = session.get(User, row.user_id) if row.user_id else None
-    address = user.email if user is not None else None
+    address = user.email if user is not None else row.to_address
+    name = user.name if user is not None else row.details.get("name", "")
     allowed = {entry.casefold() for entry in settings.email.allow_list}
     if (
         not settings.email.enabled
-        or user is None
         or not address
+        or (user is None and row.to_address is None)
         or (allowed and address.casefold() not in allowed)
-    ):
+        or (user is not None and EMAILS[row.kind].can_turn_off
+            and not is_enabled(session, user.id, row.kind))
+    ):  # fmt: skip
         row.status = "skipped"
         return "skipped"
     try:
-        transport.send(compose(row, user, address, settings))
+        transport.send(compose(row, name, address, settings))
     except Exception as error:  # any transport failure: retry later, never lose the row
         row.attempts += 1
         row.last_error = type(error).__name__[:200]  # the message may hold the address
@@ -136,12 +163,14 @@ def _send_one(
     return "sent"
 
 
-def compose(row: EmailOutboxRow, user: User, address: str, settings: Settings) -> EmailMessage:
+def compose(row: EmailOutboxRow, name: str, address: str, settings: Settings) -> EmailMessage:
     kind = EMAILS[row.kind]
+    app_url = settings.public_base_url.rstrip("/")
     values = {
-        "name": user.name,
-        "app_url": settings.public_base_url.rstrip("/"),
+        "name": name,
+        "app_url": app_url,
         "note": row.details.get("note", ""),
+        "credits": row.details.get("credits", ""),
     }
     message = EmailMessage()
     message["From"] = settings.email.from_address
@@ -149,7 +178,15 @@ def compose(row: EmailOutboxRow, user: User, address: str, settings: Settings) -
     if settings.email.reply_to:
         message["Reply-To"] = settings.email.reply_to
     message["Subject"] = kind.subject
-    template = Template(TEXTS[row.kind])
+    text = TEXTS[row.kind]
+    if kind.can_turn_off and row.user_id:
+        # One-click unsubscribe (SPEC_V4 §12.4): a link in the text, and RFC 8058 headers so
+        # mail apps can offer their own button.
+        token = unsubscribe_token(settings.email, row.user_id, GROUP_OF[row.kind])
+        text += f"\nDon't want these emails? Turn them off: {app_url}/unsubscribe?token={token}\n"
+        message["List-Unsubscribe"] = f"<{app_url}/api/email/unsubscribe?token={token}>"
+        message["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+    template = Template(text)
     message.set_content(template.safe_substitute(values))
     escaped = {key: escape(value) for key, value in values.items()}
     message.add_alternative(

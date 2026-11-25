@@ -1,6 +1,6 @@
 import { type Page, expect, test } from '@playwright/test'
 import { playMove } from './board.ts'
-import { newLoginLink } from './login.ts'
+import { acceptTerms, newLoginLink } from './login.ts'
 import { HUNG_KNIGHT, rapidGame } from './flows/games.ts'
 import { TEST_RESULTS } from './paths.ts'
 
@@ -65,6 +65,9 @@ test('every page, light and dark, 1280 and 1920', async ({ page, browser }) => {
   await other.close()
 
   await page.getByRole('link', { name: 'Set up my profile' }).click()
+  await page.getByRole('heading', { name: /We've updated our terms/ }).waitFor()
+  await shoot(page, 'terms-updated')
+  await acceptTerms(page)
   await page.getByLabel(/rating/i).waitFor()
   await shoot(page, 'profile-first-time')
 

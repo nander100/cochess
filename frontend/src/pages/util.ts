@@ -19,3 +19,15 @@ export function gameDate(iso: string): string {
 export function formatCredits(credits: number): string {
   return Number.isInteger(credits) ? String(credits) : credits.toFixed(1)
 }
+
+const REVOKE_AFTER_MS = 1000
+
+/** Save `blob` as a download named `filename` (a PGN, the data export). */
+export function saveFile(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS) // some browsers read it after click()
+}

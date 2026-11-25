@@ -28,6 +28,7 @@ from app.coach.client import AnthropicCoachClient, CoachClient
 from app.config import Settings, get_settings
 from app.db.migrate import upgrade
 from app.db.session import make_engine
+from app.email import routes as email_routes
 from app.email.smtp import EmailSender, SmtpTransport
 from app.legal import routes as legal_routes
 
@@ -112,4 +113,5 @@ def create_app(
     app.include_router(admin_routes.router)
     app.include_router(legal_routes.router)
     app.include_router(account_routes.router)
+    app.include_router(email_routes.router)
     return app

@@ -38,11 +38,18 @@ export async function logInWithProfile(page: Page, link: string, elo: number): P
   await page.getByLabel(/your game/i).waitFor()
 }
 
+/** A player made with the CLI hasn't accepted the current terms: the app asks first (SPEC_V4 §11). */
+export async function acceptTerms(page: Page): Promise<void> {
+  await page.getByRole('heading', { name: /We've updated our terms/ }).waitFor()
+  await page.getByRole('button', { name: 'I agree' }).click()
+}
+
 /** Open the login link and fill in the profile; the player lands on the onboarding page. */
 export async function logIn(page: Page, link: string, elo: number): Promise<void> {
   const url = new URL(link)
   await page.goto(`${url.pathname}${url.hash}`)
   await page.getByRole('link', { name: 'Set up my profile' }).click()
+  await acceptTerms(page)
   await page.getByLabel(/rating/i).fill(String(elo))
   await page.getByLabel('Rapid', { exact: true }).check()
   // The profile form, not the online-accounts card (which has its own Save button).

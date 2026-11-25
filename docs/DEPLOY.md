@@ -310,7 +310,23 @@ docker compose exec backend uv run --no-dev python -m app.cli admit --user playe
 3. While the account is in the SES sandbox it can only send to verified addresses: verify your own email under *Identities* to test. Before launch, *Account dashboard* → **Request production access** (describe the account emails and that bounces go to SES's suppression list), and turn on the **account-level suppression list** for bounces and complaints.
 4. In `backend/.env`: `EMAIL__ENABLED=true`, `EMAIL__SMTP_HOST=email-smtp.<region>.amazonaws.com`, `EMAIL__SMTP_USERNAME`, `EMAIL__SMTP_PASSWORD`, `EMAIL__FROM_ADDRESS="CoChess <account@<your domain>>"`, optional `EMAIL__REPLY_TO`. On staging also `EMAIL__ALLOW_LIST=["you@example.com"]`. Then `docker compose up -d`.
 
+5. Set `EMAIL__LINK_SECRET` to a long random value (`openssl rand -hex 32`) and keep it: it signs the one-click unsubscribe links in the credit emails, and a new secret breaks the links in emails already sent.
+
 Sent, skipped and failed emails are in the `email_outbox` table (kind, player, status, attempts); the logs name the kind and player, never the address.
+
+## Terms, privacy, export and deletion (v4)
+
+**The texts.** `/terms` and `/privacy` show the Markdown files in `LEGAL__TEXTS_DIR` (default: the drafts in `backend/app/legal/texts/`, marked as drafts). Put your lawyer-reviewed `terms.md` and `privacy.md` in a folder on the server, mount it into the backend container (for example `- /srv/legal:/srv/legal:ro` under `volumes` in `docker-compose.yml`) and set `LEGAL__TEXTS_DIR=/srv/legal`.
+
+**Changing the terms.** Update the files, raise `LEGAL__TERMS_VERSION` (for example `2027-01-15`), `docker compose up -d`, then email everyone once:
+
+```bash
+docker compose exec backend uv run --no-dev python -m app.cli notify-terms
+```
+
+Every signed-in account is asked to accept the new version before it continues; acceptances are in the `terms_acceptances` table.
+
+**Export and deletion** are on each player's Profile page (and on the waitlist and paused pages). Deleting cancels any live subscription in Stripe first (if Stripe refuses, nothing is deleted), then removes the player's games, chats, reports, settings and sessions in one transaction. Coaching costs, credit history, payments and owner actions are kept without the player's id. The owner's own account can't be deleted from the app: make another account the owner first (`set-role`).
 
 ## Moving the database to Postgres (RDS)
 

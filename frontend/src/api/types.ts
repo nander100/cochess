@@ -98,6 +98,9 @@ export interface Profile {
   google_connected: boolean
   waitlisted_at: string | null
   age_band: '13_17' | '18_plus' | null
+  /** SPEC_V4 §11: the current terms version, and whether this account accepted it. */
+  terms_version: string
+  terms_accepted: boolean
 }
 
 /** The Google account waiting for the sign-up form (GET /api/auth/signup). */

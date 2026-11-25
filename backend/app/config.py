@@ -1,9 +1,10 @@
 """Application settings. Every threshold and engine setting lives here (SPEC §5.3, §6.1)."""
 
+import secrets
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -311,6 +312,9 @@ class EmailSettings(BaseModel):
     poll_seconds: float = 10
     batch_size: int = 20
     timeout_seconds: float = 20
+    # Signs the one-click unsubscribe links (SPEC_V4 §12.4). Set it in production: without it a
+    # random one is made at startup, and links in emails sent before a restart stop working.
+    link_secret: str = Field(default_factory=lambda: secrets.token_hex(32))
 
 
 class AuthSettings(BaseModel):

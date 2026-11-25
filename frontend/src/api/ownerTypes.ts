@@ -142,6 +142,7 @@ export interface OwnerApi {
   acceptMany(ids: string[]): Promise<BulkAccepted>
   suspend(id: string, body: SuspendRequest): Promise<PlayerDetail>
   restore(id: string): Promise<PlayerDetail>
-  changeCredits(id: string, credits: number, note: string): Promise<PlayerDetail>
+  /** Added credits are emailed to the player; `emailNote` puts the note in that email. */
+  changeCredits(id: string, credits: number, note: string, emailNote?: boolean): Promise<PlayerDetail>
   setMetering(id: string, unmetered: boolean): Promise<PlayerDetail>
 }

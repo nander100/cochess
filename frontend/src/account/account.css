@@ -1,0 +1,48 @@
+/* A player's own account (SPEC_V4 §11): the legal pages, the terms prompt, export and deletion.
+   Tokens only; the page frames come from the account layout (redeem-*). */
+
+.legal-document {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-inline-size: var(--lead-width-wide);
+  font: var(--text-body);
+}
+
+.legal-document h1 {
+  margin: 0 0 var(--space-2);
+  font: var(--text-title);
+  letter-spacing: var(--tracking-title);
+}
+
+.legal-document h2 {
+  margin: var(--space-4) 0 0;
+  font: var(--text-panel);
+}
+
+.legal-document p,
+.legal-document ul {
+  margin: 0;
+}
+
+.legal-document li + li {
+  margin-block-start: var(--space-1);
+}
+
+.legal-version {
+  color: var(--color-muted);
+  font: var(--text-small);
+}
+
+.terms-actions,
+.data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.terms-error,
+.data-error {
+  margin: 0;
+  color: var(--color-danger);
+}

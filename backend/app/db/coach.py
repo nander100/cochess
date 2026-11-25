@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.billing.ledger import charge_usage
+from app.billing.notices import notify_balance
 from app.billing.pricing import cost_microusd
 from app.coach.client import Usage
 from app.coach.markup import MessageTokens
@@ -50,6 +51,7 @@ def record_usage(
     owner = session.get(User, owner_id) if owner_id is not None else None
     if owner is not None and not owner.unmetered and row.cost_microusd:
         charge_usage(session, owner.id, row.id, row.cost_microusd, now)
+        notify_balance(session, owner, settings, now)  # low or out: an email, once per grant
     session.commit()
 
 

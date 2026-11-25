@@ -3,7 +3,7 @@ import { type ApiClient, isLoggedOut } from '../api/client'
 import type { Color, GameDetail } from '../api/types'
 import { Button, useToast } from '../ui'
 import './GameOptions.css'
-import { errorText } from './util'
+import { errorText, saveFile } from './util'
 
 interface GameOptionsProps {
   detail: GameDetail
@@ -19,7 +19,6 @@ interface GameOptionsProps {
 type Confirm = null | 'color' | 'delete'
 
 const NAME: Record<Color, string> = { white: 'White', black: 'Black' }
-const REVOKE_AFTER_MS = 1000
 
 /** Fix a game analyzed from the wrong side, or delete it (PLAN_V3 M1). Each action asks once
  * before it runs, saying what will be lost. */
@@ -54,7 +53,7 @@ export function GameOptions({ detail, api, onColorChanged, onDeleted, onLoggedOu
     run(async () => {
       await beforeExport?.()
       const { filename, text } = await api.exportPgn(detail.id)
-      download(filename, text)
+      saveFile(new Blob([text], { type: 'application/x-chess-pgn' }), filename)
     })
 
   return (
@@ -99,13 +98,4 @@ export function GameOptions({ detail, api, onColorChanged, onDeleted, onLoggedOu
       )}
     </div>
   )
-}
-
-function download(filename: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/x-chess-pgn' }))
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  link.click()
-  setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS) // some browsers read it after click()
 }

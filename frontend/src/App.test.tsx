@@ -297,6 +297,22 @@ test('a what-if question in the chat runs the deep tier on the engine', async ()
   )
 })
 
+test('new terms are accepted before anything else, then the app opens', async () => {
+  const me = vi
+    .fn()
+    .mockResolvedValueOnce({ ...PROFILE, terms_accepted: false })
+    .mockResolvedValue(PROFILE)
+  const deps = fakeDeps({ me })
+  renderApp(deps, '/games')
+
+  expect(await screen.findByRole('heading', { name: `We've updated our terms, ${PROFILE.name}.` })).toBeInTheDocument()
+  expect(deps.api.listGames).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'I agree' }))
+
+  expect(await screen.findByRole('navigation', { name: 'Main' })).toBeInTheDocument()
+  expect(deps.api.account.acceptTerms).toHaveBeenCalledWith(PROFILE.terms_version)
+})
+
 test('only the owner sees the Owner link and reaches /owner', async () => {
   const owner = fakeDeps({ me: vi.fn(async () => ({ ...PROFILE, role: 'owner' as const })) })
   renderApp(owner, '/owner')

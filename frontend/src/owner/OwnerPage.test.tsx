@@ -208,7 +208,7 @@ test('removing credits sends a negative amount with the note, and a refusal stay
 
   expect(await within(dialog).findByRole('alert')).toHaveTextContent('the note is longer than 200 characters')
   fireEvent.click(within(dialog).getByRole('button', { name: 'Remove 5 credits' }))
-  await waitFor(() => expect(changeCredits).toHaveBeenLastCalledWith('p-ana', -5, 'Correction'))
+  await waitFor(() => expect(changeCredits).toHaveBeenLastCalledWith('p-ana', -5, 'Correction', false))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 })
 

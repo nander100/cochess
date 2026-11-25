@@ -112,9 +112,9 @@ export function PlayerActions({ api, detail, onChanged }: PlayerActionsProps) {
         <CreditsDialog
           {...shared}
           name={row.name}
-          onConfirm={(amount, note) => {
+          onConfirm={(amount, note, emailNote) => {
             const verb = amount > 0 ? 'Added' : 'Removed'
-            void run(() => api.changeCredits(row.id, amount, note), `${verb} ${Math.abs(amount)} credits.`)
+            void run(() => api.changeCredits(row.id, amount, note, emailNote), `${verb} ${Math.abs(amount)} credits.`)
           }}
         />
       )}
@@ -233,10 +233,11 @@ function CreditsDialog({
   busy,
   error,
   onClose,
-}: DialogBase & { name: string; onConfirm: (credits: number, note: string) => void }) {
+}: DialogBase & { name: string; onConfirm: (credits: number, note: string, emailNote: boolean) => void }) {
   const [direction, setDirection] = useState<'add' | 'remove'>('add')
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
+  const [emailNote, setEmailNote] = useState(false)
   const value = Number(amount)
   const valid = amount !== '' && Number.isFinite(value) && value > 0 && value <= MAX_CREDITS
   const ready = valid && note.trim().length > 0
@@ -253,7 +254,7 @@ function CreditsDialog({
           </Button>
           <Button
             disabled={busy || !ready}
-            onClick={() => onConfirm(direction === 'add' ? value : -value, note.trim())}
+            onClick={() => onConfirm(direction === 'add' ? value : -value, note.trim(), direction === 'add' && emailNote)}
           >
             {busy ? 'Saving…' : valid ? `${verb} ${value} credits` : `${verb} credits`}
           </Button>
@@ -287,7 +288,16 @@ function CreditsDialog({
         maxLength={MAX_NOTE}
         onChange={(e) => setNote(e.target.value)}
       />
-      <p className="owner-quiet">These are lasting credits: they don’t expire.</p>
+      {direction === 'add' && (
+        <label className="owner-check">
+          <input type="checkbox" checked={emailNote} onChange={(e) => setEmailNote(e.target.checked)} />
+          Include the note in the email to them
+        </label>
+      )}
+      <p className="owner-quiet">
+        These are lasting credits: they don’t expire. Added credits are emailed to the player, unless they turned
+        that email off.
+      </p>
       <DialogError error={error} />
     </Modal>
   )

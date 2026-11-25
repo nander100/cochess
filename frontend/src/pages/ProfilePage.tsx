@@ -3,6 +3,8 @@ import { type ApiClient, isLoggedOut } from '../api/client'
 import type { BoardScheme, DetailLevel, PieceSet, Profile, TendencyReport, TimeControl, UserSettings } from '../api/types'
 import { BaselineReportPanel } from '../onboarding/BaselineReportPanel'
 import { useSettings } from '../settings/settingsContext'
+import { DataActions } from '../account/DataActions'
+import { EmailCard } from '../account/EmailCard'
 import { CreditsCard } from './CreditsCard'
 import { GoogleAccount } from './GoogleAccount'
 import { OnlineAccounts } from './OnlineAccounts'
@@ -86,7 +88,9 @@ export function ProfilePage({ api, profile, onSaved, onLoggedOut }: ProfilePageP
           <OnlineAccounts key={loaded ? 'loaded' : 'loading'} />
           <GoogleAccount profile={profile} />
           <CreditsCard api={api} />
+          <EmailCard api={api.account} email={profile.email} />
           <SettingsSection />
+          <YourData api={api} profile={profile} onDeleted={onLoggedOut} />
         </div>
         {profile.complete && (
           <aside className="profile-aside" aria-label="Your progress">
@@ -323,3 +327,31 @@ function Tendencies({ report }: { report: TendencyReport | null }) {
     </Card>
   )
 }
+
+/** Profile → Your data (SPEC_V4 §11): download everything, or delete the account. */
+function YourData({ api, profile, onDeleted }: { api: ApiClient; profile: Profile; onDeleted: () => void }) {
+  const [subscribed, setSubscribed] = useState(false)
+  useEffect(() => {
+    api.billing().then(
+      (billing) => setSubscribed(billing.subscription?.status === 'active' || billing.subscription?.status === 'past_due'),
+      () => undefined, // only changes a sentence in the dialog
+    )
+  }, [api])
+  return (
+    <Card as="section" className="profile-card" aria-labelledby="profile-data">
+      <h2 id="profile-data" className="profile-card-title">
+        Your data
+      </h2>
+      <p className="profile-intro">
+        Download everything that's yours: your profile, settings, games with your notes and variations, chats,
+        reports and credit history. Or delete your account for good. Read the{' '}
+        <a href="/privacy" target="_blank" rel="noreferrer">
+          Privacy Policy
+        </a>
+        .
+      </p>
+      <DataActions api={api.account} name={profile.name} subscribed={subscribed} onDeleted={onDeleted} />
+    </Card>
+  )
+}
+

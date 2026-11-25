@@ -1,23 +1,34 @@
-"""A player's own account (SPEC_V4 §11): export everything that's theirs. Any signed-in account
-may use it, including a waitlisted or paused one."""
+"""A player's own account (SPEC_V4 §11): export everything that's theirs, or delete the account.
+Any signed-in account may use them, including a waitlisted or paused one."""
 
 import math
 import time
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.account.deletion import delete_account
 from app.account.export import build_export
 from app.api.deps import get_app_settings, get_session
 from app.auth.deps import CurrentAccount
+from app.billing.cancel import CancelError, cancel_live_subscription
+from app.billing.provider import BillingProvider
 from app.config import Settings
 
 router = APIRouter(prefix="/api/me", tags=["account"])
 
 SessionDep = Annotated[Session, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_app_settings)]
+
+WRONG_NAME = "To delete your account, type your name exactly as it appears on your profile."
+OWNER = "The owner's account can't be deleted here. Make another account the owner first (CLI)."
+
+
+class DeleteRequest(BaseModel):
+    confirm_name: str = Field(max_length=100)
 
 
 @router.post("/export")
@@ -45,3 +56,29 @@ def _check_cooldown(request: Request, user_id: str, cooldown: float) -> None:
         detail = f"You just exported your data. Try again in {minutes} minutes."
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail=detail)
     times[user_id] = now
+
+
+@router.delete("", status_code=status.HTTP_204_NO_CONTENT)
+def delete(
+    body: DeleteRequest,
+    request: Request,
+    response: Response,
+    user: CurrentAccount,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> None:
+    """Delete the account for good (SPEC_V4 §11): a live subscription is cancelled first (if
+    Stripe can't, nothing is deleted), then everything goes in one transaction and the session
+    ends."""
+    if body.confirm_name.strip().casefold() != user.name.casefold():
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=WRONG_NAME)
+    if user.role == "owner":
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=OWNER)
+    provider = cast(BillingProvider | None, request.app.state.billing_provider)
+    try:
+        cancel_live_subscription(provider, user)
+    except CancelError as error:
+        raise HTTPException(error.status, detail=error.message) from error
+    delete_account(session, user, datetime.now(UTC))
+    session.commit()
+    response.delete_cookie(settings.auth.cookie_name, path="/", httponly=True)

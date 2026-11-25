@@ -1,3 +1,4 @@
+import { DataActions } from '../account/DataActions'
 import { useEffect } from 'react'
 import { Link } from 'react-router'
 import type { ApiClient } from '../api/client'
@@ -58,11 +59,13 @@ interface AccountStatusPageProps {
   /** The player was accepted (or restored) while this page was open. */
   onActive: (profile: Profile) => void
   onLogOut: () => void
+  /** The account was deleted from this page (SPEC_V4 §11): the session has ended. */
+  onDeleted: () => void
 }
 
 /** What a waitlisted or paused account sees instead of the app (SPEC_V4 §4.2, §4.4). The
  * waitlist page checks every minute and opens the app once the player is accepted. */
-export function AccountStatusPage({ api, profile, onActive, onLogOut }: AccountStatusPageProps) {
+export function AccountStatusPage({ api, profile, onActive, onLogOut, onDeleted }: AccountStatusPageProps) {
   const waiting = profile.status === 'waitlisted'
 
   useEffect(() => {
@@ -86,7 +89,9 @@ export function AccountStatusPage({ api, profile, onActive, onLogOut }: AccountS
           <h1 className="redeem-title">Your access is paused.</h1>
           <p className="redeem-lead">
             Your games and history are kept. If you think this is a mistake, reply to the email we sent you.
+            You can still download your data or delete your account.
           </p>
+          <DataActions api={api.account} name={profile.name} onDeleted={onDeleted} />
           <Button variant="outline" onClick={onLogOut}>
             Sign out
           </Button>
@@ -104,6 +109,7 @@ export function AccountStatusPage({ api, profile, onActive, onLogOut }: AccountS
         <h1 className="redeem-title">You're on the list, {profile.name}.</h1>
         <p className="redeem-lead">We're letting players in a few at a time. {notice}</p>
         {profile.waitlisted_at && <p className="redeem-small">Joined {joinedOn(profile.waitlisted_at)}.</p>}
+        <DataActions api={api.account} name={profile.name} onDeleted={onDeleted} />
         <Button variant="outline" onClick={onLogOut}>
           Sign out
         </Button>
@@ -118,25 +124,3 @@ function joinedOn(iso: string): string {
 
 /** The terms and privacy policy. Their text is the owner's, reviewed by a lawyer (SPEC_V4 §15,
  * D6); until it's ready the pages say so. */
-export function LegalPage({ kind }: { kind: 'terms' | 'privacy' }) {
-  const title = kind === 'terms' ? 'Terms of Service' : 'Privacy Policy'
-  return (
-    <AccountLayout>
-      <div className="redeem-state">
-        <span className="redeem-badge">Draft</span>
-        <h1 className="redeem-title">{title}</h1>
-        <p className="redeem-lead">
-          The full {title.toLowerCase()} is being written. CoChess is in early access while it's finished.
-        </p>
-        {kind === 'privacy' && (
-          <p className="redeem-lead">
-            In short: your games and coach chats are sent to Anthropic's API to write your coaching, your Chess.com
-            and Lichess usernames are used only to fetch your games, Google tells us your name and email, and we
-            only set the cookie that keeps you signed in.
-          </p>
-        )}
-        <Link to="/">Back to CoChess</Link>
-      </div>
-    </AccountLayout>
-  )
-}

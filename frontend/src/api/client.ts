@@ -1,3 +1,4 @@
+import type { AccountApi, EmailPreferences } from './accountTypes'
 import type { OwnerApi, PlayerFilters } from './ownerTypes'
 import { type CoachEvent, readCoachEvents } from './sse'
 import type {
@@ -143,6 +144,8 @@ export interface ApiClient {
   baselineReport(): Promise<BaselineReport | null>
   /** The owner dashboard (SPEC_V4 §10); 404 for anyone else. */
   owner: OwnerApi
+  /** Terms, export, deletion and email preferences (SPEC_V4 §11, §12.4). */
+  account: AccountApi
 }
 
 export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)): ApiClient {
@@ -279,9 +282,29 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
       acceptMany: (ids) => post('/api/admin/users/accept', { user_ids: ids }),
       suspend: (id, body) => post(`/api/admin/users/${encodeURIComponent(id)}/suspend`, body),
       restore: (id) => post(`/api/admin/users/${encodeURIComponent(id)}/restore`, {}),
-      changeCredits: (id, credits, note) =>
-        post(`/api/admin/users/${encodeURIComponent(id)}/credits`, { credits, note }),
+      changeCredits: (id, credits, note, emailNote = false) =>
+        post(`/api/admin/users/${encodeURIComponent(id)}/credits`, { credits, note, email_note: emailNote }),
       setMetering: (id, unmetered) => post(`/api/admin/users/${encodeURIComponent(id)}/metering`, { unmetered }),
+    },
+    account: {
+      legal: (kind) => request(`/api/legal/${kind}`),
+      acceptTerms: async (version) => {
+        await send('/api/me/terms', { method: 'POST', body: JSON.stringify({ version }) })
+      },
+      exportData: async () => {
+        const response = await send('/api/me/export', { method: 'POST' })
+        const disposition = response.headers.get('Content-Disposition') ?? ''
+        const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'cochess-export.zip'
+        return { filename, blob: await response.blob() }
+      },
+      deleteAccount: async (confirmName) => {
+        await send('/api/me', { method: 'DELETE', body: JSON.stringify({ confirm_name: confirmName }) })
+      },
+      emailPreferences: async () => (await request<{ preferences: EmailPreferences }>('/api/me/email')).preferences,
+      updateEmailPreferences: async (change) =>
+        (await request<{ preferences: EmailPreferences }>('/api/me/email', { method: 'PATCH', body: JSON.stringify(change) }))
+          .preferences,
+      unsubscribe: (token) => post(`/api/email/unsubscribe?token=${encodeURIComponent(token)}`, {}),
     },
   }
 }

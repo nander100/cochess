@@ -10,7 +10,10 @@ import { poolSize } from './engine/pool'
 import { type EngineHandle, StockfishEngine } from './engine/StockfishEngine'
 import { GamesPage } from './pages/GamesPage'
 import { LatestGamePage } from './pages/LatestGamePage'
-import { AccountStatusPage, LegalPage, SignInPage } from './pages/AccountPages'
+import { LegalDocument } from './account/LegalDocument'
+import { TermsPrompt } from './account/TermsPrompt'
+import { UnsubscribePage } from './account/UnsubscribePage'
+import { AccountStatusPage, SignInPage } from './pages/AccountPages'
 import { RedeemPage } from './pages/RedeemPage'
 import { SignupPage } from './pages/SignupPage'
 import { errorText, tokenFromHash } from './pages/util'
@@ -116,7 +119,7 @@ function Shell({ deps }: AppProps) {
   const [redeemToken] = useState(() => tokenFromHash(location.hash))
   const onRedeemPage = location.pathname === '/redeem'
   // Pages with their own layout that don't need a session (SPEC_V4 §4.2, §11).
-  const standalone = ['/redeem', '/signup', '/terms', '/privacy'].includes(location.pathname)
+  const standalone = ['/redeem', '/signup', '/terms', '/privacy', '/unsubscribe'].includes(location.pathname)
 
   const loadProfile = useCallback(() => {
     pipeline.api.me().then(
@@ -156,10 +159,21 @@ function Shell({ deps }: AppProps) {
   if (onRedeemPage) return <RedeemPage api={pipeline.api} token={redeemToken} onRedeemed={redeemed} />
   if (location.pathname === '/signup') return <SignupPage api={pipeline.api} onJoined={joined} />
   if (location.pathname === '/terms' || location.pathname === '/privacy') {
-    return <LegalPage kind={location.pathname === '/terms' ? 'terms' : 'privacy'} />
+    return <LegalDocument api={pipeline.api.account} kind={location.pathname === '/terms' ? 'terms' : 'privacy'} />
   }
+  if (location.pathname === '/unsubscribe') return <UnsubscribePage api={pipeline.api.account} />
   if (session.kind === 'logged-out') {
     return <SignInPage reason={new URLSearchParams(location.search).get('signin')} />
+  }
+  if (session.kind === 'in' && !session.profile.terms_accepted) {
+    return (
+      <TermsPrompt
+        api={pipeline.api.account}
+        profile={session.profile}
+        onAccepted={loadProfile}
+        onLogOut={() => void logOut()}
+      />
+    )
   }
   if (session.kind === 'in' && session.profile.status !== 'active') {
     return (
@@ -168,6 +182,7 @@ function Shell({ deps }: AppProps) {
         profile={session.profile}
         onActive={accepted}
         onLogOut={() => void logOut()}
+        onDeleted={loggedOut}
       />
     )
   }

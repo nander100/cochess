@@ -5,7 +5,7 @@ import { ApiError } from '../api/client'
 import type { Profile } from '../api/types'
 import { PROFILE, fakeApi } from '../test/fakes'
 import { ThemeProvider } from '../theme/ThemeProvider'
-import { AccountStatusPage, GOOGLE_SIGN_IN, LegalPage, SignInPage, WAITLIST_POLL_MS } from './AccountPages'
+import { AccountStatusPage, GOOGLE_SIGN_IN, SignInPage, WAITLIST_POLL_MS } from './AccountPages'
 import { SignupPage } from './SignupPage'
 
 const WAITING: Profile = {
@@ -55,7 +55,7 @@ test('after the age check refuses, there is no button to try again', () => {
 // The waitlist and paused pages
 
 test('the waitlist page says who is waiting and where the email will go', () => {
-  wrap(<AccountStatusPage api={fakeApi()} profile={WAITING} onActive={vi.fn()} onLogOut={vi.fn()} />)
+  wrap(<AccountStatusPage api={fakeApi()} profile={WAITING} onActive={vi.fn()} onLogOut={vi.fn()} onDeleted={vi.fn()} />)
 
   expect(screen.getByRole('heading', { name: `You're on the list, ${WAITING.name}.` })).toBeInTheDocument()
   expect(screen.getByText(/sam@example.com/)).toBeInTheDocument()
@@ -67,7 +67,7 @@ test('the waitlist page opens the app once the player is accepted', async () => 
   try {
     const me = vi.fn().mockResolvedValueOnce(WAITING).mockResolvedValueOnce({ ...WAITING, status: 'active' })
     const onActive = vi.fn()
-    wrap(<AccountStatusPage api={fakeApi({ me })} profile={WAITING} onActive={onActive} onLogOut={vi.fn()} />)
+    wrap(<AccountStatusPage api={fakeApi({ me })} profile={WAITING} onActive={onActive} onLogOut={vi.fn()} onDeleted={vi.fn()} />)
 
     await act(async () => vi.advanceTimersByTimeAsync(WAITLIST_POLL_MS))
     expect(onActive).not.toHaveBeenCalled()
@@ -85,7 +85,7 @@ test('a paused account is told so and can sign out, and nothing polls', async ()
     const api = fakeApi()
     const onLogOut = vi.fn()
     const paused: Profile = { ...WAITING, status: 'suspended' }
-    wrap(<AccountStatusPage api={api} profile={paused} onActive={vi.fn()} onLogOut={onLogOut} />)
+    wrap(<AccountStatusPage api={api} profile={paused} onActive={vi.fn()} onLogOut={onLogOut} onDeleted={vi.fn()} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('Your access is paused.')
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
@@ -96,14 +96,6 @@ test('a paused account is told so and can sign out, and nothing polls', async ()
   } finally {
     vi.useRealTimers()
   }
-})
-
-test('the legal pages say the text is still a draft', () => {
-  wrap(<LegalPage kind="privacy" />)
-
-  expect(screen.getByRole('heading', { name: 'Privacy Policy' })).toBeInTheDocument()
-  expect(screen.getByText('Draft')).toBeInTheDocument()
-  expect(screen.getByText(/Anthropic's API/)).toBeInTheDocument()
 })
 
 // The sign-up form

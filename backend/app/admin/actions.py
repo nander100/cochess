@@ -12,6 +12,7 @@ from app.auth import accounts
 from app.billing.ledger import adjust_by_owner
 from app.config import CreditSettings
 from app.db.models import AdminActionRow, User
+from app.email.outbox import queue_email
 
 MAX_CREDITS = 10_000  # one change; a typo shouldn't hand out a fortune
 MAX_NOTE = 200
@@ -69,8 +70,11 @@ def change_credits(
     note: str,
     now: datetime,
     settings: CreditSettings,
+    email_note: bool = False,
 ) -> AdminActionRow:
-    """Add (positive) or remove (negative) lasting credits; the ledger entry names this action."""
+    """Add (positive) or remove (negative) lasting credits; the ledger entry names this action.
+    Added credits are emailed to the player (credits_added, which they can turn off), with the
+    note only when `email_note` (SPEC_V4 §12.4)."""
     note = note.strip()
     if not note:
         raise ActionError("adding or removing credits needs a note")
@@ -82,6 +86,13 @@ def change_credits(
     action = _record(session, admin, user, "credits", {"credits": credits, "note": note}, now)
     source = f"admin_action:{action.id}"
     adjust_by_owner(session, user, microusd, note=note, now=now, source=source)
+    if credits > 0:
+        details = {"credits": f"{credits:g}"}
+        if email_note:
+            details["note"] = f" A note from CoChess: {note}"
+        queue_email(
+            session, user, "credits_added", f"credits_added:{action.id}", now=now, details=details
+        )
     return action
 
 

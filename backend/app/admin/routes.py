@@ -27,6 +27,7 @@ from app.admin.users import (
 )
 from app.api.deps import get_app_settings, get_session
 from app.auth.deps import get_current_account
+from app.billing.cancel import LIVE, CancelError, cancel_live_subscription
 from app.billing.provider import BillingProvider
 from app.config import Settings
 from app.db.models import User
@@ -40,10 +41,7 @@ SettingsDep = Annotated[Settings, Depends(get_app_settings)]
 
 NOT_FOUND = "Not found"
 NO_PLAYER = "No such player."
-PAYMENTS_OFF = "Payments aren't set up, so the subscription can't be cancelled from here."
-PROVIDER_FAILED = "Stripe didn't cancel the subscription, so nothing was changed. Try again."
 SELF = "You can't revoke your own access."
-LIVE = frozenset({"active", "trialing", "past_due", "incomplete"})
 MAX_BULK = 100
 
 
@@ -69,6 +67,7 @@ class SuspendRequest(BaseModel):
 class CreditsRequest(BaseModel):
     credits: float
     note: str = Field(min_length=1, max_length=actions.MAX_NOTE)
+    email_note: bool = False  # put the note in the credits_added email
 
 
 class MeteringRequest(BaseModel):
@@ -203,8 +202,9 @@ def change_credits(
 
     def change() -> object:
         return actions.change_credits(
-            session, owner, user, body.credits, note=body.note, now=now, settings=settings.credits
-        )
+            session, owner, user, body.credits, note=body.note, now=now,
+            settings=settings.credits, email_note=body.email_note,
+        )  # fmt: skip
 
     _act(session, change)
     return _detail(session, settings, user_id)
@@ -225,15 +225,10 @@ def set_metering(
 
 def _cancel_subscription(request: Request, user: User) -> None:
     provider = cast(BillingProvider | None, request.app.state.billing_provider)
-    if provider is None:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=PAYMENTS_OFF)
     try:
-        provider.cancel_subscriptions(cast(str, user.billing_customer_id))
-    except Exception as error:  # any provider failure: change nothing, tell the owner
-        logger.warning(
-            "cancelling a subscription failed for user %s: %s", user.id, type(error).__name__
-        )
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=PROVIDER_FAILED) from error
+        cancel_live_subscription(provider, user)
+    except CancelError as error:
+        raise HTTPException(error.status, detail=error.message) from error
 
 
 def _target(session: Session, user_id: str) -> User:
