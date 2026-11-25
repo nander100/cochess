@@ -1,44 +1,50 @@
 #!/usr/bin/env bash
 # The restore drill (SPEC_V4 §12.3; docs/DEPLOY.md, "Restore drill"): restore production's
-# database as it was a few minutes ago into a new RDS instance, so staging can be pointed at it to
-# prove the backups work. Nothing touches production.
+# backup from S3 into staging, to prove the backups work. Production is never touched.
 #
-#   DB_INSTANCE=cochess deploy/restore-drill.sh           # restore and wait (10 to 20 minutes)
-#   DB_INSTANCE=cochess deploy/restore-drill.sh --delete  # remove the drill instance afterwards
+#   deploy/restore-drill.sh                       # staging now runs on production's latest backup
+#   deploy/restore-drill.sh 2026-12-01T09:30:00Z  # ... or as it was at that time (UTC)
+#   deploy/restore-drill.sh --back                # staging back on its own backup
 #
-# The drill instance uses the same subnet group and security group as production.
+# Staging's own Litestream stays stopped while it runs on the copy, so production's data never
+# lands in staging's backup. Staging's email allow list keeps it from mailing real players.
 set -euo pipefail
 
-SOURCE="${DB_INSTANCE:?set DB_INSTANCE to the RDS instance name (e.g. cochess)}"
-REGION="${AWS_REGION:-us-east-2}"
-DRILL="${SOURCE}-restore-drill"
-aws() { command aws --region "$REGION" "$@"; }
+repo="$(cd "$(dirname "$0")/.." && pwd)"
+compose="$repo/deploy/compose.sh"
+bucket="$(grep -E '^LITESTREAM_BUCKET=' "$repo/.env.staging" | cut -d= -f2-)"
+region="$(grep -E '^AWS_REGION=' "$repo/.env.staging" | cut -d= -f2- || true)"
+region="${region:-us-east-2}"
+volume="cochess-staging_cochess-data"
+image="litestream/litestream:0.5.14"
+if [ -z "$bucket" ]; then
+  echo "set LITESTREAM_BUCKET in .env.staging first" >&2
+  exit 2
+fi
 
-if [ "${1:-}" = "--delete" ]; then
-  aws rds delete-db-instance --db-instance-identifier "$DRILL" \
-    --skip-final-snapshot --delete-automated-backups >/dev/null
-  echo "Deleting $DRILL (it stops billing once it's gone)."
+restore() {  # restore <replica path> [timestamp]: replace staging's database with that backup
+  local source="s3://$bucket/$1" args=()
+  if [ -n "${2:-}" ]; then args=(-timestamp "$2"); fi
+  "$compose" staging stop frontend backend litestream
+  docker run --rm -v "$volume:/data" --entrypoint rm "$image" -f /data/restored.db
+  docker run --rm -v "$volume:/data" -e AWS_REGION="$region" "$image" \
+    restore "${args[@]}" -o /data/restored.db "$source"
+  # Swap it in, owned like the folder (the app's user, set by the backend image).
+  docker run --rm -v "$volume:/data" --entrypoint sh "$image" -c \
+    'rm -f /data/cochess.db /data/cochess.db-wal /data/cochess.db-shm \
+     && mv /data/restored.db /data/cochess.db && chown --reference=/data /data/cochess.db'
+}
+
+if [ "${1:-}" = "--back" ]; then
+  restore staging/cochess
+  "$compose" staging up -d
+  echo "Staging is back on its own data, with its backups running again."
   exit 0
 fi
 
-info() {
-  aws rds describe-db-instances --db-instance-identifier "$SOURCE" \
-    --query "DBInstances[0].$1" --output text
-}
-subnets="$(info DBSubnetGroup.DBSubnetGroupName)"
-groups="$(info 'VpcSecurityGroups[].VpcSecurityGroupId')"
-class="$(info DBInstanceClass)"
-
-echo "Restoring $SOURCE to its latest restorable time as $DRILL ($class) ..."
-# shellcheck disable=SC2086  # $groups is a space-separated list of ids
-aws rds restore-db-instance-to-point-in-time \
-  --source-db-instance-identifier "$SOURCE" --target-db-instance-identifier "$DRILL" \
-  --use-latest-restorable-time --db-instance-class "$class" \
-  --db-subnet-group-name "$subnets" --vpc-security-group-ids $groups \
-  --no-publicly-accessible --no-multi-az --no-deletion-protection >/dev/null
-aws rds wait db-instance-available --db-instance-identifier "$DRILL"
-endpoint="$(aws rds describe-db-instances --db-instance-identifier "$DRILL" \
-  --query 'DBInstances[0].Endpoint.Address' --output text)"
-echo "Restored. Endpoint: $endpoint"
-echo "Next (docs/DEPLOY.md): point staging's DATABASE_URL at it, restart staging, check"
-echo "/api/health and sign in; then put staging back and run: $0 --delete"
+restore production/cochess "${1:-}"
+"$compose" staging up -d frontend backend  # not litestream: keep staging's backup clean
+echo "Staging now runs on production's backup${1:+ as of $1}. Check it:"
+echo "  curl -fsS http://127.0.0.1:8081/api/health"
+echo "  sign in at https://staging.<your domain>: production's players and games should be there"
+echo "Then: deploy/restore-drill.sh --back"

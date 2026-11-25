@@ -1,0 +1,16 @@
+# Litestream (0.5.x): streams every change to the SQLite database to S3, so the server's disk is
+# never the only copy (docs/DEPLOY.md, "Backups"). Used by deploy/docker-compose.backup.yml.
+# ${...} is filled from the container's environment. Credentials come from the EC2 instance's
+# IAM role (no keys in files).
+dbs:
+  - path: /data/cochess.db
+    replica:
+      type: s3
+      bucket: ${LITESTREAM_BUCKET}
+      path: ${COCHESS_ENV}/cochess
+      region: ${AWS_REGION}
+
+# A full snapshot every day, kept 14 days: a restore can go back that far.
+snapshot:
+  interval: 24h
+  retention: 336h

@@ -31,6 +31,22 @@ def test_sqlite_file_databases_enforce_foreign_keys_too(tmp_path: Path) -> None:
         assert connection.execute(text("PRAGMA foreign_keys")).scalar() == 1
 
 
+def test_sqlite_file_databases_use_wal_and_wait_for_locks(tmp_path: Path) -> None:
+    """Litestream backs SQLite up from its write-ahead log, and needs the app to wait briefly
+    rather than fail when it checkpoints (docs/DEPLOY.md, "Backups")."""
+    engine = make_engine(f"sqlite:///{tmp_path / 'wal.db'}")
+    with engine.connect() as connection:
+        assert connection.execute(text("PRAGMA journal_mode")).scalar() == "wal"
+        assert connection.execute(text("PRAGMA busy_timeout")).scalar() == 5000
+
+
+def test_an_in_memory_database_keeps_its_own_journal() -> None:
+    engine = make_engine("sqlite://")
+    with engine.connect() as connection:
+        assert connection.execute(text("PRAGMA journal_mode")).scalar() == "memory"
+        assert connection.execute(text("PRAGMA busy_timeout")).scalar() == 5000
+
+
 @pytest.mark.skipif(not is_postgres(), reason="needs TEST_DATABASE_URL (Postgres)")
 def test_postgres_connections_are_checked_before_use() -> None:
     engine = make_engine(fresh_database_url())

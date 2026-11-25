@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.auth.service import create_user
@@ -111,3 +111,27 @@ def test_spend_sums_the_last_hours_of_api_cost(settings: Settings) -> None:
 
     assert main(["spend", "--hours", "24"], settings, out) == 0
     assert out.getvalue().strip() == "0.0200"
+
+
+def test_backup_copies_the_sqlite_database_and_keeps_the_last_five(tmp_path: Path) -> None:
+    if is_postgres():
+        pytest.skip("SQLite only: Postgres backups are the server's snapshots")
+    url = f"sqlite:///{tmp_path / 'live.db'}"
+    upgrade(make_engine(url))
+    settings = Settings(_env_file=None, database_url=url)
+    with _session(settings) as session:
+        create_user(session, "Kept")
+    folder = tmp_path / "backups"
+
+    for n in range(7):
+        assert (
+            main(["backup", "--to", str(folder), "--label", f"r{n}"], settings, io.StringIO()) == 0
+        )
+
+    copies = sorted(p.name for p in folder.glob("*.db"))
+    assert len(copies) == 5 and all(name.startswith("cochess-r") for name in copies)
+    assert not any("-r0-" in name or "-r1-" in name for name in copies)  # the oldest went
+    copy = make_engine(f"sqlite:///{folder / copies[-1]}")
+    with copy.connect() as connection:
+        names = connection.execute(text("select name from users")).scalars().all()
+    assert names == ["Kept"]

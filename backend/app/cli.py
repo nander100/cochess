@@ -14,14 +14,17 @@ price-usage                   price coach calls recorded before v4 (no charge)
 usage-report [--period 7d|30d|month|all]   the owner dashboard's overview as text
 notify-terms                  email everyone who hasn't accepted the current terms version (once)
 spend [--hours 24]            API cost in the last hours, in dollars (for the spend alarm)
+backup [--to DIR] [--label X] copy the SQLite database (before a release); keeps the last 5
 migrate-sqlite --from URL --to URL [--check-only]
                               copy the v3 SQLite database into an empty Postgres database
 """
 
 import argparse
+import sqlite3
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import TextIO
 
 from sqlalchemy import func, select
@@ -95,6 +98,8 @@ def _run(args: argparse.Namespace, session: Session, settings: Settings) -> str:
                 ids = ", ".join(f"{g.id} ({g.user_color})" for g in games)
                 lines.append(f"Duplicate uploads of one game: {ids}")
         return "\n".join(lines)
+    if args.command == "backup":
+        return _backup(settings, Path(args.to), args.label, args.keep)
     if args.command == "spend":
         since = datetime.now(UTC) - timedelta(hours=args.hours)
         query = select(func.coalesce(func.sum(LlmUsageRow.cost_microusd), 0)).where(
@@ -138,6 +143,24 @@ def _account_action(args: argparse.Namespace, session: Session, settings: Settin
         raise CliError(str(error)) from error
     session.commit()
     return message
+
+
+def _backup(settings: Settings, folder: Path, label: str, keep: int) -> str:
+    """A consistent copy of the SQLite database, taken with SQLite's online backup while the app
+    runs (docs/DEPLOY.md, "Releasing"). Litestream keeps the continuous copy in S3; this one is
+    the quick way back if a release's migration goes wrong."""
+    prefix = "sqlite:///"
+    if not settings.database_url.startswith(prefix):
+        raise CliError("backup is for SQLite; on Postgres use the database's own snapshots")
+    source = settings.database_url.removeprefix(prefix)
+    folder.mkdir(parents=True, exist_ok=True)
+    target = folder / f"cochess-{label}-{datetime.now(UTC):%Y%m%d-%H%M%S}.db"
+    with sqlite3.connect(source) as live, sqlite3.connect(target) as copy:
+        live.backup(copy)
+    copies = sorted(folder.glob("cochess-*.db"), key=lambda path: path.stat().st_mtime_ns)
+    for old in copies[:-keep]:
+        old.unlink()
+    return f"Backed up to {target} ({target.stat().st_size:,} bytes); kept the last {keep}."
 
 
 def _notify_terms(session: Session, settings: Settings) -> str:
@@ -290,6 +313,10 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("grant-trials", help="give the trial to active players without one")
     commands.add_parser("price-usage", help="price coach calls recorded before v4")
     commands.add_parser("notify-terms", help="email everyone about a new terms version")
+    backup = commands.add_parser("backup", help="copy the SQLite database before a release")
+    backup.add_argument("--to", default="/data/backups", help="folder for the copies")
+    backup.add_argument("--label", default="manual", help="e.g. the release's git revision")
+    backup.add_argument("--keep", type=int, default=5, help="how many copies to keep")
     spend = commands.add_parser("spend", help="API cost in the last hours, in dollars")
     spend.add_argument("--hours", type=float, default=24)
     report = commands.add_parser("usage-report", help="the owner dashboard's numbers as text")

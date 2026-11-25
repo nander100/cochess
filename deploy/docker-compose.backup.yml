@@ -1,0 +1,24 @@
+# On the EC2 server: continuous backups of the SQLite database to S3 with Litestream
+# (docs/DEPLOY.md, "Backups"). deploy/up.sh adds this file; it needs LITESTREAM_BUCKET in the
+# project's env file and the instance role's S3 permissions. Paths are relative to the repo
+# root (Compose resolves them from the first -f file).
+services:
+  litestream:
+    image: litestream/litestream:0.5.14
+    command: replicate
+    environment:
+      LITESTREAM_BUCKET: ${LITESTREAM_BUCKET:?set LITESTREAM_BUCKET (docs/DEPLOY.md, Backups)}
+      COCHESS_ENV: ${COCHESS_ENV:-production}
+      AWS_REGION: ${AWS_REGION:-us-east-2}
+    volumes:
+      - cochess-data:/data # the backend's volume: the same database file
+      - ./deploy/litestream.yml:/etc/litestream.yml:ro
+    depends_on:
+      backend:
+        condition: service_healthy # the database exists and is migrated
+    restart: unless-stopped
+    logging: # a "replica sync" line every few seconds: keep the last 30 MB on the server
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

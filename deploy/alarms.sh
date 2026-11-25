@@ -8,7 +8,8 @@
 # Settings (environment): AWS_REGION (us-east-2), SPEND_LIMIT_USD (5: API cost in 24 hours),
 # BUDGET_USD (30: the monthly AWS budget, production only).
 #
-# Alarms: the health check failing for 3 minutes (or not reported at all), disk above 80%, 5+
+# Alarms: the health check failing for 3 minutes (or not reported at all), disk above 80%, the
+# Litestream backup not running for 5 minutes, 5+
 # backend errors in 5 minutes, 3+ Anthropic errors in 5 minutes, any payment error, API spend
 # over the limit; plus the AWS budget. Confirm the subscription email AWS sends you first.
 set -euo pipefail
@@ -50,6 +51,7 @@ env="Name=Environment,Value=$ENVIRONMENT"
 ours="CoChess/$ENVIRONMENT"
 alarm health-failing CoChess HealthOk Minimum LessThanThreshold 1 3 breaching "$env"
 alarm disk-above-80 CoChess DiskUsedPercent Maximum GreaterThanThreshold 80 5 missing "$env"
+alarm backup-stopped CoChess BackupRunning Minimum LessThanThreshold 1 5 breaching "$env"
 alarm backend-errors "$ours" BackendErrors Sum GreaterThanOrEqualToThreshold 5 5 notBreaching
 alarm anthropic-errors "$ours" AnthropicErrors Sum GreaterThanOrEqualToThreshold 3 5 notBreaching
 alarm payment-errors "$ours" PaymentErrors Sum GreaterThanOrEqualToThreshold 1 1 notBreaching
