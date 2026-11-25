@@ -11,6 +11,7 @@ grant-credits --user X --credits N --note TEXT   add (or, negative, remove) coac
 metering --user X --off|--on  never charge this player (owner, testers), or charge again
 grant-trials                  give the free trial to every active player who hasn't had it
 price-usage                   price coach calls recorded before v4 (no charge)
+usage-report [--period 7d|30d|month|all]   the owner dashboard's overview as text
 migrate-sqlite --from URL --to URL [--check-only]
                               copy the v3 SQLite database into an empty Postgres database
 """
@@ -24,9 +25,11 @@ from typing import TextIO
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.auth.accounts import AccountError, admit, restore, set_role, suspend
+from app.admin import actions
+from app.admin.overview import overview
+from app.admin.report import usage_report
 from app.auth.service import UserExistsError, create_invite, create_user, find_account, find_user
-from app.billing.ledger import adjust_by_owner, grant_trial
+from app.billing.ledger import grant_trial
 from app.billing.pricing import cost_microusd
 from app.coach.client import Usage
 from app.config import Settings, get_settings
@@ -88,6 +91,8 @@ def _run(args: argparse.Namespace, session: Session, settings: Settings) -> str:
                 ids = ", ".join(f"{g.id} ({g.user_color})" for g in games)
                 lines.append(f"Duplicate uploads of one game: {ids}")
         return "\n".join(lines)
+    if args.command == "usage-report":
+        return usage_report(overview(session, args.period, datetime.now(UTC)))
     if args.command in ("admit", "suspend", "restore", "set-role"):
         return _account_action(args, session, settings)
     if args.command in ("grant-credits", "metering", "grant-trials", "price-usage"):
@@ -104,18 +109,20 @@ def _account_action(args: argparse.Namespace, session: Session, settings: Settin
     now = datetime.now(UTC)
     try:
         if args.command == "admit":
-            admit(session, user, now, settings.credits)
+            actions.accept(session, None, user, now, settings.credits)
             message = f'Accepted "{user.name}": they can sign in now (acceptance email queued).'
         elif args.command == "suspend":
-            suspend(session, user, now, reason=args.reason, tell_reason=args.tell_reason)
+            actions.suspend(
+                session, None, user, now, reason=args.reason, tell_reason=args.tell_reason
+            )
             message = f'Paused "{user.name}": signed out everywhere (email queued).'
         elif args.command == "restore":
-            restore(session, user, now)
+            actions.restore(session, None, user, now)
             message = f'Restored "{user.name}" (status: {user.status}).'
         else:
-            set_role(user, args.role)
+            actions.set_role(session, None, user, args.role, now)
             message = f'"{user.name}" is now {args.role}.'
-    except AccountError as error:
+    except actions.ActionError as error:
         raise CliError(str(error)) from error
     session.commit()
     return message
@@ -157,9 +164,8 @@ def _migrate_sqlite(args: argparse.Namespace, out: TextIO) -> int:
 
 
 def _credit_action(args: argparse.Namespace, session: Session, settings: Settings) -> str:
-    """Owner credit commands (SPEC_V4 §5). The dashboard (M5) adds the same with an audit log."""
+    """Owner credit commands (SPEC_V4 §5), audited like the dashboard's (§10.3)."""
     now = datetime.now(UTC)
-    per_credit = settings.credits.microusd_per_credit
     if args.command == "grant-trials":
         players = session.scalars(select(User).where(User.status == "active")).all()
         had = set(
@@ -184,14 +190,16 @@ def _credit_action(args: argparse.Namespace, session: Session, settings: Setting
     user = find_account(session, args.user)
     if user is None:
         raise CliError(f'no player named or with the email "{args.user}"')
-    if args.command == "metering":
-        user.unmetered = args.off
-        session.commit()
-        state = "never charged (unmetered)" if args.off else "charged for coaching again"
-        return f'"{user.name}" is now {state}.'
     try:
-        adjust_by_owner(session, user, round(args.credits * per_credit), note=args.note, now=now)
-    except ValueError as error:
+        if args.command == "metering":
+            actions.set_metering(session, None, user, unmetered=args.off, now=now)
+            session.commit()
+            state = "never charged (unmetered)" if args.off else "charged for coaching again"
+            return f'"{user.name}" is now {state}.'
+        actions.change_credits(
+            session, None, user, args.credits, note=args.note, now=now, settings=settings.credits
+        )
+    except actions.ActionError as error:
         raise CliError(str(error)) from error
     session.commit()
     verb = "Added" if args.credits >= 0 else "Removed"
@@ -244,6 +252,8 @@ def _parser() -> argparse.ArgumentParser:
     switch.add_argument("--on", action="store_true", help="charge them again")
     commands.add_parser("grant-trials", help="give the trial to active players without one")
     commands.add_parser("price-usage", help="price coach calls recorded before v4")
+    report = commands.add_parser("usage-report", help="the owner dashboard's numbers as text")
+    report.add_argument("--period", choices=["7d", "30d", "month", "all"], default="30d")
     copy = commands.add_parser(
         "migrate-sqlite", help="copy the v3 SQLite database into an empty Postgres database"
     )

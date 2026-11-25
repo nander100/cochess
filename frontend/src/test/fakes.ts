@@ -1,4 +1,5 @@
 import { AnalysisQueue } from '../analysis/backgroundQueue'
+import { fakeOwnerApi } from './ownerFakes'
 import type { PipelineDeps } from '../analysis/pipeline'
 import type { ApiClient } from '../api/client'
 import type { CoachEvent } from '../api/sse'
@@ -324,6 +325,7 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     onboardingStatus: vi.fn(async () => EMPTY_ONBOARDING),
     streamBaselineReport: vi.fn(coachSays(REPORT_TEXT)),
     baselineReport: vi.fn(async () => null),
+    owner: fakeOwnerApi(),
     ...overrides,
   }
 }

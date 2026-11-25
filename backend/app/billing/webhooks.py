@@ -43,6 +43,7 @@ def apply_event(
         user_id=user.id if user else None,
         amount_cents=event.amount_cents,
         currency=event.currency,
+        object_id=event.object_id,
         outcome="ignored",
         received_at=now,
     )

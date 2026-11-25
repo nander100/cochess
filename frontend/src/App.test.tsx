@@ -297,6 +297,26 @@ test('a what-if question in the chat runs the deep tier on the engine', async ()
   )
 })
 
+test('only the owner sees the Owner link and reaches /owner', async () => {
+  const owner = fakeDeps({ me: vi.fn(async () => ({ ...PROFILE, role: 'owner' as const })) })
+  renderApp(owner, '/owner')
+
+  const nav = await screen.findByRole('navigation', { name: 'Main' })
+  expect(within(nav).getByRole('link', { name: 'Owner' })).toHaveAttribute('aria-current', 'page')
+  expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+  expect(owner.api.owner.overview).toHaveBeenCalledWith('30d')
+})
+
+test('a player has no Owner link, and /owner goes home', async () => {
+  const deps = fakeDeps()
+  renderApp(deps, '/owner')
+
+  const nav = await screen.findByRole('navigation', { name: 'Main' })
+  expect(within(nav).queryByRole('link', { name: 'Owner' })).not.toBeInTheDocument()
+  expect(await screen.findByRole('link', { name: 'Games', current: 'page' })).toBeInTheDocument()
+  expect(deps.api.owner.overview).not.toHaveBeenCalled()
+})
+
 test('without a session the app offers Google sign-in', async () => {
   renderApp(fakeDeps({ me: vi.fn().mockRejectedValue(LOGGED_OUT) }))
 

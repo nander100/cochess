@@ -1,3 +1,4 @@
+import type { OwnerApi, PlayerFilters } from './ownerTypes'
 import { type CoachEvent, readCoachEvents } from './sse'
 import type {
   Billing,
@@ -140,6 +141,8 @@ export interface ApiClient {
   streamBaselineReport(onEvent: (event: CoachEvent) => void): Promise<void>
   /** The latest baseline report, or null before the first one. */
   baselineReport(): Promise<BaselineReport | null>
+  /** The owner dashboard (SPEC_V4 §10); 404 for anyone else. */
+  owner: OwnerApi
 }
 
 export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)): ApiClient {
@@ -268,7 +271,29 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
         throw error
       }
     },
+    owner: {
+      overview: (period) => request(`/api/admin/overview?period=${period}`),
+      players: (filters) => request(`/api/admin/users?${playerQuery(filters)}`),
+      player: (id) => request(`/api/admin/users/${encodeURIComponent(id)}`),
+      accept: (id) => post(`/api/admin/users/${encodeURIComponent(id)}/accept`, {}),
+      acceptMany: (ids) => post('/api/admin/users/accept', { user_ids: ids }),
+      suspend: (id, body) => post(`/api/admin/users/${encodeURIComponent(id)}/suspend`, body),
+      restore: (id) => post(`/api/admin/users/${encodeURIComponent(id)}/restore`, {}),
+      changeCredits: (id, credits, note) =>
+        post(`/api/admin/users/${encodeURIComponent(id)}/credits`, { credits, note }),
+      setMetering: (id, unmetered) => post(`/api/admin/users/${encodeURIComponent(id)}/metering`, { unmetered }),
+    },
   }
+}
+
+/** The players table's filters as a query string; empty and default values are left out. */
+export function playerQuery(filters: PlayerFilters): string {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(filters)) {
+    if (value === undefined || value === '' || value === false) continue
+    query.set(key, String(value))
+  }
+  return query.toString()
 }
 
 /** FastAPI errors: `detail` is a string, a `{message}` object (PGN errors), or a list (validation). */

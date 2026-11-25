@@ -30,6 +30,8 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ defa
 const BillingReturnPage = lazy(() =>
   import('./pages/BillingReturnPage').then((m) => ({ default: m.BillingReturnPage })),
 )
+// The owner dashboard (SPEC_V4 §10): its own chunk, only ever loaded by an owner.
+const OwnerArea = lazy(() => import('./owner/OwnerPage').then((m) => ({ default: m.OwnerArea })))
 
 type Session =
   | { kind: 'loading' }
@@ -77,15 +79,19 @@ interface AppProps {
 
 /** The main nav (docs/design/screens.md). "Analysis" and "Critical moments" open the latest game;
  * on a game's page, the moments view (?view=moments) highlights "Critical moments". */
-function mainNav(search: string): NavItem[] {
+function mainNav(search: string, owner: boolean): NavItem[] {
   const moments = new URLSearchParams(search).get('view') === 'moments'
   const onGame = (path: string) => path.startsWith('/games/')
+  const ownerLink: NavItem[] = owner
+    ? [{ to: '/owner', label: 'Owner', activeFor: (path) => path === '/owner' || path.startsWith('/owner/') }]
+    : []
   return [
     { to: '/games', label: 'Games', activeFor: (path) => path === '/games' || path === '/new' },
     { to: '/analysis', label: 'Analysis', activeFor: (path) => path === '/analysis' || (onGame(path) && !moments) },
     { to: '/moments', label: 'Critical moments', activeFor: (path) => path === '/moments' || (onGame(path) && moments) },
     { to: '/onboarding', label: 'Assessment', activeFor: (path) => path === '/onboarding' },
     { to: '/profile', label: 'Profile', activeFor: (path) => path === '/profile' },
+    ...ownerLink,
   ]
 }
 
@@ -194,6 +200,9 @@ function Shell({ deps }: AppProps) {
             }
           />
           <Route path="/billing/return" element={<BillingReturnPage api={pipeline.api} />} />
+          {session.profile.role === 'owner' && (
+            <Route path="/owner/*" element={<OwnerArea api={pipeline.api.owner} />} />
+          )}
           {session.profile.complete ? (
             <>
               <Route path="/" element={<Navigate to="/games" replace />} />
@@ -244,7 +253,7 @@ function AppHeader({ session, onLogOut }: AppHeaderProps) {
   return (
     <>
       <Header
-      nav={signedIn ? mainNav(search) : []}
+      nav={signedIn ? mainNav(search, session.profile.role === 'owner') : []}
       pathname={pathname}
       playerName={signedIn ? session.profile.name : null}
       theme={theme}

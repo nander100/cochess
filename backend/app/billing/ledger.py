@@ -117,16 +117,22 @@ def refund_credits(
 
 
 def adjust_by_owner(
-    session: Session, user: User, microusd: int, *, note: str, now: datetime
+    session: Session,
+    user: User,
+    microusd: int,
+    *,
+    note: str,
+    now: datetime,
+    source: str | None = None,
 ) -> CreditLedgerRow:
-    """Credits the owner adds or removes (dashboard or CLI), always with a note (SPEC_V4 §10)."""
+    """Credits the owner adds or removes (dashboard or CLI), always with a note (SPEC_V4 §10).
+    `source` names the owner action it came from (`admin_action:<id>`, SPEC_V4 §10.3)."""
     if not note.strip():
         raise ValueError("an owner grant or removal needs a note")
     kind = "owner_grant" if microusd >= 0 else "owner_removal"
-    entry = _record(
-        session, user.id, microusd, kind, f"owner:{uuid.uuid4()}", "lasting", now, note=note.strip()
-    )
-    if entry is None:  # a fresh uuid can't repeat
+    origin = source or f"owner:{uuid.uuid4()}"
+    entry = _record(session, user.id, microusd, kind, origin, "lasting", now, note=note.strip())
+    if entry is None:  # each action, like a fresh uuid, is recorded once
         raise RuntimeError("owner adjustment was not recorded")
     return entry
 

@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from sqlalchemy.orm import sessionmaker
 
+from app.admin import routes as admin_routes
 from app.api import billing_routes, games, profile, settings_routes, validation
 from app.api import coach as coach_routes
 from app.api import credits as credit_routes
@@ -105,4 +106,5 @@ def create_app(
     app.include_router(onboarding_import_routes.router)
     app.include_router(credit_routes.router)
     app.include_router(billing_routes.router)
+    app.include_router(admin_routes.router)
     return app

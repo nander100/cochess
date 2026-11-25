@@ -45,7 +45,10 @@ ROUTES = sorted(
     if path.startswith("/api/")
     for method in operations
 )
-PRIVATE = [route for route in ROUTES if route not in PUBLIC]
+# The owner dashboard (SPEC_V4 §10) answers 404 to everyone but an owner, signed in or not, so
+# it doesn't show it exists (tests/admin/test_admin_api.py checks players get 404 too).
+ADMIN = [route for route in ROUTES if route[1].startswith("/api/admin/")]
+PRIVATE = [route for route in ROUTES if route not in PUBLIC and route not in ADMIN]
 GAME_ROUTES = [route for route in PRIVATE if "{game_id}" in route[1]]
 
 
@@ -84,3 +87,17 @@ def test_another_players_game_is_not_found(
 
     assert _request(other, method, path, game_id) == 404
     assert _request(owner, method, path, game_id) != 404  # the owner gets past the check
+
+
+@pytest.mark.parametrize(("method", "path"), ADMIN)
+def test_owner_routes_are_not_found_without_a_login(
+    setup: tuple[FastAPI, TestClient, TestClient, str], method: str, path: str
+) -> None:
+    app, _, _, game_id = setup
+    url = path.replace("{user_id}", "someone")
+
+    assert _request(TestClient(app, base_url=BASE_URL), method, url, game_id) == 404
+
+
+def test_the_owner_routes_are_all_found() -> None:
+    assert len(ADMIN) >= 9  # overview, users, a user, bulk accept and five actions

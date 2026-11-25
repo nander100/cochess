@@ -282,7 +282,7 @@ class LlmUsageRow(Base):
     # `cli price-usage` fills them in. `tier` is the player's coach strength for the call.
     cost_microusd: Mapped[int | None] = mapped_column(BigInteger)
     tier: Mapped[str | None] = mapped_column(String(10))
-    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, index=True)
 
 
 class CreditLedgerRow(Base):
@@ -292,7 +292,10 @@ class CreditLedgerRow(Base):
     (trial, top-ups, owner grants)."""
 
     __tablename__ = "credit_ledger"
-    __table_args__ = (UniqueConstraint("kind", "source", name="uq_credit_ledger_kind_source"),)
+    __table_args__ = (
+        UniqueConstraint("kind", "source", name="uq_credit_ledger_kind_source"),
+        Index("ix_credit_ledger_kind_created_at", "kind", "created_at"),  # the owner dashboard
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     # NULL once the player's account is deleted (the money record is kept, anonymized).
@@ -319,6 +322,21 @@ class CreditBalanceRow(Base):
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, onupdate=_utcnow)
 
 
+class AdminActionRow(Base):
+    """The audit log of owner actions (SPEC_V4 §10.3): one row per action, from the dashboard or
+    the CLI (`admin_user_id` is NULL for the CLI, run on the server). `details` holds what the
+    action needed: a reason, credits, a note. Ledger entries the owner makes name their action."""
+
+    __tablename__ = "admin_actions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    admin_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    target_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
+    action: Mapped[str] = mapped_column(String(20))
+    details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+
+
 class BillingEventRow(Base):
     """Every payment-provider webhook event, stored once (SPEC_V4 §6.2): a repeat is acknowledged
     and ignored, and the amounts feed the owner dashboard's revenue."""
@@ -334,11 +352,14 @@ class BillingEventRow(Base):
     type: Mapped[str] = mapped_column(String(60))
     # NULL when the event names no player of ours, or once their account is deleted.
     user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
-    amount_cents: Mapped[int | None] = mapped_column(Integer)  # money in (negative: refunded)
+    # Money in; for a refund, minus everything refunded on that payment so far (the provider
+    # reports a running total), so revenue takes the latest refund per `object_id`.
+    amount_cents: Mapped[int | None] = mapped_column(Integer)
     currency: Mapped[str | None] = mapped_column(String(3))
+    object_id: Mapped[str | None] = mapped_column(String(80))  # the payment or invoice
     # applied | ignored | unmatched (no player found) | failed
     outcome: Mapped[str] = mapped_column(String(10))
-    received_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow)
+    received_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=_utcnow, index=True)
 
 
 class PendingToolCallRow(Base):

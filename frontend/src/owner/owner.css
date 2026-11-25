@@ -1,0 +1,345 @@
+/* The owner dashboard (SPEC_V4 §10). Tokens only. A ledger: big heading-font figures over hairline
+   rules, tabular numbers so columns line up, quiet labels, color only where it means something. */
+
+.owner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  font-variant-numeric: tabular-nums;
+}
+
+.owner-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.owner-title {
+  margin: 0;
+  font: var(--text-title);
+  letter-spacing: var(--tracking-title);
+}
+
+.owner-quiet {
+  margin: 0;
+  color: var(--color-muted);
+  font: var(--text-small);
+}
+
+.owner-sub {
+  display: block;
+  color: var(--color-muted);
+  font: var(--text-small);
+}
+
+.owner-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.owner-overview,
+.owner-players,
+.owner-waitlist,
+.owner-player {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* The money row: figures between rules, read left to right like a statement. */
+.owner-ledger {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--side-panel), 1fr));
+  border-block: var(--border-width) solid var(--color-fg);
+}
+
+.owner-figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-5) var(--space-5) var(--space-5) 0;
+}
+
+.owner-figure + .owner-figure {
+  padding-inline-start: var(--space-5);
+  border-inline-start: var(--border-width) solid var(--color-border);
+}
+
+.owner-figure p {
+  margin: 0;
+}
+
+.owner-figure-label {
+  color: var(--color-label);
+  font: var(--text-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.owner-figure-value {
+  font: var(--text-display);
+  letter-spacing: var(--tracking-display);
+}
+
+.owner-figure-note {
+  color: var(--color-muted);
+  font: var(--text-small);
+}
+
+.owner-loss {
+  color: var(--color-danger);
+}
+
+/* Cards: the wide ones span the row; the small ones sit side by side. */
+.owner-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--side-panel), 1fr));
+  gap: var(--space-4);
+}
+
+.owner-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+.owner-card-wide {
+  grid-column: 1 / -1;
+}
+
+.owner-card-double {
+  grid-column: span 2;
+}
+
+.owner-card-title {
+  margin: 0;
+  font: var(--text-panel);
+}
+
+.owner-chart {
+  margin: 0;
+  min-inline-size: 0;
+}
+
+.owner-split {
+  display: grid;
+  grid-template-columns: minmax(var(--field-min), 1fr) 2fr;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+/* Label on the left, number on the right, a hairline between rows. */
+.owner-facts {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.owner-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+  border-block-end: var(--border-width) solid var(--color-row-border);
+}
+
+.owner-fact:last-child {
+  border-block-end: 0;
+}
+
+.owner-fact dt {
+  color: var(--color-muted);
+}
+
+.owner-fact dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: end;
+}
+
+.owner-mini-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+
+.owner-mini-table th,
+.owner-mini-table td {
+  padding: var(--space-2) var(--space-3);
+  border-block-end: var(--border-width) solid var(--color-row-border);
+  text-align: end;
+}
+
+.owner-mini-table th[scope='row'],
+.owner-mini-table thead th:first-child {
+  color: var(--color-muted);
+  font-weight: 400;
+  text-align: start;
+}
+
+.owner-mini-table tbody tr:last-child > * {
+  border-block-end: 0;
+}
+
+/* The players table. */
+.owner-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.owner-search {
+  display: flex;
+  flex: 1 1 var(--field-min);
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.owner-search .ui-field {
+  flex: 1;
+}
+
+.owner-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--control-height);
+}
+
+.owner-num {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.owner-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.owner-sort:hover {
+  color: var(--color-link-hover);
+}
+
+.owner-sort:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.owner-sort-mark {
+  display: inline-block;
+  min-inline-size: 1ch;
+}
+
+.owner-name {
+  color: var(--color-link);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.owner-name:hover {
+  color: var(--color-link-hover);
+  text-decoration: underline;
+}
+
+.owner-check-cell {
+  inline-size: var(--space-8);
+}
+
+.owner-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+}
+
+/* One player. */
+.owner-back {
+  align-self: flex-start;
+  color: var(--color-link);
+  font: var(--text-small);
+}
+
+.owner-player-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.owner-player-head > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.owner-pills,
+.owner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.owner-actions {
+  justify-content: flex-end;
+}
+
+.owner-external {
+  align-self: flex-start;
+  color: var(--color-link);
+}
+
+.owner-audit {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.owner-audit li {
+  padding-block: var(--space-2);
+  padding-inline-start: var(--space-3);
+  border-inline-start: var(--border-width) solid var(--color-tint-border);
+}
+
+.owner-audit-what {
+  display: block;
+}
+
+/* Dialogs. */
+.owner-warning {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-danger);
+  border-radius: var(--radius-control);
+}
+
+.owner-warning p {
+  margin: 0;
+}
+
+.owner-dialog-error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.owner-confirm-list {
+  max-block-size: var(--chat-log-max);
+  margin: 0;
+  padding-inline-start: var(--space-5);
+  overflow-y: auto;
+}
