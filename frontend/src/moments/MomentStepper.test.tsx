@@ -52,6 +52,7 @@ test('a question goes to the moment and the server record replaces the pending m
   const api = fakeApi({ getGame: vi.fn(async () => ({ ...DETAIL, moments: [asked] })) })
   const { onUpdated } = renderStepper([open], api)
 
+  fireEvent.click(screen.getByRole('button', { name: 'Get a hint' }))
   fireEvent.change(screen.getByLabelText('Ask the coach about this moment'), { target: { value: 'A hint?' } })
   fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
 

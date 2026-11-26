@@ -20,6 +20,11 @@ vi.mock('./board/Board', () => ({
   ),
 }))
 
+/** The move list starts folded away on the game page; open it to click moves. */
+async function openMoves() {
+  fireEvent.click(await screen.findByRole('button', { name: 'Moves' }))
+}
+
 function renderApp(deps: PipelineDeps, path = '/new') {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -40,7 +45,22 @@ const LOGGED_OUT = new ApiError(401, "You're not logged in. Ask the owner for a 
 test('renders the app title', async () => {
   renderApp(fakeDeps())
 
-  expect(await screen.findByRole('heading', { name: 'CoChess' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'Tempo Labs' })).toBeInTheDocument()
+})
+
+test('the header switches between light and dark mode and remembers the choice', async () => {
+  window.localStorage.removeItem('tempo-labs-theme')
+  const { unmount } = renderApp(fakeDeps(), '/games')
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Switch to dark mode' }))
+  expect(document.documentElement.dataset.theme).toBe('dark')
+  expect(window.localStorage.getItem('tempo-labs-theme')).toBe('dark')
+  unmount()
+
+  renderApp(fakeDeps(), '/games') // a later visit starts dark
+  fireEvent.click(await screen.findByRole('button', { name: 'Switch to light mode' }))
+  expect(document.documentElement.dataset.theme).toBe('light')
+  window.localStorage.removeItem('tempo-labs-theme')
 })
 
 test('a new game is analyzed, then opens on the board with engine details and a synopsis', async () => {
@@ -141,7 +161,11 @@ test('a reopened game shows its stored synopsis and chat', async () => {
 test('the move list marks my mistake, and moves are explored with clicks, the board and arrow keys', async () => {
   renderApp(fakeDeps(), '/games/game-1')
 
-  const moves = await screen.findByLabelText('Moves')
+  const toggle = await screen.findByRole('button', { name: 'Moves' })
+  expect(toggle).toHaveAttribute('aria-expanded', 'false') // folded away until asked for
+  fireEvent.click(toggle)
+  expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  const moves = screen.getByLabelText('Moves')
   expect(within(moves).getByRole('button', { name: '2. Nf3, mistake' })).toHaveTextContent('Nf3?')
 
   fireEvent.click(within(moves).getByRole('button', { name: '1... e5' }))
@@ -162,6 +186,7 @@ test('the eval bar follows the position', async () => {
 
   const bar = await screen.findByRole('meter', { name: 'Evaluation' })
   expect(bar).toHaveAttribute('aria-valuenow', '50')
+  await openMoves()
   fireEvent.click(screen.getByRole('button', { name: '2. Nf3, mistake' }))
 
   expect(bar).toHaveAttribute('aria-valuenow', '30')
@@ -296,6 +321,7 @@ describe('chat and Explain are about the position on the board', () => {
     const deps = fakeDeps()
     renderApp(deps, '/games/game-1')
     // DETAIL stores a verify result for the position after 1... e5.
+    await openMoves()
     fireEvent.click(await screen.findByRole('button', { name: '1... e5' }))
 
     const body = await askHere(deps, 'What now?')
@@ -308,6 +334,7 @@ describe('chat and Explain are about the position on the board', () => {
   test('a variation: the browser analyzes it first and sends its result', async () => {
     const deps = fakeDeps()
     renderApp(deps, '/games/game-1')
+    await openMoves()
     fireEvent.click(await screen.findByRole('button', { name: '1... e5' }))
     fireEvent.click(screen.getByRole('button', { name: 'play Bc4' }))
 
@@ -329,6 +356,7 @@ describe('chat and Explain are about the position on the board', () => {
   test('Explain sends the board position and the answer appears in the chat', async () => {
     const deps = fakeDeps()
     renderApp(deps, '/games/game-1')
+    await openMoves()
     fireEvent.click(await screen.findByRole('button', { name: '1... e5' }))
 
     fireEvent.click(screen.getByRole('button', { name: 'Explain this position' }))
@@ -419,6 +447,7 @@ describe('critical moments', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show me' }))
 
     expect(await screen.findByText(/The engine's move:/)).toHaveTextContent('2. d4')
+    await openMoves()
     expect(screen.getByRole('button', { name: '2. Bc4' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '2. d4' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Live engine' })).toBeInTheDocument()

@@ -42,7 +42,7 @@ test.each([
 test('reports an unreachable server', async () => {
   const fetchImpl = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('Failed to fetch'))
 
-  await expect(createApiClient(fetchImpl).engineConfig()).rejects.toThrow("Couldn't reach the CoChess server")
+  await expect(createApiClient(fetchImpl).engineConfig()).rejects.toThrow("Couldn't reach the Tempo Labs server")
 })
 
 test('streams synopsis events from the SSE response', async () => {

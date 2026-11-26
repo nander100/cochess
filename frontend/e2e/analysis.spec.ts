@@ -39,7 +39,7 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
   await page.goto('/')
   // The Vite dev server can reload the page once while it bundles newly added dependencies.
   await page.waitForLoadState('networkidle')
-  await expect(page.getByRole('heading', { name: 'CoChess' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Tempo Labs' })).toBeVisible()
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(true)
   await expect(page.getByRole('alert')).toContainText("You're not logged in")
 
@@ -92,6 +92,7 @@ test('analyzes a real game in the browser with the multi-threaded engine', async
 
   // M2: the analysis board shows the game from the database.
   await expect(page.locator('cg-board piece')).toHaveCount(32)
+  await page.getByRole('button', { name: 'Moves' }).click() // folded by default
   const moves = page.getByLabel('Moves')
   expect(await moves.locator('button.move').count()).toBeGreaterThan(10)
   const marked = await moves.locator('button.move .glyph').count()

@@ -99,7 +99,7 @@ export function createApiClient(fetchImpl: typeof fetch = fetch.bind(globalThis)
         headers: { 'Content-Type': 'application/json', ...init?.headers },
       })
     } catch {
-      throw new ApiError(0, "Couldn't reach the CoChess server. Check your connection and try again.")
+      throw new ApiError(0, "Couldn't reach the Tempo Labs server. Check your connection and try again.")
     }
     if (!response.ok) {
       const body: unknown = await response.json().catch(() => null)

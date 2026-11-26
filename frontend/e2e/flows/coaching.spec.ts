@@ -20,6 +20,7 @@ test('a player uploads a game, reads the coach, and steps through a critical mom
   await expect(page).toHaveURL(/\/games\/[0-9a-f-]+$/, { timeout: 60_000 })
   const gameId = page.url().split('/').at(-1) ?? ''
   await expect(page.locator('cg-board')).toBeVisible()
+  await page.getByRole('button', { name: 'Moves' }).click() // folded by default
   await page.getByRole('button', { name: '3. Ng5' }).click()
   await expect(page.locator('.eval-bar')).toBeVisible()
 

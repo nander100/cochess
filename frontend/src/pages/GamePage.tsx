@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useLocation, useParams } from 'react-router'
 import { type ChatDeps, type ChatProgress, askCoach, explainPosition } from '../analysis/chat'
 import { BeforeSearches, type MomentDeps, fenAfter } from '../analysis/moments'
@@ -206,7 +206,7 @@ function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: Analysi
       : positionEval(node, detail, stored)
   const points = graphPoints(detail)
   return (
-    <section className="analysis" aria-label="Analysis board">
+    <section className={`analysis${locked ? ' focus' : ''}`} aria-label="Analysis board">
       <GameHeading detail={detail} />
       {detail.status !== 'analyzed' && (
         <ResumeAnalysis detail={detail} deps={deps} onLoggedOut={onLoggedOut} onDone={onAnalyzed} />
@@ -242,7 +242,7 @@ function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: Analysi
               ⏭
             </button>
           </div>
-          {points.length > 1 && (
+          {points.length > 1 && !locked && (
             <EvalGraph
               points={points}
               userColor={detail.user_color}
@@ -258,10 +258,6 @@ function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: Analysi
           {fresh && <EngineStats run={fresh} />}
         </div>
         <div className="side-column">
-          <div className="panel">
-            <h2 className="panel-title">Moves</h2>
-            <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} />
-          </div>
           {detail.status === 'analyzed' && moments.length > 0 && (
             <div className="tabs" role="tablist" aria-label="Coaching">
               <button type="button" role="tab" aria-selected={tab === 'coach'} onClick={() => openTab('coach')}>
@@ -299,7 +295,39 @@ function AnalysisBoard({ detail, deps, fresh, onLoggedOut, onAnalyzed }: Analysi
               onLoggedOut={onLoggedOut}
             />
           )}
+          {!locked && (
+            <MovesPanel>
+              <MoveList tree={tree} current={current} userColor={detail.user_color} onSelect={navigate} />
+            </MovesPanel>
+          )}
         </div>
+      </div>
+    </section>
+  )
+}
+
+/** The move list, folded away until asked for: the board and the coach come first. */
+function MovesPanel({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const id = useId()
+  return (
+    <section className="panel moves-panel">
+      <h2 className="panel-title">
+        <button
+          type="button"
+          className="disclosure"
+          aria-expanded={open}
+          aria-controls={id}
+          onClick={() => setOpen((shown) => !shown)}
+        >
+          <span>Moves</span>
+          <span className="disclosure-hint" aria-hidden="true">
+            {open ? 'Hide' : 'Show'}
+          </span>
+        </button>
+      </h2>
+      <div id={id} hidden={!open}>
+        {children}
       </div>
     </section>
   )

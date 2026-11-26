@@ -48,7 +48,8 @@ interface MomentStepperProps {
   onLoggedOut: () => void
 }
 
-/** The critical-moment exercise (SPEC_V2 §8.2): intro → attempts → feedback → reveal → next. */
+/** The critical-moment exercise (SPEC_V2 §8.2): intro → attempts → feedback → reveal → next.
+ * One task at a time: the instruction, the latest coach message, and one main action. */
 export function MomentStepper(props: MomentStepperProps) {
   const { gameId, moments, current, onSelect, fen, candidate, onTakeBack, deps, searches, onUpdated, onLoggedOut } =
     props
@@ -61,6 +62,7 @@ export function MomentStepper(props: MomentStepperProps) {
   const [reasoning, setReasoning] = useState('')
   const [question, setQuestion] = useState('')
   const [lastGrade, setLastGrade] = useState<string | null>(null)
+  const [hintOpen, setHintOpen] = useState(false)
   const busy = progress !== null
   const last = moments[moments.length - 1]
   const wrapUp = last.messages.find((m) => m.kind === 'wrap_up')
@@ -85,6 +87,7 @@ export function MomentStepper(props: MomentStepperProps) {
   }
 
   function select(index: number) {
+    setHintOpen(false)
     setPending([])
     setLastGrade(null)
     setError(null)
@@ -137,40 +140,66 @@ export function MomentStepper(props: MomentStepperProps) {
   const next = moments[position + 1]
   const open = moment.state === 'intro' || moment.state === 'attempt'
 
+  const side = moment.side === 'white' ? 'White' : 'Black'
+  const task =
+    moment.state === 'solved'
+      ? 'Solved!'
+      : moment.state === 'revealed'
+        ? "Here's the engine's move."
+        : `${side} to move. Find a better move.`
+  // The latest exchange stays in view; anything older folds away.
+  const recent = messages.slice(-2)
+  const older = messages.slice(0, -2)
+
   return (
     <section className="moments" aria-label="Critical moments">
-      <ol className="moment-list" aria-label="Moments in this game">
-        {moments.map((m) => (
-          <li key={m.index}>
-            <button
-              type="button"
-              className={`moment-chip ${m.state}`}
-              aria-current={m.index === moment.index ? 'step' : undefined}
-              disabled={busy}
-              onClick={() => select(m.index)}
-            >
-              {numbered(m, m.san)}
-              <span className="visually-hidden"> ({stateText(m)})</span>
-            </button>
-          </li>
-        ))}
-      </ol>
+      <div className="moment-progress">
+        <ol className="moment-list" aria-label="Moments in this game">
+          {moments.map((m) => (
+            <li key={m.index}>
+              <button
+                type="button"
+                className={`moment-chip ${m.state}`}
+                aria-current={m.index === moment.index ? 'step' : undefined}
+                disabled={busy}
+                onClick={() => select(m.index)}
+              >
+                <span className="visually-hidden">
+                  {numbered(m, m.san)} ({stateText(m)})
+                </span>
+              </button>
+            </li>
+          ))}
+        </ol>
+        <span className="moment-count" aria-hidden="true">
+          {position + 1} / {moments.length}
+        </span>
+      </div>
 
-      <h2>
-        Moment {position + 1} of {moments.length}
+      <h2 className="moment-task">
+        <span className="visually-hidden">
+          Moment {position + 1} of {moments.length}:{' '}
+        </span>
+        {task}
       </h2>
       <p className="moment-summary">
-        You played <strong>{numbered(moment, moment.san)}</strong> ({moment.label.replace('_', ' ')}):{' '}
-        {moment.eval_before} → {moment.eval_after}
+        In the game you played <strong>{numbered(moment, moment.san)}</strong> ({moment.label.replace('_', ' ')}).
       </p>
 
-      {messages.length > 0 && (
-        <ul ref={log} className="chat-log" aria-live="polite">
-          {messages.map((message, i) => (
-            <li key={i} className={`chat-message ${message.role}`}>
-              <span className="chat-author">{message.role === 'coach' ? 'Coach' : 'You'}</span>
-              <Markdown>{message.text}</Markdown>
-            </li>
+      {older.length > 0 && (
+        <details className="moment-earlier">
+          <summary>Earlier messages ({older.length})</summary>
+          <ul className="chat-log">
+            {older.map((message, i) => (
+              <MessageItem key={i} message={message} />
+            ))}
+          </ul>
+        </details>
+      )}
+      {recent.length > 0 && (
+        <ul ref={log} className="chat-log moment-recent" aria-live="polite">
+          {recent.map((message, i) => (
+            <MessageItem key={older.length + i} message={message} />
           ))}
         </ul>
       )}
@@ -183,60 +212,68 @@ export function MomentStepper(props: MomentStepperProps) {
       )}
 
       {moment.state === 'new' && (
-        <button type="button" onClick={start} disabled={busy}>
+        <button type="button" className="primary-action" onClick={start} disabled={busy}>
           Start this moment
         </button>
       )}
 
-      {open && (
-        <div className="moment-controls">
-          {candidate ? (
-            <form className="moment-attempt" onSubmit={check}>
-              <p>
-                Your move: <strong>{numbered(moment, sanOf(fen, candidate))}</strong>
-              </p>
-              <label htmlFor={`${id}-why`}>Why this move? (optional)</label>
-              <textarea
-                id={`${id}-why`}
-                value={reasoning}
-                maxLength={MAX_TEXT_CHARS}
-                rows={2}
-                onChange={(event) => setReasoning(event.target.value)}
-                disabled={busy}
-              />
-              <div className="moment-actions">
-                <button type="submit" disabled={busy}>
-                  Check my move
-                </button>
-                <button type="button" className="secondary" onClick={onTakeBack} disabled={busy}>
-                  Take back
-                </button>
-              </div>
-            </form>
-          ) : (
-            <p className="chat-hint">{busy ? 'Waiting for the coach…' : 'Play your move on the board.'}</p>
-          )}
-          <form className="chat-form" onSubmit={ask}>
-            <label className="visually-hidden" htmlFor={`${id}-ask`}>
-              Ask the coach about this moment
-            </label>
-            <input
-              id={`${id}-ask`}
-              value={question}
+      {open &&
+        (candidate ? (
+          <form className="moment-attempt" onSubmit={check}>
+            <p>
+              Your move: <strong>{numbered(moment, sanOf(fen, candidate))}</strong>
+            </p>
+            <label htmlFor={`${id}-why`}>Why this move? (optional)</label>
+            <textarea
+              id={`${id}-why`}
+              value={reasoning}
               maxLength={MAX_TEXT_CHARS}
-              placeholder="Ask for a hint…"
-              onChange={(event) => setQuestion(event.target.value)}
+              rows={1}
+              onChange={(event) => setReasoning(event.target.value)}
               disabled={busy}
             />
-            <button type="submit" disabled={busy || !question.trim()}>
-              Ask
-            </button>
+            <div className="moment-actions">
+              <button type="submit" className="primary-action" disabled={busy}>
+                Check my move
+              </button>
+              <button type="button" className="quiet" onClick={onTakeBack} disabled={busy}>
+                Take back
+              </button>
+            </div>
           </form>
-          <button type="button" className="secondary" onClick={reveal} disabled={busy}>
-            Show me
-          </button>
-        </div>
-      )}
+        ) : (
+          <div className="moment-controls">
+            <p className="moment-prompt">{busy ? 'Waiting for the coach…' : 'Play your move on the board.'}</p>
+            {hintOpen && (
+              <form className="chat-form" onSubmit={ask}>
+                <label className="visually-hidden" htmlFor={`${id}-ask`}>
+                  Ask the coach about this moment
+                </label>
+                <input
+                  id={`${id}-ask`}
+                  value={question}
+                  maxLength={MAX_TEXT_CHARS}
+                  placeholder="Ask for a hint…"
+                  onChange={(event) => setQuestion(event.target.value)}
+                  disabled={busy}
+                />
+                <button type="submit" disabled={busy || !question.trim()}>
+                  Ask
+                </button>
+              </form>
+            )}
+            <div className="moment-help">
+              {!hintOpen && (
+                <button type="button" className="quiet" onClick={() => setHintOpen(true)} disabled={busy}>
+                  Get a hint
+                </button>
+              )}
+              <button type="button" className="quiet" onClick={reveal} disabled={busy}>
+                Show me
+              </button>
+            </div>
+          </div>
+        ))}
 
       {!isUnsolved(moment) && (
         <div className="moment-controls">
@@ -247,13 +284,13 @@ export function MomentStepper(props: MomentStepperProps) {
             </p>
           )}
           {next ? (
-            <button type="button" onClick={() => select(next.index)} disabled={busy}>
+            <button type="button" className="primary-action" onClick={() => select(next.index)} disabled={busy}>
               Next moment
             </button>
           ) : (
             moments.every((m) => !isUnsolved(m)) &&
             !wrapUp && (
-              <button type="button" onClick={finish} disabled={busy}>
+              <button type="button" className="primary-action" onClick={finish} disabled={busy}>
                 Wrap up
               </button>
             )
@@ -267,6 +304,15 @@ export function MomentStepper(props: MomentStepperProps) {
         </div>
       )}
     </section>
+  )
+}
+
+function MessageItem({ message }: { message: MomentMessage }) {
+  return (
+    <li className={`chat-message ${message.role}`}>
+      <span className="chat-author">{message.role === 'coach' ? 'Coach' : 'You'}</span>
+      <Markdown>{message.text}</Markdown>
+    </li>
   )
 }
 
